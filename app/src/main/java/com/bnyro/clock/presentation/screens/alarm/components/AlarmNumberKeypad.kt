@@ -28,7 +28,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun AlarmNumberKeypad(
     onOperation: (NumberKeypadOperation) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val view = LocalView.current
     val coroutineScope = rememberCoroutineScope()
@@ -54,6 +55,7 @@ fun AlarmNumberKeypad(
                 rowNumbers.forEach { number ->
                     AlarmNumPadButton(
                         number = number,
+                        enabled = enabled,
                         modifier = Modifier.weight(1f),
                         onOperation = onOperation
                     )
@@ -68,11 +70,13 @@ fun AlarmNumberKeypad(
         ) {
             AlarmNumPadButton(
                 number = "00",
+                enabled = enabled,
                 modifier = Modifier.weight(1f),
                 onOperation = onOperation
             )
             AlarmNumPadButton(
                 number = "0",
+                enabled = enabled,
                 modifier = Modifier.weight(1f),
                 onOperation = onOperation
             )
@@ -90,7 +94,12 @@ fun AlarmNumberKeypad(
                     }
                     onOperation(NumberKeypadOperation.Clear)
                 },
-                color = MaterialTheme.colorScheme.secondaryContainer,
+                enabled = enabled,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
                 modifier = Modifier
                     .weight(1f)
                     .aspectRatio(1f)
@@ -102,7 +111,11 @@ fun AlarmNumberKeypad(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Backspace,
                         contentDescription = stringResource(R.string.delete),
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        tint = if (enabled) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                 }
             }
@@ -113,8 +126,9 @@ fun AlarmNumberKeypad(
 @Composable
 fun AlarmNumPadButton(
     number: String,
+    onOperation: (NumberKeypadOperation) -> Unit,
     modifier: Modifier = Modifier,
-    onOperation: (NumberKeypadOperation) -> Unit
+    enabled: Boolean = true
 ) {
     val view = LocalView.current
     val coroutineScope = rememberCoroutineScope()
@@ -126,8 +140,13 @@ fun AlarmNumPadButton(
             }
             onOperation(NumberKeypadOperation.AddNumber(number))
         },
+        enabled = enabled,
         modifier = modifier.aspectRatio(1f),
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+        color = if (enabled) {
+            MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        }
     ) {
         Box(
             modifier = Modifier.fillMaxWidth(),
@@ -135,7 +154,11 @@ fun AlarmNumPadButton(
         ) {
             Text(
                 text = number,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 fontSize = MaterialTheme.typography.displaySmall.fontSize
             )
         }

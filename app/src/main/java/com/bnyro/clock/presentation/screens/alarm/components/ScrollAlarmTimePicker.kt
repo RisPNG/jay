@@ -29,6 +29,7 @@ import com.bnyro.clock.presentation.screens.timer.components.ScrollTimePicker
 fun ScrollAlarmTimePicker(
     initialHours: Int,
     initialMinutes: Int,
+    enabled: Boolean = true,
     onHoursChanged: (Int) -> Unit,
     onMinutesChanged: (Int) -> Unit
 ) {
@@ -63,7 +64,8 @@ fun ScrollAlarmTimePicker(
                         onHoursChanged(updatedHours)
                     },
                     maxValue = if (is24Hour) 24 else 12,
-                    offset = if (is24Hour) 0 else 1
+                    offset = if (is24Hour) 0 else 1,
+                    enabled = enabled
                 )
 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -71,12 +73,13 @@ fun ScrollAlarmTimePicker(
                 ScrollTimePicker(
                     value = initialMinutes,
                     onValueChanged = { onMinutesChanged(it) },
-                    maxValue = 60
+                    maxValue = 60,
+                    enabled = enabled
                 )
 
                 if (!is24Hour) {
                     Spacer(modifier = Modifier.width(16.dp))
-                    MeridiemPicker(value = meridiem, onValueChanged = { newMeridiem ->
+                    MeridiemPicker(value = meridiem, enabled = enabled, onValueChanged = { newMeridiem ->
                         val h = initialHours % 12
                         val current12Hour = if (h == 0) 12 else h
 
@@ -96,29 +99,31 @@ fun ScrollAlarmTimePicker(
 @Composable
 fun MeridiemPicker(
     value: Meridiem,
+    enabled: Boolean = true,
     onValueChanged: (Meridiem) -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
-    val primaryMuted = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
     val state = rememberPagerState(initialPage = 200 + value.ordinal + 1) {
         400
     }
     val currentPage = state.currentPage + 1
 
     LaunchedEffect(currentPage) {
-        onValueChanged(Meridiem.entries[currentPage % 2])
+        if (enabled) onValueChanged(Meridiem.entries[currentPage % 2])
     }
 
     VerticalPager(
         modifier = Modifier.height(224.dp),
         state = state,
         pageSpacing = 16.dp,
-        pageSize = PageSize.Fixed(64.dp)
+        pageSize = PageSize.Fixed(64.dp),
+        userScrollEnabled = enabled
     ) { index ->
         Text(
             text = Meridiem.entries[index % 2].name,
             style = MaterialTheme.typography.displayMedium,
-            color = if (index == currentPage) primary else primaryMuted
+            color = if (enabled && index == currentPage) primary else secondary
         )
     }
 }

@@ -14,9 +14,7 @@ class SocialSyncWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result = try {
         val result = (applicationContext as App).container.socialRepository.synchronize()
-        result.newActivity.filter { it.deviceId != result.deviceId }.forEach {
-            SocialNotificationHelper.notify(applicationContext, it)
-        }
+        SocialNotificationHelper.notifyNewActivity(applicationContext, result)
         Result.success()
     } catch (_: Exception) {
         Result.retry()

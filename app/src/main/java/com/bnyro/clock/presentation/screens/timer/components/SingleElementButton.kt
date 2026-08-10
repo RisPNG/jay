@@ -23,6 +23,7 @@ fun SingleElementButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
+    enabled: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(5.dp),
     color: Color = MaterialTheme.colorScheme.inverseOnSurface,
     content: @Composable RowScope.() -> Unit
@@ -34,7 +35,7 @@ fun SingleElementButton(
                 onLongClick = onLongClick,
                 interactionSource = remember { MutableInteractionSource() },
                 cornerRadiusRange = 30..50,
-                enabled = true
+                enabled = enabled
             )
             .then(modifier),
         color = color

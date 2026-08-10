@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.bnyro.clock.App
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.navigation.HomeRoutes
 import com.bnyro.clock.navigation.MainNavContainer
@@ -28,17 +30,23 @@ import com.bnyro.clock.presentation.screens.permission.PermissionModel
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.presentation.screens.stopwatch.model.StopwatchModel
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
+import com.bnyro.clock.social.presentation.SocialNotificationHelper
 import com.bnyro.clock.ui.theme.ClockYouTheme
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.ThemeUtil
 import com.bnyro.clock.util.services.StopwatchService
 import com.bnyro.clock.util.services.TimerService
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     val stopwatchModel by viewModels<StopwatchModel>()
     val timerModel by viewModels<TimerModel>()
     private var initialTab: HomeRoutes = HomeRoutes.Alarm
+    private var socialLiveSyncJob: Job? = null
 
     lateinit var stopwatchService: StopwatchService
 
@@ -151,6 +159,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        socialLiveSyncJob = lifecycleScope.launch {
+            while (isActive) {
+                runCatching {
+                    (application as App).container.socialRepository.followLiveChanges {
+                        SocialNotificationHelper.notifyNewActivity(this@MainActivity, it)
+                    }
+                }
+                if (isActive) delay(2_000)
+            }
+        }
         Intent(this, StopwatchService::class.java).also { intent ->
             bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         }
@@ -167,6 +185,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        socialLiveSyncJob?.cancel()
+        socialLiveSyncJob = null
         unbindService(serviceConnection)
         unbindService(timerServiceConnection)
     }

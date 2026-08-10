@@ -139,6 +139,7 @@ fun AlarmPicker(
                     initialHours = hours,
                     initialMinutes = minutes,
                     isEditing = currentAlarm.id != 0L,
+                    enabled = canSave,
                     onHoursChanged = { hours = it },
                     onMinutesChanged = { minutes = it }
                 )
@@ -146,6 +147,7 @@ fun AlarmPicker(
                 ScrollAlarmTimePicker(
                     initialHours = hours,
                     initialMinutes = minutes,
+                    enabled = canSave,
                     onHoursChanged = { hours = it },
                     onMinutesChanged = { minutes = it }
                 )
@@ -155,7 +157,7 @@ fun AlarmPicker(
             ExposedDropdownMenuBox(
                 expanded = groupMenuExpanded,
                 onExpandedChange = {
-                    if (isNewAlarm) groupMenuExpanded = !groupMenuExpanded
+                    if (isNewAlarm && canSave) groupMenuExpanded = !groupMenuExpanded
                 }
             ) {
                 OutlinedTextField(
@@ -166,7 +168,7 @@ fun AlarmPicker(
                         ?: stringResource(R.string.personal_alarm),
                     onValueChange = {},
                     readOnly = true,
-                    enabled = isNewAlarm,
+                    enabled = isNewAlarm && canSave,
                     label = { Text(stringResource(R.string.alarm_group)) },
                     trailingIcon = {
                         if (isNewAlarm) ExposedDropdownMenuDefaults.TrailingIcon(groupMenuExpanded)
@@ -200,6 +202,7 @@ fun AlarmPicker(
                 SwitchItem(
                     title = stringResource(R.string.repeat),
                     isChecked = repeat,
+                    enabled = canSave,
                     onClick = { newValue ->
                         repeat = newValue
                     },
@@ -222,16 +225,24 @@ fun AlarmPicker(
                                 modifier = Modifier
                                     .size(30.dp)
                                     .background(
-                                        if (enabled) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        when {
+                                            enabled && canSave -> MaterialTheme.colorScheme.primary
+                                            enabled -> MaterialTheme.colorScheme.surfaceVariant
+                                            else -> Color.Transparent
+                                        },
                                         CircleShape
                                     )
                                     .clip(CircleShape)
                                     .border(
                                         if (enabled) 0.dp else 1.dp,
-                                        MaterialTheme.colorScheme.primary,
+                                        if (canSave) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.outlineVariant
+                                        },
                                         CircleShape
                                     )
-                                    .clickable {
+                                    .clickable(enabled = canSave) {
                                         if (enabled) {
                                             if (chosenDays.size > 1) chosenDays.remove(index)
                                         } else {
@@ -244,7 +255,11 @@ fun AlarmPicker(
                             ) {
                                 Text(
                                     text = day,
-                                    color = if (enabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
+                                    color = when {
+                                        enabled && canSave -> MaterialTheme.colorScheme.onPrimary
+                                        canSave -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
                                 )
                             }
                         }
@@ -257,6 +272,7 @@ fun AlarmPicker(
                     OutlinedTextField(
                         modifier = Modifier.fillMaxWidth(),
                         value = label,
+                        enabled = canSave,
                         onValueChange = {
                             label = it
                         },
@@ -278,6 +294,7 @@ fun AlarmPicker(
                     title = stringResource(R.string.sound),
                     description = soundName ?: stringResource(R.string.default_sound),
                     isChecked = soundEnabled,
+                    enabled = canSave,
                     icon = Icons.Rounded.Alarm,
                     onClick = {
                         showRingtoneDialog = true
@@ -293,6 +310,7 @@ fun AlarmPicker(
                         vibrationPatternName
                     ),
                     isChecked = vibrationEnabled,
+                    enabled = canSave,
                     icon = Icons.Rounded.Vibration,
                     onClick = {
                         showVibrationDialog = true
@@ -311,6 +329,7 @@ fun AlarmPicker(
                         )
                     },
                     isChecked = snoozeEnabled,
+                    enabled = canSave,
                     icon = Icons.Rounded.Snooze,
                     onClick = {
                         showSnoozeDialog = true

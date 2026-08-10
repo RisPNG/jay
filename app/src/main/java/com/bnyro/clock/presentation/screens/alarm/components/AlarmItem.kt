@@ -42,6 +42,7 @@ fun AlarmItem(
     alarm: Alarm,
     groupName: String? = null,
     deliveryCount: AlarmDeliveryCount? = null,
+    canEdit: Boolean = true,
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
     onClick: (Alarm) -> Unit,
@@ -63,7 +64,7 @@ fun AlarmItem(
 
     SwipeToDismissBox(
         state = dismissState,
-        enableDismissFromStartToEnd = !isSelectionMode,
+        enableDismissFromStartToEnd = !isSelectionMode && canEdit,
         enableDismissFromEndToStart = false,
         content = {
             val cardShape = RoundedCornerShape(20.dp)
@@ -85,19 +86,24 @@ fun AlarmItem(
                         }
                     )
                     .combinedClickable(
-                        onClick = { onClick(alarm) },
-                        onLongClick = { onLongClick(alarm) }
+                        onClick = {
+                            if (!isSelectionMode || canEdit) onClick(alarm)
+                        },
+                        onLongClick = {
+                            if (canEdit) onLongClick(alarm)
+                        }
                     )
             ) {
                 AlarmCard(
                     alarm = alarm,
                     groupName = groupName,
                     deliveryCount = deliveryCount,
+                    canEdit = canEdit,
                     onClick = {
                     },
                     isAlarmEnabled = isAlarmEnabled,
                     onEnable = { enabled ->
-                        if (!isSelectionMode) {
+                        if (!isSelectionMode && canEdit) {
                             isAlarmEnabled = enabled
                             alarm.enabled = enabled
                             onUpdateAlarm.invoke(alarm)

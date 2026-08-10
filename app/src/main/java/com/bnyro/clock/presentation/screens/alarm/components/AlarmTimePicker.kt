@@ -36,6 +36,7 @@ fun AlarmTimePicker(
     initialHours: Int,
     initialMinutes: Int,
     isEditing: Boolean,
+    enabled: Boolean = true,
     onHoursChanged: (Int) -> Unit,
     onMinutesChanged: (Int) -> Unit
 ) {
@@ -105,7 +106,11 @@ fun AlarmTimePicker(
                     Text(
                         text = displayString.substring(0, 2),
                         style = MaterialTheme.typography.displayLarge.copy(fontSize = 64.sp),
-                        color = MaterialTheme.colorScheme.primary
+                        color = if (enabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                     Text(
                         text = ":",
@@ -118,7 +123,11 @@ fun AlarmTimePicker(
                     Text(
                         text = displayString.substring(2, 4),
                         style = MaterialTheme.typography.displayLarge.copy(fontSize = 64.sp),
-                        color = MaterialTheme.colorScheme.primary
+                        color = if (enabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
                 }
 
@@ -128,12 +137,16 @@ fun AlarmTimePicker(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         AmPmSelector(
-                            label = Meridiem.AM.name, isSelected = meridiem == Meridiem.AM
+                            label = Meridiem.AM.name,
+                            isSelected = meridiem == Meridiem.AM,
+                            enabled = enabled
                         ) {
                             meridiem = Meridiem.AM
                         }
                         AmPmSelector(
-                            label = Meridiem.PM.name, isSelected = meridiem == Meridiem.PM
+                            label = Meridiem.PM.name,
+                            isSelected = meridiem == Meridiem.PM,
+                            enabled = enabled
                         ) {
                             meridiem = Meridiem.PM
                         }
@@ -143,6 +156,7 @@ fun AlarmTimePicker(
         }
 
         AlarmNumberKeypad(
+            enabled = enabled,
             onOperation = { operation ->
                 when (operation) {
                     is NumberKeypadOperation.AddNumber -> {
@@ -166,7 +180,10 @@ fun AlarmTimePicker(
 
 @Composable
 private fun AmPmSelector(
-    label: String, isSelected: Boolean, onClick: () -> Unit
+    label: String,
+    isSelected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -175,14 +192,17 @@ private fun AmPmSelector(
                 if (isSelected) MaterialTheme.colorScheme.tertiaryContainer
                 else MaterialTheme.colorScheme.surfaceVariant
             )
-            .clickable { onClick() }
+            .clickable(enabled = enabled) { onClick() }
             .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = if (isSelected) MaterialTheme.colorScheme.onTertiaryContainer
-            else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (enabled && isSelected) {
+                MaterialTheme.colorScheme.onTertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
         )
     }
 }

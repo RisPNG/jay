@@ -21,22 +21,24 @@ fun ScrollTimePicker(
     value: Int,
     onValueChanged: (Int) -> Unit,
     maxValue: Int,
-    offset: Int = 0
+    offset: Int = 0,
+    enabled: Boolean = true
 ) {
     val primary = MaterialTheme.colorScheme.primary
-    val primaryMuted = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
     val state = rememberPagerState(initialPage = maxValue * 100 + value - 1 - offset) {
         maxValue * 200
     }
     val currentPage = state.currentPage + 1
     LaunchedEffect(currentPage) {
-        onValueChanged((currentPage + offset) % maxValue)
+        if (enabled) onValueChanged((currentPage + offset) % maxValue)
     }
     VerticalPager(
         modifier = Modifier.height(224.dp),
         state = state,
         pageSpacing = 16.dp,
         pageSize = PageSize.Fixed(64.dp),
+        userScrollEnabled = enabled,
         flingBehavior = PagerDefaults.flingBehavior(
             state = state,
             pagerSnapDistance = PagerSnapDistance.atMost(60)
@@ -47,7 +49,7 @@ fun ScrollTimePicker(
         Text(
             text = String.format("%02d", number),
             style = MaterialTheme.typography.displayMedium,
-            color = if (index == currentPage) primary else primaryMuted
+            color = if (enabled && index == currentPage) primary else secondary
         )
     }
 }

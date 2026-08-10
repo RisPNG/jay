@@ -37,7 +37,7 @@ class PushTokenUpdate(BaseModel):
 class GroupCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     alarm_permission: AlarmPermission = AlarmPermission.EVERYONE
-    notify_snoozed: bool = False
+    notify_snoozed: bool = True
     notify_dismissed: bool = True
 
 

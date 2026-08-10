@@ -30,6 +30,9 @@ data class SocialGroup(
     val role: MemberRole
 )
 
+val SocialGroup.canEditAlarms: Boolean
+    get() = alarmPermission == AlarmPermission.EVERYONE || role == MemberRole.LEADER
+
 @Entity(tableName = "social_members", primaryKeys = ["groupId", "deviceId"])
 data class SocialMember(
     val groupId: String,

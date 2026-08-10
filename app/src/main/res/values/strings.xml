@@ -63,8 +63,8 @@
     <string name="leaders_only" translatable="false">Only leaders can edit alarms</string>
     <string name="everyone_can_edit_alarms" translatable="false">Everyone can edit alarms</string>
     <string name="leaders_can_edit_alarms" translatable="false">Only leaders can edit alarms</string>
-    <string name="notify_snoozed" translatable="false">Notify everyone when someone snoozes</string>
-    <string name="notify_dismissed" translatable="false">Notify everyone when someone dismisses</string>
+    <string name="notify_snoozed" translatable="false">Notify group on snooze</string>
+    <string name="notify_dismissed" translatable="false">Notify group on dismiss</string>
     <string name="remove_member" translatable="false">Remove member</string>
     <string name="no_groups" translatable="false">Create a group or join one with an invitation.</string>
     <string name="sync" translatable="false">Synchronize</string>
@@ -75,6 +75,9 @@
     <string name="jay_server" translatable="false">Jay server</string>
     <string name="server_privacy_notice" translatable="false">The selected Jay server can read group names, alarms, and activity. Changing servers removes this device’s current shared alarms. Use a server you trust.</string>
     <string name="clock_you_attribution" translatable="false">Jay is based on Clock You by You Apps and remains available under GPLv3.</string>
+    <string name="jay_version" translatable="false">Jay Version</string>
+    <string name="clock_you_version" translatable="false">Clock You Version</string>
+    <string name="version_value" translatable="false">%1$s (%2$s)</string>
     <string name="recent_activity" translatable="false">Recent activity</string>
     <string name="alarm_delivery_count" translatable="false">Delivered to %1$d of %2$d devices</string>
     <string name="timer_use_big_start">Use big start button</string>

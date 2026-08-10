@@ -1,6 +1,6 @@
 # Jay server
 
-The Jay server synchronizes device identities, groups, alarm revisions, delivery acknowledgements, and snooze or dismissal activity. Android clients communicate with this API; they never connect directly to PostgreSQL.
+The Jay server synchronizes device identities, groups, alarm revisions, delivery acknowledgements, and snooze or dismissal activity. Authenticated server-sent events make changes appear immediately while Jay is open; Firebase and periodic synchronization recover changes while it is in the background. Android clients communicate with this API and never connect directly to PostgreSQL.
 
 ## Local development
 

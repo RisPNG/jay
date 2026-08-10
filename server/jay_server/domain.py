@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -39,6 +40,18 @@ def record_group_change(
     connection.execute(
         "INSERT INTO changes (group_id, entity_type, entity_id) VALUES (%s, %s, %s)",
         (group_id, entity_type, entity_id),
+    )
+    connection.execute(
+        "SELECT pg_notify('jay_changes', %s)",
+        (
+            json.dumps(
+                {
+                    "group_id": str(group_id),
+                    "entity_type": entity_type,
+                    "entity_id": entity_id,
+                }
+            ),
+        ),
     )
 
 

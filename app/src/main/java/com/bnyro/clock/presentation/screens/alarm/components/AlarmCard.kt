@@ -38,6 +38,7 @@ fun AlarmCard(
     alarm: Alarm,
     groupName: String? = null,
     deliveryCount: AlarmDeliveryCount? = null,
+    canEdit: Boolean = true,
     onClick: () -> Unit,
     isAlarmEnabled: Boolean,
     onEnable: (Boolean) -> Unit
@@ -152,7 +153,8 @@ fun AlarmCard(
 
             Switch(
                 checked = isAlarmEnabled,
-                onCheckedChange = onEnable
+                onCheckedChange = onEnable,
+                enabled = canEdit
             )
         }
     }

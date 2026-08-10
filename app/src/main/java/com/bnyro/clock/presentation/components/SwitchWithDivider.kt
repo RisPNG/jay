@@ -31,13 +31,20 @@ fun SwitchWithDivider(
     description: String? = null,
     icon: ImageVector? = null,
     isChecked: Boolean = true,
+    enabled: Boolean = true,
     onClick: (() -> Unit) = {},
     onChecked: (Boolean) -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.clickable(
+            enabled = enabled,
             onClick = onClick
-        )
+        ),
+        contentColor = if (enabled) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
     ) {
         Row(
             modifier = Modifier
@@ -73,11 +80,12 @@ fun SwitchWithDivider(
                     .padding(horizontal = 8.dp)
                     .width(1.dp)
                     .align(Alignment.CenterVertically),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                color = MaterialTheme.colorScheme.outlineVariant
             )
             Switch(
                 checked = isChecked,
                 onCheckedChange = onChecked,
+                enabled = enabled,
                 modifier = Modifier
                     .padding(horizontal = 6.dp)
                     .semantics {
@@ -94,13 +102,20 @@ fun SwitchItem(
     description: String? = null,
     icon: ImageVector? = null,
     isChecked: Boolean = true,
+    enabled: Boolean = true,
     onClick: (Boolean) -> Unit
 ) {
     Surface(
         modifier = Modifier.toggleable(
             value = isChecked,
+            enabled = enabled,
             onValueChange = onClick
-        )
+        ),
+        contentColor = if (enabled) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
     ) {
         Row(
             modifier = Modifier
@@ -133,6 +148,7 @@ fun SwitchItem(
             Switch(
                 checked = isChecked,
                 onCheckedChange = null,
+                enabled = enabled,
                 modifier = Modifier.padding(start = 20.dp, end = 6.dp)
             )
         }
