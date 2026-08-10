@@ -6,7 +6,7 @@ import com.google.firebase.messaging.RemoteMessage
 class SocialPushMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         if (message.data["kind"] == "sync") {
-            SocialSyncWorker.enqueue(this)
+            SocialSyncWorker.enqueue(this, expedited = true)
         }
     }
 

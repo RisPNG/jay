@@ -8,6 +8,7 @@ import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.social.domain.AlarmActivityKind
 import com.bnyro.clock.social.domain.AlarmActivityRequest
+import com.bnyro.clock.social.domain.AlarmChangeKind
 import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.social.domain.GroupCreate
 import com.bnyro.clock.social.domain.GroupUpdate
@@ -15,22 +16,25 @@ import com.bnyro.clock.social.domain.MemberRole
 import com.bnyro.clock.social.domain.SharedAlarmLink
 import com.bnyro.clock.social.domain.SharedAlarmRequest
 import com.bnyro.clock.social.domain.SocialActivity
+import com.bnyro.clock.social.domain.SocialAlarmChange
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
 import com.bnyro.clock.social.domain.SharedAlarmDelivery
+import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
+import com.bnyro.clock.util.services.AlarmService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.net.URI
 import java.time.Instant
-import com.bnyro.clock.util.services.AlarmService
-import com.bnyro.clock.util.AlarmHelper
 
 data class SocialSyncResult(
     val newActivity: List<SocialActivity>,
+    val alarmLabels: Map<String, String?>,
+    val alarmChanges: List<SocialAlarmChange>,
     val deviceId: String
 )
 
@@ -185,9 +189,23 @@ class SocialRepository(
             }
 
             val newActivity = synchronizedActivity.filter { it.id !in previousActivityIds }
+            val alarmChanges = response.alarmChanges.map {
+                SocialAlarmChange(
+                    it.sequence,
+                    it.alarmId,
+                    it.groupId,
+                    it.groupName,
+                    it.deviceId,
+                    it.deviceName,
+                    it.alarmLabel,
+                    AlarmChangeKind.valueOf(it.kind.uppercase())
+                )
+            }
             Preferences.edit { putLong(Preferences.jaySyncCursorKey, response.cursor) }
             SocialSyncResult(
                 if (previousCursor == 0L) emptyList() else newActivity,
+                response.alarms.associate { it.id to it.label },
+                if (previousCursor == 0L) emptyList() else alarmChanges,
                 identity.id
             )
         }
@@ -333,89 +351,97 @@ class SocialRepository(
     }
 
     suspend fun createSharedAlarm(groupId: String, alarm: Alarm): Long =
-        withContext(Dispatchers.IO) {
-            val serverUrl = Preferences.instance.getString(
-                Preferences.jayServerUrlKey,
-                DEFAULT_SERVER_URL
-            ) ?: DEFAULT_SERVER_URL
-            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            val response = SocialApi(serverUrl, identity).createAlarm(
-                SharedAlarmRequest(
-                    groupId,
-                    alarm.time,
-                    alarm.label,
-                    alarm.enabled,
-                    alarm.days,
-                    alarm.vibrate,
-                    alarm.repeat,
-                    alarm.snoozeEnabled,
-                    alarm.snoozeMinutes,
-                    alarm.soundEnabled,
-                    alarm.vibrationPattern,
-                    alarm.vibrationPatternName
+        synchronizationMutex.withLock {
+            withContext(Dispatchers.IO) {
+                val serverUrl = Preferences.instance.getString(
+                    Preferences.jayServerUrlKey,
+                    DEFAULT_SERVER_URL
+                ) ?: DEFAULT_SERVER_URL
+                val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+                val response = SocialApi(serverUrl, identity).createAlarm(
+                    SharedAlarmRequest(
+                        groupId,
+                        alarm.time,
+                        alarm.label,
+                        alarm.enabled,
+                        alarm.days,
+                        alarm.vibrate,
+                        alarm.repeat,
+                        alarm.snoozeEnabled,
+                        alarm.snoozeMinutes,
+                        alarm.soundEnabled,
+                        alarm.vibrationPattern,
+                        alarm.vibrationPatternName
+                    )
                 )
-            )
-            val localId = alarmUseCase.createAlarm(alarm)
-            socialDao.putAlarmLink(
-                SharedAlarmLink(response.id, localId, groupId, response.revision ?: 1)
-            )
-            localId
+                val localId = alarmUseCase.createAlarm(alarm)
+                socialDao.putAlarmLink(
+                    SharedAlarmLink(response.id, localId, groupId, response.revision ?: 1)
+                )
+                localId
+            }
         }
 
-    suspend fun updateAlarm(alarm: Alarm) = withContext(Dispatchers.IO) {
-        val link = socialDao.getAlarmLinkByLocalId(alarm.id)
-        if (link == null) {
-            alarmUseCase.updateAlarm(alarm)
-        } else {
-            val serverUrl = Preferences.instance.getString(
-                Preferences.jayServerUrlKey,
-                DEFAULT_SERVER_URL
-            ) ?: DEFAULT_SERVER_URL
-            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            val response = SocialApi(serverUrl, identity).updateAlarm(
-                link.remoteAlarmId,
-                SharedAlarmRequest(
-                    time = alarm.time,
-                    label = alarm.label,
-                    enabled = alarm.enabled,
-                    days = alarm.days,
-                    vibrate = alarm.vibrate,
-                    repeat = alarm.repeat,
-                    snoozeEnabled = alarm.snoozeEnabled,
-                    snoozeMinutes = alarm.snoozeMinutes,
-                    soundEnabled = alarm.soundEnabled,
-                    vibrationPattern = alarm.vibrationPattern,
-                    vibrationPatternName = alarm.vibrationPatternName,
-                    expectedRevision = link.revision
+    suspend fun updateAlarm(alarm: Alarm) = synchronizationMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val link = socialDao.getAlarmLinkByLocalId(alarm.id)
+            if (link == null) {
+                alarmUseCase.updateAlarm(alarm)
+            } else {
+                val serverUrl = Preferences.instance.getString(
+                    Preferences.jayServerUrlKey,
+                    DEFAULT_SERVER_URL
+                ) ?: DEFAULT_SERVER_URL
+                val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+                val response = SocialApi(serverUrl, identity).updateAlarm(
+                    link.remoteAlarmId,
+                    SharedAlarmRequest(
+                        time = alarm.time,
+                        label = alarm.label,
+                        enabled = alarm.enabled,
+                        days = alarm.days,
+                        vibrate = alarm.vibrate,
+                        repeat = alarm.repeat,
+                        snoozeEnabled = alarm.snoozeEnabled,
+                        snoozeMinutes = alarm.snoozeMinutes,
+                        soundEnabled = alarm.soundEnabled,
+                        vibrationPattern = alarm.vibrationPattern,
+                        vibrationPatternName = alarm.vibrationPatternName,
+                        expectedRevision = link.revision
+                    )
                 )
-            )
-            context.sendBroadcast(
-                Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
-                    .setPackage(context.packageName)
-                    .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
-            )
-            alarmUseCase.updateAlarm(alarm)
-            socialDao.putAlarmLink(link.copy(revision = response.revision ?: link.revision + 1))
+                context.sendBroadcast(
+                    Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
+                        .setPackage(context.packageName)
+                        .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                )
+                alarmUseCase.updateAlarm(alarm)
+                socialDao.putAlarmLink(
+                    link.copy(revision = response.revision ?: link.revision + 1)
+                )
+            }
         }
     }
 
-    suspend fun deleteAlarm(alarm: Alarm) = withContext(Dispatchers.IO) {
-        val link = socialDao.getAlarmLinkByLocalId(alarm.id)
-        if (link != null) {
-            val serverUrl = Preferences.instance.getString(
-                Preferences.jayServerUrlKey,
-                DEFAULT_SERVER_URL
-            ) ?: DEFAULT_SERVER_URL
-            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            SocialApi(serverUrl, identity).deleteAlarm(link.remoteAlarmId, link.revision)
-            context.sendBroadcast(
-                Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
-                    .setPackage(context.packageName)
-                    .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
-            )
-            socialDao.deleteAlarmLink(link.remoteAlarmId)
+    suspend fun deleteAlarm(alarm: Alarm) = synchronizationMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val link = socialDao.getAlarmLinkByLocalId(alarm.id)
+            if (link != null) {
+                val serverUrl = Preferences.instance.getString(
+                    Preferences.jayServerUrlKey,
+                    DEFAULT_SERVER_URL
+                ) ?: DEFAULT_SERVER_URL
+                val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+                SocialApi(serverUrl, identity).deleteAlarm(link.remoteAlarmId, link.revision)
+                context.sendBroadcast(
+                    Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
+                        .setPackage(context.packageName)
+                        .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                )
+                socialDao.deleteAlarmLink(link.remoteAlarmId)
+            }
+            alarmUseCase.deleteAlarm(alarm)
         }
-        alarmUseCase.deleteAlarm(alarm)
     }
 
     suspend fun recordActivity(localAlarmId: Long, kind: AlarmActivityKind) =

@@ -163,7 +163,7 @@ class MainActivity : ComponentActivity() {
             while (isActive) {
                 runCatching {
                     (application as App).container.socialRepository.followLiveChanges {
-                        SocialNotificationHelper.notifyNewActivity(this@MainActivity, it)
+                        SocialNotificationHelper.notifySocialChanges(this@MainActivity, it)
                     }
                 }
                 if (isActive) delay(2_000)

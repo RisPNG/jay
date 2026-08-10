@@ -373,7 +373,15 @@ def create_shared_alarm(
                 device["id"],
             ),
         )
-        record_group_change(connection, alarm.group_id, "alarm", str(alarm_id))
+        record_group_change(
+            connection,
+            alarm.group_id,
+            "alarm",
+            str(alarm_id),
+            device["id"],
+            "created",
+            alarm.label,
+        )
         push_tokens = get_group_push_tokens(connection, alarm.group_id, device["id"])
     send_group_sync(push_tokens)
     return {"id": alarm_id, "revision": 1}
@@ -387,7 +395,7 @@ def update_shared_alarm(
 ) -> dict:
     with transaction() as connection:
         alarm = connection.execute(
-            "SELECT group_id FROM shared_alarms WHERE id = %s AND deleted = false",
+            "SELECT group_id, enabled FROM shared_alarms WHERE id = %s AND deleted = false",
             (alarm_id,),
         ).fetchone()
         if alarm is None:
@@ -423,7 +431,18 @@ def update_shared_alarm(
         if changed is None:
             raise HTTPException(status.HTTP_409_CONFLICT, "Shared alarm has a newer revision")
         connection.execute("DELETE FROM alarm_activity WHERE alarm_id = %s", (alarm_id,))
-        record_group_change(connection, alarm["group_id"], "alarm", str(alarm_id))
+        action = "edited"
+        if alarm["enabled"] != update.enabled:
+            action = "enabled" if update.enabled else "disabled"
+        record_group_change(
+            connection,
+            alarm["group_id"],
+            "alarm",
+            str(alarm_id),
+            device["id"],
+            action,
+            update.label,
+        )
         push_tokens = get_group_push_tokens(connection, alarm["group_id"], device["id"])
     send_group_sync(push_tokens)
     return {"id": alarm_id, "revision": changed["revision"]}
@@ -437,7 +456,7 @@ def delete_shared_alarm(
 ) -> dict:
     with transaction() as connection:
         alarm = connection.execute(
-            "SELECT group_id FROM shared_alarms WHERE id = %s AND deleted = false",
+            "SELECT group_id, label FROM shared_alarms WHERE id = %s AND deleted = false",
             (alarm_id,),
         ).fetchone()
         if alarm is None:
@@ -455,7 +474,15 @@ def delete_shared_alarm(
         if changed is None:
             raise HTTPException(status.HTTP_409_CONFLICT, "Shared alarm has a newer revision")
         connection.execute("DELETE FROM alarm_activity WHERE alarm_id = %s", (alarm_id,))
-        record_group_change(connection, alarm["group_id"], "alarm", str(alarm_id))
+        record_group_change(
+            connection,
+            alarm["group_id"],
+            "alarm",
+            str(alarm_id),
+            device["id"],
+            "deleted",
+            alarm["label"],
+        )
         push_tokens = get_group_push_tokens(connection, alarm["group_id"], device["id"])
     send_group_sync(push_tokens)
     return {"id": alarm_id, "revision": changed["revision"]}
@@ -529,7 +556,14 @@ def synchronize(
         ).fetchall()
         group_ids = [group["id"] for group in groups]
         if not group_ids:
-            return {"cursor": since, "groups": [], "members": [], "alarms": [], "activity": []}
+            return {
+                "cursor": since,
+                "groups": [],
+                "members": [],
+                "alarms": [],
+                "activity": [],
+                "alarm_changes": [],
+            }
 
         cursor = connection.execute(
             "SELECT coalesce(max(sequence), %s) AS cursor FROM changes WHERE group_id = ANY(%s)",
@@ -562,6 +596,24 @@ def synchronize(
             """,
             (group_ids,),
         ).fetchall()
+        alarm_changes = connection.execute(
+            """
+            SELECT c.sequence, c.group_id, c.entity_id AS alarm_id,
+                c.action AS kind, c.entity_label AS alarm_label,
+                c.actor_device_id AS device_id, d.name AS device_name,
+                g.name AS group_name
+            FROM changes c
+            JOIN groups g ON g.id = c.group_id
+            LEFT JOIN devices d ON d.id = c.actor_device_id
+            WHERE c.group_id = ANY(%s)
+              AND c.sequence > %s
+              AND c.sequence <= %s
+              AND c.entity_type = 'alarm'
+              AND c.action IS NOT NULL
+            ORDER BY c.sequence
+            """,
+            (group_ids, since, cursor),
+        ).fetchall()
         for alarm in alarms:
             if not alarm["deleted"]:
                 connection.execute(
@@ -589,5 +641,6 @@ def synchronize(
         "members": members,
         "alarms": alarms,
         "activity": activity,
+        "alarm_changes": alarm_changes,
         "deliveries": deliveries,
     }
