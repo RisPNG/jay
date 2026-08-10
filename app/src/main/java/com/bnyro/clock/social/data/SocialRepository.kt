@@ -462,6 +462,6 @@ class SocialRepository(
     }
 
     companion object {
-        const val DEFAULT_SERVER_URL = "https://jay-server.onrender.com"
+        const val DEFAULT_SERVER_URL = "https://jay.poppybit.com"
     }
 }
