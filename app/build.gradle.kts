@@ -25,11 +25,6 @@ android {
 
         buildConfigField(
             "String",
-            "JAY_FIREBASE_APPLICATION_ID",
-            "\"${providers.gradleProperty("jayFirebaseApplicationId").orElse("").get()}\""
-        )
-        buildConfigField(
-            "String",
             "JAY_FIREBASE_PROJECT_ID",
             "\"${providers.gradleProperty("jayFirebaseProjectId").orElse("").get()}\""
         )
@@ -49,6 +44,11 @@ android {
 
     buildTypes {
         release {
+            buildConfigField(
+                "String",
+                "JAY_FIREBASE_APPLICATION_ID",
+                "\"${providers.gradleProperty("jayFirebaseReleaseApplicationId").orElse("").get()}\""
+            )
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -58,6 +58,11 @@ android {
 
         }
         debug {
+            buildConfigField(
+                "String",
+                "JAY_FIREBASE_APPLICATION_ID",
+                "\"${providers.gradleProperty("jayFirebaseDebugApplicationId").orElse("").get()}\""
+            )
             isDebuggable = true
             applicationIdSuffix = ".debug"
         }
