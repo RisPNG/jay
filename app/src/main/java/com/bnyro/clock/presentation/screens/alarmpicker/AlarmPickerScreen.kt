@@ -25,14 +25,15 @@ fun AlarmPickerScreen(onNavigateBack: () -> Unit) {
         canSave = currentGroup == null || currentGroup.canEditAlarms,
         onSave = { alarm, groupId ->
             if (alarm.id == 0L) {
-                // Create New Alarm and enable by default
-                viewModel.createAlarm(alarm.copy(enabled = true), groupId)
-                viewModel.createToast(alarm, context)
+                viewModel.createAlarm(alarm.copy(enabled = true), groupId) {
+                    viewModel.createToast(alarm, context)
+                    onNavigateBack.invoke()
+                }
             } else {
-                // Update Alarm and enable automatically
-                viewModel.updateAlarm(alarm.copy(enabled = true))
-                viewModel.createToast(alarm, context)
+                viewModel.updateAlarm(alarm.copy(enabled = true)) {
+                    viewModel.createToast(alarm, context)
+                    onNavigateBack.invoke()
+                }
             }
-            onNavigateBack.invoke()
         })
 }

@@ -46,7 +46,16 @@
     <string name="show_clock_bottom_tab">Toggle items</string>
     <string name="altname">Clock</string>
     <string name="shared_alarm_activity" translatable="false">Shared alarm activity</string>
-    <string name="member_alarm_activity" translatable="false">%1$s %2$s a shared alarm</string>
+    <string name="member_alarm_activity" translatable="false">%1$s %2$s “%3$s”</string>
+    <string name="member_unnamed_alarm_activity" translatable="false">%1$s %2$s a shared alarm</string>
+    <string name="shared_alarm_change" translatable="false">Shared alarm update</string>
+    <string name="member_created_alarm" translatable="false">%1$s created %2$s in %3$s</string>
+    <string name="member_edited_alarm" translatable="false">%1$s edited %2$s in %3$s</string>
+    <string name="member_enabled_alarm" translatable="false">%1$s enabled %2$s in %3$s</string>
+    <string name="member_disabled_alarm" translatable="false">%1$s disabled %2$s in %3$s</string>
+    <string name="member_deleted_alarm" translatable="false">%1$s deleted %2$s in %3$s</string>
+    <string name="unnamed_shared_alarm" translatable="false">a shared alarm</string>
+    <string name="unknown_group_member" translatable="false">A group member</string>
     <string name="social_snoozed" translatable="false">snoozed</string>
     <string name="social_dismissed" translatable="false">dismissed</string>
     <string name="groups" translatable="false">Groups</string>

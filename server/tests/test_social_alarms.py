@@ -98,6 +98,8 @@ def test_group_alarm_lifecycle() -> None:
         assert first_sync.json()["alarms"][0]["label"] == "Airport"
         assert first_sync.json()["groups"][0]["notify_snoozed"] is True
         assert first_sync.json()["groups"][0]["notify_dismissed"] is True
+        assert first_sync.json()["alarm_changes"][0]["kind"] == "created"
+        assert first_sync.json()["alarm_changes"][0]["device_name"] == "Cozy Otter"
         assert {item["name"] for item in first_sync.json()["members"]} == {
             "Quiet Mango",
             "Cozy Otter",
@@ -128,21 +130,50 @@ def test_group_alarm_lifecycle() -> None:
         stale = client.put(f"/v1/alarms/{alarm_id}", headers=member, json=update)
         assert stale.status_code == 409
 
-        latest_sync = client.get("/v1/sync", headers=member)
+        latest_sync = client.get(
+            f"/v1/sync?since={first_sync.json()['cursor']}", headers=member
+        )
         assert latest_sync.status_code == 200
         assert latest_sync.json()["alarms"][0]["time"] == 18_000_000
         assert latest_sync.json()["activity"] == []
+        assert latest_sync.json()["alarm_changes"][0]["kind"] == "edited"
+        assert latest_sync.json()["alarm_changes"][0]["device_name"] == "Quiet Mango"
+
+        disabled_update = update | {"enabled": False, "expected_revision": 2}
+        disabled = client.put(
+            f"/v1/alarms/{alarm_id}", headers=member, json=disabled_update
+        )
+        assert disabled.status_code == 200
+        assert disabled.json()["revision"] == 3
+        disabled_sync = client.get(
+            f"/v1/sync?since={latest_sync.json()['cursor']}", headers=leader
+        )
+        assert disabled_sync.json()["alarm_changes"][0]["kind"] == "disabled"
+
+        enabled_update = update | {"enabled": True, "expected_revision": 3}
+        enabled = client.put(
+            f"/v1/alarms/{alarm_id}", headers=leader, json=enabled_update
+        )
+        assert enabled.status_code == 200
+        assert enabled.json()["revision"] == 4
+        enabled_sync = client.get(
+            f"/v1/sync?since={disabled_sync.json()['cursor']}", headers=member
+        )
+        assert enabled_sync.json()["alarm_changes"][0]["kind"] == "enabled"
 
         deleted = client.request(
             "DELETE",
             f"/v1/alarms/{alarm_id}",
             headers=member,
-            json={"expected_revision": 2},
+            json={"expected_revision": 4},
         )
         assert deleted.status_code == 200
-        assert deleted.json()["revision"] == 3
-        deleted_sync = client.get("/v1/sync", headers=leader)
+        assert deleted.json()["revision"] == 5
+        deleted_sync = client.get(
+            f"/v1/sync?since={enabled_sync.json()['cursor']}", headers=leader
+        )
         assert deleted_sync.json()["alarms"][0]["deleted"] is True
+        assert deleted_sync.json()["alarm_changes"][0]["kind"] == "deleted"
 
 
 def test_leader_only_group_rejects_member_alarm_changes() -> None:

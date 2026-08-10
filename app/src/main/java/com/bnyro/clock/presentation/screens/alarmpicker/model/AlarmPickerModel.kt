@@ -13,6 +13,7 @@ import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.navigation.NavRoutes
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.TimeHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -55,34 +56,42 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
         }
     }
 
-    fun createAlarm(alarm: Alarm, groupId: String?) {
+    fun createAlarm(alarm: Alarm, groupId: String?, onCreated: () -> Unit) {
         viewModelScope.launch {
-            if (groupId == null) {
-                createUpdateDeleteAlarmUseCase.createAlarm(alarm)
-            } else {
-                runCatching { socialRepository.createSharedAlarm(groupId, alarm) }
-                    .onFailure {
-                        Toast.makeText(
-                            getApplication(),
-                            it.message ?: "Unable to create shared alarm",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+            try {
+                if (groupId == null) {
+                    createUpdateDeleteAlarmUseCase.createAlarm(alarm)
+                } else {
+                    socialRepository.createSharedAlarm(groupId, alarm)
+                }
+                onCreated()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                Toast.makeText(
+                    getApplication(),
+                    exception.message ?: "Unable to create shared alarm",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
 
-    fun updateAlarm(alarm: Alarm) {
+    fun updateAlarm(alarm: Alarm, onUpdated: () -> Unit) {
         viewModelScope.launch {
-            runCatching { socialRepository.updateAlarm(alarm) }
-                .onFailure {
-                    socialRepository.synchronize()
-                    Toast.makeText(
-                        getApplication(),
-                        it.message ?: "Unable to update shared alarm",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
+            try {
+                socialRepository.updateAlarm(alarm)
+                onUpdated()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                socialRepository.synchronize()
+                Toast.makeText(
+                    getApplication(),
+                    exception.message ?: "Unable to update shared alarm",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 

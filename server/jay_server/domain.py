@@ -35,11 +35,21 @@ def require_alarm_editor(connection: Connection, group_id: UUID, device_id: str)
 
 
 def record_group_change(
-    connection: Connection, group_id: UUID, entity_type: str, entity_id: str
+    connection: Connection,
+    group_id: UUID,
+    entity_type: str,
+    entity_id: str,
+    actor_device_id: str | None = None,
+    action: str | None = None,
+    entity_label: str | None = None,
 ) -> None:
     connection.execute(
-        "INSERT INTO changes (group_id, entity_type, entity_id) VALUES (%s, %s, %s)",
-        (group_id, entity_type, entity_id),
+        """
+        INSERT INTO changes (
+            group_id, entity_type, entity_id, actor_device_id, action, entity_label
+        ) VALUES (%s, %s, %s, %s, %s, %s)
+        """,
+        (group_id, entity_type, entity_id, actor_device_id, action, entity_label),
     )
     connection.execute(
         "SELECT pg_notify('jay_changes', %s)",

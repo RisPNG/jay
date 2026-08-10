@@ -69,9 +69,9 @@ class SocialApi(
         request("/v1/groups/$groupId/invites", "POST", json.encodeToString(InviteCreate()))
     )
 
-    fun joinGroup(token: String): IdResponse = json.decodeFromString(
+    fun joinGroup(token: String) {
         request("/v1/groups/join", "POST", json.encodeToString(InviteJoin(token)))
-    )
+    }
 
     fun updateMember(groupId: String, deviceId: String, role: String) {
         request(

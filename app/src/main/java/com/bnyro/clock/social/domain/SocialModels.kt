@@ -20,6 +20,14 @@ enum class AlarmActivityKind {
     DISMISSED
 }
 
+enum class AlarmChangeKind {
+    CREATED,
+    EDITED,
+    ENABLED,
+    DISABLED,
+    DELETED
+}
+
 @Entity(tableName = "social_groups")
 data class SocialGroup(
     @androidx.room.PrimaryKey val id: String,
@@ -82,6 +90,17 @@ data class AlarmDeliveryCount(
     val localAlarmId: Long,
     val deliveredCount: Int,
     val memberCount: Int
+)
+
+data class SocialAlarmChange(
+    val sequence: Long,
+    val alarmId: String,
+    val groupId: String,
+    val groupName: String,
+    val deviceId: String?,
+    val deviceName: String?,
+    val alarmLabel: String?,
+    val kind: AlarmChangeKind
 )
 
 @Serializable
@@ -220,12 +239,25 @@ data class SocialActivityDto(
 )
 
 @Serializable
+data class AlarmChangeDto(
+    val sequence: Long,
+    @SerialName("alarm_id") val alarmId: String,
+    @SerialName("group_id") val groupId: String,
+    @SerialName("group_name") val groupName: String,
+    @SerialName("device_id") val deviceId: String?,
+    @SerialName("device_name") val deviceName: String?,
+    @SerialName("alarm_label") val alarmLabel: String?,
+    val kind: String
+)
+
+@Serializable
 data class SyncResponse(
     val cursor: Long,
     val groups: List<SocialGroupDto>,
     val members: List<SocialMemberDto>,
     val alarms: List<SharedAlarmDto>,
     val activity: List<SocialActivityDto>,
+    @SerialName("alarm_changes") val alarmChanges: List<AlarmChangeDto> = emptyList(),
     val deliveries: List<DeliveryDto> = emptyList()
 )
 
