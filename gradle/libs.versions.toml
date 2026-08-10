@@ -19,6 +19,7 @@ material-icons-extended = "1.7.8"
 room = "2.8.4"
 work = "2.11.2"
 firebase-bom = "34.16.0"
+play-integrity = "1.6.0"
 androidx-appcompat = "1.7.1"
 json = "1.11.0"
 sdp-android = "1.1.1"
@@ -60,6 +61,7 @@ room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room"}
 work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
+play-integrity = { group = "com.google.android.play", name = "integrity", version.ref = "play-integrity" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

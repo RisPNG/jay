@@ -216,3 +216,52 @@ def test_leader_only_group_rejects_member_alarm_changes() -> None:
             "/v1/alarms", headers=member, json=alarm_payload(group_id)
         )
         assert allowed.status_code == 201
+
+
+def test_play_entitlement_is_bound_to_the_authenticated_device(monkeypatch) -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_deliveries, shared_alarms, "
+                "group_invites, group_members, groups, devices CASCADE"
+            )
+        device = register_device(
+            client, "Bright Finch", "play-device-secret-that-is-long-enough"
+        )
+        monkeypatch.setattr(
+            "jay_server.main.verify_play_entitlement",
+            lambda integrity_token, device_id: integrity_token == "licensed-token"
+            and device_id == device["X-Jay-Device-ID"],
+        )
+
+        entitled = client.post(
+            "/v1/device/play-entitlement",
+            headers=device,
+            json={"integrity_token": "licensed-token"},
+        )
+        assert entitled.status_code == 200
+        assert entitled.json()["shared_sound_upload"] is True
+        assert entitled.json()["expires_at"] is not None
+        with transaction() as connection:
+            stored = connection.execute(
+                "SELECT play_entitlement_expires_at FROM devices WHERE id = %s",
+                (device["X-Jay-Device-ID"],),
+            ).fetchone()
+        assert stored["play_entitlement_expires_at"] is not None
+
+        unlicensed = client.post(
+            "/v1/device/play-entitlement",
+            headers=device,
+            json={"integrity_token": "unlicensed-token"},
+        )
+        assert unlicensed.status_code == 200
+        assert unlicensed.json() == {
+            "shared_sound_upload": False,
+            "expires_at": None,
+        }
+        with transaction() as connection:
+            stored = connection.execute(
+                "SELECT play_entitlement_expires_at FROM devices WHERE id = %s",
+                (device["X-Jay-Device-ID"],),
+            ).fetchone()
+        assert stored["play_entitlement_expires_at"] is None

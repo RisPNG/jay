@@ -3,11 +3,14 @@ package com.bnyro.clock
 import android.app.Application
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.bnyro.clock.data.database.AppDatabase
 import com.bnyro.clock.social.data.SocialSyncWorker
+import com.bnyro.clock.social.data.PlayEntitlementWorker
 import com.bnyro.clock.social.data.PushRegistrationWorker
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
@@ -54,5 +57,21 @@ class App : Application() {
                 .setConstraints(constraints)
                 .build()
         )
+        if (BuildConfig.JAY_PLAY_ENTITLEMENT_ELIGIBLE) {
+            WorkManager.getInstance(this).enqueueUniqueWork(
+                "jay_play_entitlement_refresh",
+                ExistingWorkPolicy.KEEP,
+                OneTimeWorkRequestBuilder<PlayEntitlementWorker>()
+                    .setConstraints(constraints)
+                    .build()
+            )
+            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "jay_play_entitlement",
+                ExistingPeriodicWorkPolicy.UPDATE,
+                PeriodicWorkRequestBuilder<PlayEntitlementWorker>(24, TimeUnit.HOURS)
+                    .setConstraints(constraints)
+                    .build()
+            )
+        }
     }
 }

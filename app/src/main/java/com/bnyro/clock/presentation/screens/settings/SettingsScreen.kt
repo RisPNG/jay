@@ -287,8 +287,8 @@ fun SettingsScreen(
                 title = stringResource(R.string.clock_you_version),
                 summary = stringResource(
                     R.string.version_value,
-                    BuildConfig.VERSION_NAME,
-                    BuildConfig.VERSION_CODE
+                    BuildConfig.CLOCK_YOU_VERSION_NAME,
+                    BuildConfig.CLOCK_YOU_VERSION_CODE
                 ),
                 imageVector = Icons.Default.History
             ) {

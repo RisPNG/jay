@@ -10,6 +10,8 @@ import com.bnyro.clock.social.domain.InviteCreate
 import com.bnyro.clock.social.domain.InviteJoin
 import com.bnyro.clock.social.domain.InviteResponse
 import com.bnyro.clock.social.domain.MemberUpdate
+import com.bnyro.clock.social.domain.PlayEntitlementStatus
+import com.bnyro.clock.social.domain.PlayEntitlementVerification
 import com.bnyro.clock.social.domain.SharedAlarmDelete
 import com.bnyro.clock.social.domain.SharedAlarmRequest
 import com.bnyro.clock.social.domain.SyncResponse
@@ -48,6 +50,15 @@ class SocialApi(
             json.encodeToString(PushTokenUpdate(token))
         )
     }
+
+    fun updatePlayEntitlement(integrityToken: String): PlayEntitlementStatus =
+        json.decodeFromString(
+            request(
+                "/v1/device/play-entitlement",
+                "POST",
+                json.encodeToString(PlayEntitlementVerification(integrityToken))
+            )
+        )
 
     fun synchronize(cursor: Long): SyncResponse = json.decodeFromString(
         request("/v1/sync?since=$cursor")

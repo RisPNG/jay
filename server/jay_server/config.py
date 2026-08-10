@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     public_url: str = "http://127.0.0.1:8000"
     invite_lifetime_hours: int = 72
     firebase_credentials_json: str | None = None
+    google_play_credentials_json: str | None = None
+    play_entitlement_lifetime_hours: int = 48
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
