@@ -7,8 +7,7 @@ import com.bnyro.clock.presentation.screens.alarmpicker.components.AlarmPicker
 import com.bnyro.clock.presentation.screens.alarmpicker.model.AlarmPickerModel
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import com.bnyro.clock.social.domain.AlarmPermission
-import com.bnyro.clock.social.domain.MemberRole
+import com.bnyro.clock.social.domain.canEditAlarms
 
 @Composable
 fun AlarmPickerScreen(onNavigateBack: () -> Unit) {
@@ -20,14 +19,10 @@ fun AlarmPickerScreen(onNavigateBack: () -> Unit) {
         onCancel = { onNavigateBack.invoke() },
         currentAlarm = viewModel.alarm,
         groups = groups.filter {
-            it.id == viewModel.groupId ||
-                    it.alarmPermission == AlarmPermission.EVERYONE ||
-                    it.role == MemberRole.LEADER
+            it.id == viewModel.groupId || it.canEditAlarms
         },
         currentGroupId = viewModel.groupId,
-        canSave = currentGroup == null ||
-                currentGroup.alarmPermission == AlarmPermission.EVERYONE ||
-                currentGroup.role == MemberRole.LEADER,
+        canSave = currentGroup == null || currentGroup.canEditAlarms,
         onSave = { alarm, groupId ->
             if (alarm.id == 0L) {
                 // Create New Alarm and enable by default

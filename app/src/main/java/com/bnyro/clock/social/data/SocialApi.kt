@@ -16,6 +16,8 @@ import com.bnyro.clock.social.domain.SyncResponse
 import com.bnyro.clock.social.domain.PushTokenUpdate
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URI
 
@@ -102,6 +104,34 @@ class SocialApi(
 
     fun recordActivity(alarmId: String, activity: AlarmActivityRequest) {
         request("/v1/alarms/$alarmId/activity", "POST", json.encodeToString(activity))
+    }
+
+    suspend fun listenForChanges(
+        shouldContinue: () -> Boolean,
+        onChange: suspend () -> Unit
+    ) = withContext(Dispatchers.IO) {
+        val connection = URI("$baseUrl/v1/events").toURL().openConnection() as HttpURLConnection
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 0
+        connection.setRequestProperty("Accept", "text/event-stream")
+        connection.setRequestProperty("Authorization", "Bearer ${identity.token}")
+        connection.setRequestProperty("X-Jay-Device-ID", identity.id)
+        val status = connection.responseCode
+        if (status !in 200..299) {
+            val response = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            connection.disconnect()
+            throw SocialApiException(status, response)
+        }
+        try {
+            connection.inputStream.bufferedReader().use { reader ->
+                while (shouldContinue()) {
+                    val line = reader.readLine() ?: break
+                    if (line == "event: sync") onChange()
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun request(

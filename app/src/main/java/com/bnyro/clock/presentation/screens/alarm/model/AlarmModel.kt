@@ -15,6 +15,7 @@ import com.bnyro.clock.domain.model.AlarmFilters
 import com.bnyro.clock.domain.model.AlarmSortOrder
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
+import com.bnyro.clock.social.domain.canEditAlarms
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,6 +63,19 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
         )
     val alarmGroupNames = socialRepository.alarmGroupNames.map { names ->
         names.associate { it.localAlarmId to it.groupName }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyMap()
+    )
+    val alarmEditability = combine(
+        socialRepository.alarmGroupNames,
+        socialRepository.groups
+    ) { alarmGroups, groups ->
+        alarmGroups.associate { alarmGroup ->
+            alarmGroup.localAlarmId to
+                    (groups.firstOrNull { it.id == alarmGroup.groupId }?.canEditAlarms == true)
+        }
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),

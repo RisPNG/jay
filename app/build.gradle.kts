@@ -21,6 +21,8 @@ android {
         versionCode = 23
         versionName = "11.0"
 
+        buildConfigField("String", "JAY_VERSION", "\"0.2\"")
+
         buildConfigField(
             "String",
             "JAY_FIREBASE_APPLICATION_ID",

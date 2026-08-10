@@ -277,11 +277,22 @@ fun SettingsScreen(
                 uriHandler.openUri("https://github.com/RisPNG/jay")
             }
             IconPreference(
-                title = stringResource(R.string.app_name), summary = stringResource(
-                    R.string.version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE
-                ), imageVector = Icons.Default.History
+                title = stringResource(R.string.jay_version),
+                summary = BuildConfig.JAY_VERSION,
+                imageVector = Icons.Default.History
             ) {
                 uriHandler.openUri("https://github.com/RisPNG/jay/releases/latest")
+            }
+            IconPreference(
+                title = stringResource(R.string.clock_you_version),
+                summary = stringResource(
+                    R.string.version_value,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE
+                ),
+                imageVector = Icons.Default.History
+            ) {
+                uriHandler.openUri("https://github.com/you-apps/ClockYou/releases/latest")
             }
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),

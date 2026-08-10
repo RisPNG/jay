@@ -55,6 +55,7 @@ fun AlarmScreen(
     val filters by alarmModel.filters.collectAsState()
     val alarmGroupNames by alarmModel.alarmGroupNames.collectAsState()
     val alarmDeliveryCounts by alarmModel.alarmDeliveryCounts.collectAsState()
+    val alarmEditability by alarmModel.alarmEditability.collectAsState()
 
     val selectedAlarmIds = remember { mutableStateListOf<Long>() }
     val isSelectionMode = selectedAlarmIds.isNotEmpty()
@@ -160,6 +161,7 @@ fun AlarmScreen(
                     alarm = alarm,
                     groupName = alarmGroupNames[alarm.id],
                     deliveryCount = alarmDeliveryCounts[alarm.id],
+                    canEdit = alarmEditability[alarm.id] ?: true,
                     isSelected = isSelected,
                     isSelectionMode = isSelectionMode,
                     onLongClick = { alarmItem ->

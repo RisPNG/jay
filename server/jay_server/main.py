@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from psycopg.errors import UniqueViolation
+from starlette.responses import StreamingResponse
 
 from jay_server.auth import authenticated_device
 from jay_server.config import settings
@@ -32,13 +33,18 @@ from jay_server.schemas import (
     PushTokenUpdate,
 )
 from jay_server.push import send_group_sync
+from jay_server.live import live_changes
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     open_database_pool()
-    yield
-    close_database_pool()
+    await live_changes.start()
+    try:
+        yield
+    finally:
+        await live_changes.stop()
+        close_database_pool()
 
 
 app = FastAPI(title="Jay Server", version="1", lifespan=lifespan)
@@ -49,6 +55,15 @@ def health() -> dict:
     with transaction() as connection:
         connection.execute("SELECT 1")
     return {"status": "ok"}
+
+
+@app.get("/v1/events")
+def stream_events(device: dict = Depends(authenticated_device)) -> StreamingResponse:
+    return StreamingResponse(
+        live_changes.events(device["id"]),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/v1/devices/register", status_code=status.HTTP_201_CREATED)

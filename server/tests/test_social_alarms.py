@@ -1,8 +1,10 @@
+import asyncio
 import hashlib
 
 from fastapi.testclient import TestClient
 
 from jay_server.database import transaction
+from jay_server.live import LiveChangeBroker
 from jay_server.main import app
 
 
@@ -36,6 +38,16 @@ def alarm_payload(group_id: str) -> dict:
     }
 
 
+def test_live_change_broker_routes_device_events() -> None:
+    broker = LiveChangeBroker()
+    events = broker.events("recipient")
+    with asyncio.Runner() as runner:
+        assert runner.run(anext(events)) == "event: sync\ndata: connected\n\n"
+        broker.publish({"recipient"})
+        assert runner.run(anext(events)) == "event: sync\ndata: changed\n\n"
+        runner.run(events.aclose())
+
+
 def test_group_alarm_lifecycle() -> None:
     with TestClient(app) as client:
         with transaction() as connection:
@@ -59,8 +71,6 @@ def test_group_alarm_lifecycle() -> None:
             json={
                 "name": "Airport friends",
                 "alarm_permission": "everyone",
-                "notify_snoozed": True,
-                "notify_dismissed": True,
             },
         )
         assert created_group.status_code == 201
@@ -86,6 +96,8 @@ def test_group_alarm_lifecycle() -> None:
         first_sync = client.get("/v1/sync", headers=leader)
         assert first_sync.status_code == 200
         assert first_sync.json()["alarms"][0]["label"] == "Airport"
+        assert first_sync.json()["groups"][0]["notify_snoozed"] is True
+        assert first_sync.json()["groups"][0]["notify_dismissed"] is True
         assert {item["name"] for item in first_sync.json()["members"]} == {
             "Quiet Mango",
             "Cozy Otter",

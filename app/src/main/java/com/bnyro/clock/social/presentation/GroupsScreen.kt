@@ -147,7 +147,7 @@ fun GroupsScreen(
     if (showCreate) {
         var name by remember { mutableStateOf("") }
         var leadersOnly by remember { mutableStateOf(false) }
-        var notifySnoozed by remember { mutableStateOf(false) }
+        var notifySnoozed by remember { mutableStateOf(true) }
         var notifyDismissed by remember { mutableStateOf(true) }
         AlertDialog(
             onDismissRequest = { showCreate = false },
