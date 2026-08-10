@@ -26,11 +26,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Collections
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.flow.map
 
 class AlarmModel(application: Application) : AndroidViewModel(application) {
     private val alarmRepository: AlarmRepository = (application as App).container.alarmRepository
     private val createUpdateDeleteAlarmUseCase =
         CreateUpdateDeleteAlarmUseCase(application.applicationContext, alarmRepository)
+    private val socialRepository = (application as App).container.socialRepository
 
     var showFilter by mutableStateOf(false)
     var showSortOrder by mutableStateOf(false)
@@ -58,10 +60,25 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
             started = SharingStarted.WhileSubscribed(5000L),
             initialValue = listOf()
         )
+    val alarmGroupNames = socialRepository.alarmGroupNames.map { names ->
+        names.associate { it.localAlarmId to it.groupName }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyMap()
+    )
+    val alarmDeliveryCounts = socialRepository.alarmDeliveryCounts.map { counts ->
+        counts.associateBy { it.localAlarmId }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyMap()
+    )
 
     fun updateAlarm(alarm: Alarm) {
         viewModelScope.launch {
-            createUpdateDeleteAlarmUseCase.updateAlarm(alarm)
+            runCatching { socialRepository.updateAlarm(alarm) }
+                .onFailure { socialRepository.synchronize() }
         }
     }
 
@@ -88,7 +105,8 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteAlarm(alarm: Alarm) {
         viewModelScope.launch {
-            createUpdateDeleteAlarmUseCase.deleteAlarm(alarm)
+            runCatching { socialRepository.deleteAlarm(alarm) }
+                .onFailure { socialRepository.synchronize() }
         }
     }
 

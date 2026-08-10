@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,10 +31,13 @@ import androidx.compose.ui.unit.sp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.util.AlarmHelper
+import com.bnyro.clock.social.domain.AlarmDeliveryCount
 
 @Composable
 fun AlarmCard(
     alarm: Alarm,
+    groupName: String? = null,
+    deliveryCount: AlarmDeliveryCount? = null,
     onClick: () -> Unit,
     isAlarmEnabled: Boolean,
     onEnable: (Boolean) -> Unit
@@ -57,6 +61,26 @@ fun AlarmCard(
                 val relativeTimeString = DateUtils.getRelativeTimeSpanString(
                     AlarmHelper.getAlarmTime(alarm),
                 )
+                groupName?.let {
+                    Row(
+                        modifier = Modifier.padding(start = 5.dp, end = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Groups, null)
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(text = it, overflow = TextOverflow.Ellipsis, maxLines = 1)
+                    }
+                }
+                deliveryCount?.let {
+                    Text(
+                        text = stringResource(
+                            R.string.alarm_delivery_count,
+                            it.deliveredCount,
+                            it.memberCount
+                        ),
+                        modifier = Modifier.padding(start = 5.dp, end = 10.dp)
+                    )
+                }
                 alarm.label?.let {
                     Row(
                         modifier = Modifier
@@ -116,9 +140,7 @@ fun AlarmCard(
                                 color = if (enabled) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(
-                                        alpha = 0.5f
-                                    )
+                                    MaterialTheme.colorScheme.onSurfaceVariant
                                 },
                                 fontWeight = FontWeight.Normal,
                                 letterSpacing = 1.sp

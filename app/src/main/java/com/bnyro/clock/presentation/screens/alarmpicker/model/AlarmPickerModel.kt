@@ -14,9 +14,12 @@ import com.bnyro.clock.navigation.NavRoutes
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 
 class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHandle) :
     AndroidViewModel(application) {
@@ -25,8 +28,15 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
     private val alarmRepository = (application as App).container.alarmRepository
     private val createUpdateDeleteAlarmUseCase =
         CreateUpdateDeleteAlarmUseCase(application.applicationContext, alarmRepository)
+    private val socialRepository = (application as App).container.socialRepository
+    val groups = socialRepository.groups.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyList()
+    )
 
     var alarm: Alarm
+    var groupId: String?
 
     init {
         val alarmId = id?.toLong() ?: 0L
@@ -38,17 +48,41 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                 alarmRepository.getAlarmById(alarmId)!!
             }
         }
+        groupId = if (alarmId == 0L) null else runBlocking(Dispatchers.IO) {
+            socialRepository.alarmGroupNames.first()
+                .firstOrNull { it.localAlarmId == alarmId }
+                ?.groupId
+        }
     }
 
-    fun createAlarm(alarm: Alarm) {
+    fun createAlarm(alarm: Alarm, groupId: String?) {
         viewModelScope.launch {
-            createUpdateDeleteAlarmUseCase.createAlarm(alarm)
+            if (groupId == null) {
+                createUpdateDeleteAlarmUseCase.createAlarm(alarm)
+            } else {
+                runCatching { socialRepository.createSharedAlarm(groupId, alarm) }
+                    .onFailure {
+                        Toast.makeText(
+                            getApplication(),
+                            it.message ?: "Unable to create shared alarm",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+            }
         }
     }
 
     fun updateAlarm(alarm: Alarm) {
         viewModelScope.launch {
-            createUpdateDeleteAlarmUseCase.updateAlarm(alarm)
+            runCatching { socialRepository.updateAlarm(alarm) }
+                .onFailure {
+                    socialRepository.synchronize()
+                    Toast.makeText(
+                        getApplication(),
+                        it.message ?: "Unable to update shared alarm",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
         }
     }
 

@@ -12,11 +12,12 @@ class CreateUpdateDeleteAlarmUseCase(
     private val alarmRepository: AlarmRepository
 ) {
     @RequiresApi(Build.VERSION_CODES.M)
-    suspend fun createAlarm(alarm: Alarm) {
+    suspend fun createAlarm(alarm: Alarm): Long {
         // fixx maybe baby D:
         val newId = alarmRepository.addAlarm(alarm)
         val alarmWithId = alarm.copy(id = newId)
         AlarmHelper.enqueue(context, alarmWithId)
+        return newId
     }
 
     @RequiresApi(Build.VERSION_CODES.M)

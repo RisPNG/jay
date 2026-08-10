@@ -18,6 +18,11 @@ object Preferences {
     const val customColorKey = "customColor"
     const val colorThemeKey = "colorTheme"
     const val startTabKey = "startTab"
+    const val jayServerUrlKey = "jayServerUrl"
+    const val jayDeviceSecretKey = "jayDeviceSecret"
+    const val jayDeviceNameKey = "jayDeviceName"
+    const val jaySyncCursorKey = "jaySyncCursor"
+    const val jayPendingInvitationKey = "jayPendingInvitation"
 
 
     fun init(context: Context) {

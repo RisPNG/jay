@@ -1,0 +1,174 @@
+package com.bnyro.clock.social.presentation
+
+import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.bnyro.clock.App
+import com.bnyro.clock.social.domain.AlarmPermission
+import com.bnyro.clock.social.domain.MemberRole
+import com.bnyro.clock.social.domain.SocialGroup
+import com.bnyro.clock.social.domain.SocialMember
+import com.bnyro.clock.util.Preferences
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+class SocialModel(application: Application) : AndroidViewModel(application) {
+    private val repository = (application as App).container.socialRepository
+
+    val groups: StateFlow<List<SocialGroup>> = repository.groups.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyList()
+    )
+    val members = repository.members.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyList()
+    )
+    val activity = repository.activity.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyList()
+    )
+    var busy by mutableStateOf(false)
+        private set
+    var message by mutableStateOf<String?>(null)
+        private set
+    var invitation by mutableStateOf<String?>(null)
+        private set
+    var deviceName by mutableStateOf(
+        Preferences.instance.getString(Preferences.jayDeviceNameKey, null).orEmpty()
+    )
+        private set
+    var serverUrl by mutableStateOf(
+        Preferences.instance.getString(
+            Preferences.jayServerUrlKey,
+            com.bnyro.clock.social.data.SocialRepository.DEFAULT_SERVER_URL
+        ) ?: com.bnyro.clock.social.data.SocialRepository.DEFAULT_SERVER_URL
+    )
+        private set
+
+    init {
+        synchronize()
+    }
+
+    fun synchronize() {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.synchronize() }
+                .onSuccess {
+                    deviceName = Preferences.instance.getString(
+                        Preferences.jayDeviceNameKey,
+                        deviceName
+                    ) ?: deviceName
+                }
+                .onFailure { message = it.message ?: "Unable to synchronize" }
+            busy = false
+        }
+    }
+
+    fun createGroup(
+        name: String,
+        permission: AlarmPermission,
+        notifySnoozed: Boolean,
+        notifyDismissed: Boolean
+    ) {
+        viewModelScope.launch {
+            busy = true
+            runCatching {
+                repository.createGroup(name, permission, notifySnoozed, notifyDismissed)
+            }.onFailure { message = it.message ?: "Unable to create group" }
+            busy = false
+        }
+    }
+
+    fun updateGroup(group: SocialGroup) {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.updateGroup(group) }
+                .onFailure { message = it.message ?: "Unable to update group" }
+            busy = false
+        }
+    }
+
+    fun createInvite(groupId: String) {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.createInvite(groupId) }
+                .onSuccess { invitation = it }
+                .onFailure { message = it.message ?: "Unable to create invitation" }
+            busy = false
+        }
+    }
+
+    fun joinGroup(invitation: String) {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.joinGroup(invitation) }
+                .onFailure { message = it.message ?: "Unable to join group" }
+            busy = false
+        }
+    }
+
+    fun leaveGroup(groupId: String) {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.leaveGroup(groupId) }
+                .onFailure { message = it.message ?: "Unable to leave group" }
+            busy = false
+        }
+    }
+
+    fun updateMember(groupId: String, member: SocialMember, role: MemberRole) {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.updateMember(groupId, member.deviceId, role) }
+                .onFailure { message = it.message ?: "Unable to update member" }
+            busy = false
+        }
+    }
+
+    fun removeMember(groupId: String, member: SocialMember) {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.removeMember(groupId, member.deviceId) }
+                .onFailure { message = it.message ?: "Unable to remove member" }
+            busy = false
+        }
+    }
+
+    fun renameDevice(name: String) {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.renameDevice(name) }
+                .onSuccess { deviceName = name }
+                .onFailure { message = it.message ?: "Unable to rename device" }
+            busy = false
+        }
+    }
+
+    fun changeServer(url: String) {
+        viewModelScope.launch {
+            busy = true
+            runCatching {
+                repository.changeServer(url)
+                repository.synchronize()
+            }.onSuccess { serverUrl = url.trimEnd('/') }
+                .onFailure { message = it.message ?: "Unable to change server" }
+            busy = false
+        }
+    }
+
+    fun consumeMessage() {
+        message = null
+    }
+
+    fun consumeInvitation() {
+        invitation = null
+    }
+}

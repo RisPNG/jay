@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: jay-server
+    runtime: python
+    rootDir: server
+    buildCommand: pip install .
+    preDeployCommand: alembic upgrade head
+    startCommand: uvicorn jay_server.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jay-postgres
+          property: connectionString
+      - key: PUBLIC_URL
+        sync: false
+      - key: FIREBASE_CREDENTIALS_JSON
+        sync: false
+
+databases:
+  - name: jay-postgres

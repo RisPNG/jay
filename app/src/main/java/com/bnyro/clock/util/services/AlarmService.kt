@@ -35,6 +35,8 @@ import com.bnyro.clock.util.receivers.PreAlarmReceiver
 import kotlinx.coroutines.runBlocking
 import java.util.Timer
 import java.util.TimerTask
+import com.bnyro.clock.social.data.SocialActivityWorker
+import com.bnyro.clock.social.domain.AlarmActivityKind
 
 class AlarmService : Service() {
     private val notificationId = 5
@@ -60,8 +62,18 @@ class AlarmService : Service() {
     private val alarmActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             Log.d("AlarmService", "magga")
+            if (
+                intent?.action == CANCEL_SHARED_ALARM_INTENT_ACTION &&
+                intent.getLongExtra(AlarmHelper.EXTRA_ID, -1L) == currentAlarm?.id
+            ) {
+                stopSelf()
+                return
+            }
             when (intent?.getStringExtra(ACTION_EXTRA_KEY)) {
                 DISMISS_ACTION -> {
+                    currentAlarm?.let {
+                        SocialActivityWorker.enqueue(this@AlarmService, it.id, AlarmActivityKind.DISMISSED)
+                    }
                     //maybe fixes a super shitty bug that was shitty kinda D:
                     currentAlarm?.let { alarm ->
                         if (alarm.repeat) {
@@ -71,6 +83,9 @@ class AlarmService : Service() {
                     stopSelf()
                 }
                 SNOOZE_ACTION -> {
+                    currentAlarm?.let {
+                        SocialActivityWorker.enqueue(this@AlarmService, it.id, AlarmActivityKind.SNOOZED)
+                    }
                     AlarmHelper.snooze(this@AlarmService, currentAlarm!!)
                     stopSelf()
                 }
@@ -84,7 +99,9 @@ class AlarmService : Service() {
         ContextCompat.registerReceiver(
             this,
             alarmActionReceiver,
-            IntentFilter(ALARM_INTENT_ACTION),
+            IntentFilter(ALARM_INTENT_ACTION).apply {
+                addAction(CANCEL_SHARED_ALARM_INTENT_ACTION)
+            },
             ContextCompat.RECEIVER_EXPORTED
         )
         super.onCreate()
@@ -264,6 +281,7 @@ class AlarmService : Service() {
         const val ACTION_EXTRA_KEY = "action"
         const val DISMISS_ACTION = "DISMISS"
         const val SNOOZE_ACTION = "SNOOZE"
+        const val CANCEL_SHARED_ALARM_INTENT_ACTION = "com.rispng.jay.CANCEL_SHARED_ALARM"
         const val AUTO_SNOOZE_MINUTES = 10
 
         private const val MAX_VOLUME: Float = 1.0f

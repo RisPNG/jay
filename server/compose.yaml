@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: jay
+      POSTGRES_USER: jay
+      POSTGRES_PASSWORD: jay
+    volumes:
+      - jay_postgres:/var/lib/postgresql
+
+  server:
+    build: .
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://jay:jay@postgres:5432/jay
+      PUBLIC_URL: http://127.0.0.1:8000
+
+volumes:
+  jay_postgres:
