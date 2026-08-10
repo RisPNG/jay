@@ -123,6 +123,17 @@ data class DeviceUpdate(val name: String)
 data class PushTokenUpdate(val token: String)
 
 @Serializable
+data class PlayEntitlementVerification(
+    @SerialName("integrity_token") val integrityToken: String
+)
+
+@Serializable
+data class PlayEntitlementStatus(
+    @SerialName("shared_sound_upload") val sharedSoundUpload: Boolean,
+    @SerialName("expires_at") val expiresAt: String? = null
+)
+
+@Serializable
 data class GroupCreate(
     val name: String,
     @SerialName("alarm_permission") val alarmPermission: String,

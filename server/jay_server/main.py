@@ -27,6 +27,7 @@ from jay_server.schemas import (
     InviteCreate,
     InviteJoin,
     MemberUpdate,
+    PlayEntitlementVerification,
     SharedAlarmCreate,
     SharedAlarmDelete,
     SharedAlarmUpdate,
@@ -34,6 +35,7 @@ from jay_server.schemas import (
 )
 from jay_server.push import send_group_sync
 from jay_server.live import live_changes
+from jay_server.play_integrity import verify_play_entitlement
 
 
 @asynccontextmanager
@@ -124,6 +126,31 @@ def update_push_token(
             "UPDATE devices SET push_token = %s, updated_at = now() WHERE id = %s",
             (update.token, device["id"]),
         )
+
+
+@app.post("/v1/device/play-entitlement")
+def update_play_entitlement(
+    verification: PlayEntitlementVerification,
+    device: dict = Depends(authenticated_device),
+) -> dict:
+    entitled = verify_play_entitlement(verification.integrity_token, device["id"])
+    verified_at = datetime.now(UTC)
+    expires_at = verified_at + timedelta(hours=settings.play_entitlement_lifetime_hours)
+    with transaction() as connection:
+        connection.execute(
+            """
+            UPDATE devices
+            SET play_entitlement_verified_at = %s,
+                play_entitlement_expires_at = %s,
+                updated_at = now()
+            WHERE id = %s
+            """,
+            (verified_at, expires_at if entitled else None, device["id"]),
+        )
+    return {
+        "shared_sound_upload": entitled,
+        "expires_at": expires_at if entitled else None,
+    }
 
 
 @app.post("/v1/groups", status_code=status.HTTP_201_CREATED)

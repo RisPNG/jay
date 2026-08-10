@@ -2,7 +2,9 @@ package com.bnyro.clock.social.data
 
 import android.content.Context
 import android.content.Intent
+import android.util.Base64
 import androidx.room.withTransaction
+import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
@@ -28,7 +30,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import com.google.android.gms.tasks.Tasks
+import com.google.android.play.core.integrity.IntegrityManagerFactory
+import com.google.android.play.core.integrity.StandardIntegrityManager
 import java.net.URI
+import java.security.MessageDigest
 import java.time.Instant
 
 data class SocialSyncResult(
@@ -485,6 +491,39 @@ class SocialRepository(
         SocialApi(serverUrl, identity).apply {
             register()
             updatePushToken(token)
+        }
+    }
+
+    suspend fun refreshPlayEntitlement() = withContext(Dispatchers.IO) {
+        val serverUrl = Preferences.instance.getString(
+            Preferences.jayServerUrlKey,
+            DEFAULT_SERVER_URL
+        ) ?: DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+        val requestHash = Base64.encodeToString(
+            MessageDigest.getInstance("SHA-256").digest(
+                "jay-play-entitlement:${identity.id}".toByteArray()
+            ),
+            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
+        )
+        val integrityManager = IntegrityManagerFactory.createStandard(context)
+        val tokenProvider = Tasks.await(
+            integrityManager.prepareIntegrityToken(
+                StandardIntegrityManager.PrepareIntegrityTokenRequest.builder()
+                    .setCloudProjectNumber(BuildConfig.JAY_PLAY_CLOUD_PROJECT_NUMBER)
+                    .build()
+            )
+        )
+        val integrityToken = Tasks.await(
+            tokenProvider.request(
+                StandardIntegrityManager.StandardIntegrityTokenRequest.builder()
+                    .setRequestHash(requestHash)
+                    .build()
+            )
+        ).token()
+        SocialApi(serverUrl, identity).apply {
+            register()
+            updatePlayEntitlement(integrityToken)
         }
     }
 

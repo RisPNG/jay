@@ -14,14 +14,45 @@ android {
     namespace = "com.bnyro.clock"
     compileSdk = 37
 
+    val signingStoreFile = providers.gradleProperty("jaySigningStoreFile").orNull
+    val signingStorePassword = providers.gradleProperty("jaySigningStorePassword").orNull
+    val signingKeyAlias = providers.gradleProperty("jaySigningKeyAlias").orNull
+    val signingKeyPassword = providers.gradleProperty("jaySigningKeyPassword").orNull
+
+    signingConfigs {
+        if (
+            signingStoreFile != null &&
+            signingStorePassword != null &&
+            signingKeyAlias != null &&
+            signingKeyPassword != null
+        ) {
+            create("jay") {
+                storeFile = file(signingStoreFile)
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.rispng.jay"
         minSdk = 23
         targetSdk = 37
-        versionCode = 23
-        versionName = "11.0"
+        versionCode = providers.gradleProperty("jayVersionCode").get().toInt()
+        versionName = providers.gradleProperty("jayVersionName").get()
 
-        buildConfigField("String", "JAY_VERSION", "\"0.3\"")
+        buildConfigField("String", "JAY_VERSION", "\"$versionName\"")
+        buildConfigField(
+            "String",
+            "CLOCK_YOU_VERSION_NAME",
+            "\"${providers.gradleProperty("clockYouVersionName").get()}\""
+        )
+        buildConfigField(
+            "int",
+            "CLOCK_YOU_VERSION_CODE",
+            providers.gradleProperty("clockYouVersionCode").get()
+        )
 
         buildConfigField(
             "String",
@@ -32,6 +63,11 @@ android {
             "String",
             "JAY_FIREBASE_API_KEY",
             "\"${providers.gradleProperty("jayFirebaseApiKey").orElse("").get()}\""
+        )
+        buildConfigField(
+            "long",
+            "JAY_PLAY_CLOUD_PROJECT_NUMBER",
+            "${providers.gradleProperty("jayPlayCloudProjectNumber").get()}L"
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -44,6 +80,8 @@ android {
 
     buildTypes {
         release {
+            signingConfigs.findByName("jay")?.let { signingConfig = it }
+            buildConfigField("boolean", "JAY_PLAY_ENTITLEMENT_ELIGIBLE", "true")
             buildConfigField(
                 "String",
                 "JAY_FIREBASE_APPLICATION_ID",
@@ -58,6 +96,8 @@ android {
 
         }
         debug {
+            signingConfigs.findByName("jay")?.let { signingConfig = it }
+            buildConfigField("boolean", "JAY_PLAY_ENTITLEMENT_ELIGIBLE", "false")
             buildConfigField(
                 "String",
                 "JAY_FIREBASE_APPLICATION_ID",
@@ -125,6 +165,7 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
+    implementation(libs.play.integrity)
 
     implementation(libs.kotlinx.serialization.json)
 }

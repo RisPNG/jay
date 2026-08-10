@@ -11,8 +11,10 @@ dependencies = [
     "alembic==1.19.1",
     "fastapi==0.141.1",
     "firebase-admin==7.5.0",
+    "google-auth==2.56.3",
     "psycopg[binary,pool]==3.3.4",
     "pydantic-settings==2.15.0",
+    "requests==2.34.2",
     "sqlalchemy==2.0.51",
     "uvicorn==0.52.1",
 ]

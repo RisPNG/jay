@@ -34,6 +34,10 @@ class PushTokenUpdate(BaseModel):
     token: str = Field(min_length=1, max_length=4096)
 
 
+class PlayEntitlementVerification(BaseModel):
+    integrity_token: str = Field(min_length=1, max_length=65536)
+
+
 class GroupCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     alarm_permission: AlarmPermission = AlarmPermission.EVERYONE
