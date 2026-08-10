@@ -1,4 +1,9 @@
 *.iml
+.env
+.pytest_cache/
+.venv/
+*.egg-info/
+__pycache__/
 .gradle
 /local.properties
 /.idea/caches

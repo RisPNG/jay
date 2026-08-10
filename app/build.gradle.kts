@@ -15,11 +15,27 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.bnyro.clock"
+        applicationId = "com.rispng.jay"
         minSdk = 23
         targetSdk = 37
         versionCode = 23
         versionName = "11.0"
+
+        buildConfigField(
+            "String",
+            "JAY_FIREBASE_APPLICATION_ID",
+            "\"${providers.gradleProperty("jayFirebaseApplicationId").orElse("").get()}\""
+        )
+        buildConfigField(
+            "String",
+            "JAY_FIREBASE_PROJECT_ID",
+            "\"${providers.gradleProperty("jayFirebaseProjectId").orElse("").get()}\""
+        )
+        buildConfigField(
+            "String",
+            "JAY_FIREBASE_API_KEY",
+            "\"${providers.gradleProperty("jayFirebaseApiKey").orElse("").get()}\""
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -99,6 +115,9 @@ dependencies {
     ksp(libs.room.compiler)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.work.runtime.ktx)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     implementation(libs.kotlinx.serialization.json)
 }

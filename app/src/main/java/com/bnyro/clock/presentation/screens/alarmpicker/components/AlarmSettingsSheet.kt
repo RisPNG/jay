@@ -33,6 +33,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,9 +66,18 @@ import com.bnyro.clock.presentation.screens.alarm.components.SnoozeTimePickerDia
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.TimeHelper
+import com.bnyro.clock.social.domain.SocialGroup
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlarmPicker(currentAlarm: Alarm, onSave: (Alarm) -> Unit, onCancel: () -> Unit) {
+fun AlarmPicker(
+    currentAlarm: Alarm,
+    groups: List<SocialGroup>,
+    currentGroupId: String?,
+    canSave: Boolean = true,
+    onSave: (Alarm, String?) -> Unit,
+    onCancel: () -> Unit
+) {
     val context = LocalContext.current
     var showRingtoneDialog by remember { mutableStateOf(false) }
     var showSnoozeDialog by remember { mutableStateOf(false) }
@@ -95,6 +108,8 @@ fun AlarmPicker(currentAlarm: Alarm, onSave: (Alarm) -> Unit, onCancel: () -> Un
     var snoozeMinutes by remember { mutableIntStateOf(currentAlarm.snoozeMinutes) }
     var snoozeEnabled by remember { mutableStateOf(currentAlarm.snoozeEnabled) }
     var soundEnabled by remember { mutableStateOf(currentAlarm.soundEnabled) }
+    var selectedGroupId by remember { mutableStateOf(currentGroupId) }
+    var groupMenuExpanded by remember { mutableStateOf(false) }
 
     val initialTime = remember { TimeHelper.millisToTime(currentAlarm.time) }
     var hours by remember { mutableIntStateOf(initialTime.hours) }
@@ -134,6 +149,50 @@ fun AlarmPicker(currentAlarm: Alarm, onSave: (Alarm) -> Unit, onCancel: () -> Un
                     onHoursChanged = { hours = it },
                     onMinutesChanged = { minutes = it }
                 )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            ExposedDropdownMenuBox(
+                expanded = groupMenuExpanded,
+                onExpandedChange = {
+                    if (isNewAlarm) groupMenuExpanded = !groupMenuExpanded
+                }
+            ) {
+                OutlinedTextField(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    value = groups.firstOrNull { it.id == selectedGroupId }?.name
+                        ?: stringResource(R.string.personal_alarm),
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = isNewAlarm,
+                    label = { Text(stringResource(R.string.alarm_group)) },
+                    trailingIcon = {
+                        if (isNewAlarm) ExposedDropdownMenuDefaults.TrailingIcon(groupMenuExpanded)
+                    }
+                )
+                ExposedDropdownMenu(
+                    expanded = groupMenuExpanded,
+                    onDismissRequest = { groupMenuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.personal_alarm)) },
+                        onClick = {
+                            selectedGroupId = null
+                            groupMenuExpanded = false
+                        }
+                    )
+                    groups.forEach { group ->
+                        DropdownMenuItem(
+                            text = { Text(group.name) },
+                            onClick = {
+                                selectedGroupId = group.id
+                                groupMenuExpanded = false
+                            }
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -270,7 +329,9 @@ fun AlarmPicker(currentAlarm: Alarm, onSave: (Alarm) -> Unit, onCancel: () -> Un
             OutlinedButton(onClick = { onCancel.invoke() }) {
                 Text(text = stringResource(id = android.R.string.cancel))
             }
-            Button(onClick = {
+            Button(
+                enabled = canSave,
+                onClick = {
                 val alarm =
                     currentAlarm.copy(
                         time = (hours * 60 + minutes) * 60 * 1000L,
@@ -286,8 +347,9 @@ fun AlarmPicker(currentAlarm: Alarm, onSave: (Alarm) -> Unit, onCancel: () -> Un
                         vibrationPattern = vibrationPattern,
                         vibrationPatternName = vibrationPatternName
                     )
-                onSave(alarm)
-            }) {
+                    onSave(alarm, selectedGroupId)
+                }
+            ) {
                 Text(text = stringResource(id = android.R.string.ok))
             }
         }

@@ -17,6 +17,7 @@ import com.bnyro.clock.presentation.screens.settings.SettingsScreen
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.presentation.screens.stopwatch.model.StopwatchModel
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
+import com.bnyro.clock.social.presentation.SocialModel
 
 @Composable
 fun AppNavHost(
@@ -30,6 +31,7 @@ fun AppNavHost(
     val timerModel: TimerModel = viewModel()
     val stopwatchModel: StopwatchModel = viewModel()
     val clockModel: ClockModel = viewModel()
+    val socialModel: SocialModel = viewModel()
 
     NavHost(navController, startDestination = startDestination, modifier = modifier) {
         composable(NavRoutes.Home.route,
@@ -52,7 +54,8 @@ fun AppNavHost(
                 timerModel = timerModel,
                 stopwatchModel = stopwatchModel,
                 initialTab = initialTab,
-                settingsModel = settingsModel
+                settingsModel = settingsModel,
+                socialModel = socialModel
             )
         }
         composable(NavRoutes.Settings.route,

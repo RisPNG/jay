@@ -28,9 +28,11 @@ fun AlarmReceiverDialog(context: Context, alarm: Alarm) {
             AlarmPicker(
                 onCancel = { showDialog = false },
                 currentAlarm = alarm,
-                onSave = {
-                    alarmModel.createAlarm(alarm)
-                    alarmModel.createToast(alarm, context)
+                groups = emptyList(),
+                currentGroupId = null,
+                onSave = { savedAlarm, _ ->
+                    alarmModel.createAlarm(savedAlarm, null)
+                    alarmModel.createToast(savedAlarm, context)
                 }
             )
         }

@@ -32,6 +32,8 @@ import com.bnyro.clock.presentation.screens.stopwatch.model.StopwatchModel
 import com.bnyro.clock.presentation.screens.timer.TimerScreen
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import kotlinx.coroutines.launch
+import com.bnyro.clock.social.presentation.GroupsScreen
+import com.bnyro.clock.social.presentation.SocialModel
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -42,7 +44,8 @@ fun HomeNavContainer(
     timerModel: TimerModel,
     stopwatchModel: StopwatchModel,
     alarmModel: AlarmModel,
-    settingsModel: SettingsModel
+    settingsModel: SettingsModel,
+    socialModel: SocialModel
 ) {
     val orientation = LocalConfiguration.current.orientation
     val coroutineScope = rememberCoroutineScope()
@@ -135,6 +138,13 @@ fun HomeNavContainer(
                             StopwatchScreen(
                                 onClickSettings = { onNavigate(NavRoutes.Settings.route) },
                                 stopwatchModel = stopwatchModel
+                            )
+                        }
+
+                        HomeRoutes.Groups -> {
+                            GroupsScreen(
+                                onClickSettings = { onNavigate(NavRoutes.Settings.route) },
+                                socialModel = socialModel
                             )
                         }
                     }

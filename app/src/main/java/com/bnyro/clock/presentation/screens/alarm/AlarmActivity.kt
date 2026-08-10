@@ -25,6 +25,8 @@ import com.bnyro.clock.App
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.services.AlarmService
+import com.bnyro.clock.social.data.SocialActivityWorker
+import com.bnyro.clock.social.domain.AlarmActivityKind
 import kotlinx.coroutines.runBlocking
 
 class AlarmActivity : ComponentActivity() {
@@ -112,6 +114,7 @@ class AlarmActivity : ComponentActivity() {
         handleIntent(intent)
     }
     private fun dismiss() {
+        SocialActivityWorker.enqueue(this, alarm.id, AlarmActivityKind.DISMISSED)
         stopService(
             Intent(
                 this@AlarmActivity.applicationContext,
@@ -122,6 +125,7 @@ class AlarmActivity : ComponentActivity() {
     }
 
     private fun snooze(minutes: Int = alarm.snoozeMinutes) {
+        SocialActivityWorker.enqueue(this, alarm.id, AlarmActivityKind.SNOOZED)
         stopService(
             Intent(
                 this@AlarmActivity.applicationContext,

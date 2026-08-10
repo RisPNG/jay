@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jay-server"
+version = "0.1.0"
+description = "Synchronization server for Jay social alarms"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic==1.19.1",
+    "fastapi==0.141.1",
+    "firebase-admin==7.5.0",
+    "psycopg[binary,pool]==3.3.4",
+    "pydantic-settings==2.15.0",
+    "sqlalchemy==2.0.51",
+    "uvicorn==0.52.1",
+]
+
+[project.optional-dependencies]
+test = [
+    "httpx==0.28.1",
+    "pytest==9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["jay_server"]

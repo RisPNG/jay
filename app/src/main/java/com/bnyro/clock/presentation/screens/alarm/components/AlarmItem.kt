@@ -34,11 +34,14 @@ import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.presentation.components.DialogButton
+import com.bnyro.clock.social.domain.AlarmDeliveryCount
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 fun AlarmItem(
     alarm: Alarm,
+    groupName: String? = null,
+    deliveryCount: AlarmDeliveryCount? = null,
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
     onClick: (Alarm) -> Unit,
@@ -74,7 +77,7 @@ fun AlarmItem(
                         if (isSelected) {
                             Modifier.border(
                                 width = 2.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                color = MaterialTheme.colorScheme.primary,
                                 shape = cardShape
                             )
                         } else {
@@ -88,6 +91,8 @@ fun AlarmItem(
             ) {
                 AlarmCard(
                     alarm = alarm,
+                    groupName = groupName,
+                    deliveryCount = deliveryCount,
                     onClick = {
                     },
                     isAlarmEnabled = isAlarmEnabled,

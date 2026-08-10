@@ -16,6 +16,12 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LargeTopAppBar
@@ -25,6 +31,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +53,8 @@ import com.bnyro.clock.presentation.screens.settings.components.SwitchPref
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import com.bnyro.clock.util.Preferences
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.bnyro.clock.social.presentation.SocialModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -50,6 +62,9 @@ fun SettingsScreen(
     onClickBack: () -> Unit, settingsModel: SettingsModel, timerModel: TimerModel
 ) {
     val context = LocalContext.current
+    val socialModel: SocialModel = viewModel()
+    var showDeviceNameDialog by remember { mutableStateOf(false) }
+    var showServerDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState()
@@ -121,7 +136,7 @@ fun SettingsScreen(
             ButtonGroupPref(
                 title = "Name",
                 options = SettingsModel.AppName.entries.map {
-                    if (it == SettingsModel.AppName.DEFAULT) "Clock You" else "Clock"
+                    if (it == SettingsModel.AppName.DEFAULT) "Jay" else "Clock"
                 },
                 values = SettingsModel.AppName.entries,
                 currentValue = settingsModel.appName
@@ -153,7 +168,8 @@ fun SettingsScreen(
                 "alarm" to R.string.alarm,
                 "clock" to R.string.clock,
                 "timer" to R.string.timer,
-                "stopwatch" to R.string.stopwatch
+                "stopwatch" to R.string.stopwatch,
+                "groups" to R.string.groups
             )
             val activeTabs = tabItems.map { it.first }.filter { key ->
                 Preferences.instance.getBoolean("show_tab_$key", true)
@@ -210,6 +226,27 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.surfaceVariant
             )
 
+            SettingsCategory(stringResource(R.string.jay_social))
+            IconPreference(
+                title = stringResource(R.string.device_name),
+                summary = socialModel.deviceName,
+                imageVector = Icons.Default.Badge
+            ) {
+                showDeviceNameDialog = true
+            }
+            IconPreference(
+                title = stringResource(R.string.jay_server),
+                summary = socialModel.serverUrl,
+                imageVector = Icons.Default.Cloud
+            ) {
+                showServerDialog = true
+            }
+            Text(stringResource(R.string.server_privacy_notice))
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            )
+
 
             SettingsCategory(stringResource(R.string.migrate_title))
             IconPreference(
@@ -224,7 +261,7 @@ fun SettingsScreen(
                 summary = stringResource(R.string.exportdesc),
                 imageVector = Icons.Default.Backup
             ) {
-                exportDocumentLauncher.launch("clockyou_export.json")
+                exportDocumentLauncher.launch("jay_export.json")
             }
 
             HorizontalDivider(
@@ -237,24 +274,80 @@ fun SettingsScreen(
                 summary = stringResource(R.string.source_code_summary),
                 imageVector = Icons.AutoMirrored.Filled.OpenInNew
             ) {
-                uriHandler.openUri("https://github.com/you-apps/ClockYou")
+                uriHandler.openUri("https://github.com/RisPNG/jay")
             }
             IconPreference(
                 title = stringResource(R.string.app_name), summary = stringResource(
                     R.string.version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE
                 ), imageVector = Icons.Default.History
             ) {
-                uriHandler.openUri("https://github.com/you-apps/ClockYou/releases/latest")
+                uriHandler.openUri("https://github.com/RisPNG/jay/releases/latest")
             }
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
             )
-            Text("Created by You-Apps maintained by Elektron")
+            Text(stringResource(R.string.clock_you_attribution))
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
             )
         }
+    }
+    if (showDeviceNameDialog) {
+        var name by remember(socialModel.deviceName) { mutableStateOf(socialModel.deviceName) }
+        AlertDialog(
+            onDismissRequest = { showDeviceNameDialog = false },
+            title = { Text(stringResource(R.string.device_name)) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        socialModel.renameDevice(name.trim())
+                        showDeviceNameDialog = false
+                    },
+                    enabled = name.isNotBlank()
+                ) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDeviceNameDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
+    if (showServerDialog) {
+        var server by remember(socialModel.serverUrl) { mutableStateOf(socialModel.serverUrl) }
+        AlertDialog(
+            onDismissRequest = { showServerDialog = false },
+            title = { Text(stringResource(R.string.jay_server)) },
+            text = {
+                OutlinedTextField(
+                    value = server,
+                    onValueChange = { server = it },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        socialModel.changeServer(server.trim())
+                        showServerDialog = false
+                    },
+                    enabled = server.startsWith("https://") || BuildConfig.DEBUG && server.startsWith("http://")
+                ) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showServerDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
     }
 }

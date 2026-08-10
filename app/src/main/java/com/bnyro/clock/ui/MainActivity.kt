@@ -92,6 +92,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        receiveGroupInvitation(intent)
 
         val allPermissions = PermissionModel.allPermissions
         val requiredPermissions = allPermissions.any {
@@ -107,6 +108,7 @@ class MainActivity : ComponentActivity() {
             SHOW_STOPWATCH_ACTION -> HomeRoutes.Stopwatch
             AlarmClock.ACTION_SET_ALARM, AlarmClock.ACTION_SHOW_ALARMS -> HomeRoutes.Alarm
             AlarmClock.ACTION_SET_TIMER, AlarmClock.ACTION_SHOW_TIMERS -> HomeRoutes.Timer
+            Intent.ACTION_VIEW -> HomeRoutes.Groups
             else -> homeRoutes.first {
                 Preferences.instance.getString(
                     Preferences.startTabKey,
@@ -157,6 +159,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (receiveGroupInvitation(intent)) recreate()
+    }
+
     override fun onStop() {
         super.onStop()
         unbindService(serviceConnection)
@@ -189,6 +197,14 @@ class MainActivity : ComponentActivity() {
         if (intent?.action != AlarmClock.ACTION_SET_TIMER) return null
 
         return intent.getIntExtra(AlarmClock.EXTRA_LENGTH, 0).takeIf { it > 0 }
+    }
+
+    private fun receiveGroupInvitation(intent: Intent?): Boolean {
+        val invitation = intent?.dataString?.takeIf {
+            intent.action == Intent.ACTION_VIEW && it.startsWith("jay://join?")
+        } ?: return false
+        Preferences.edit { putString(Preferences.jayPendingInvitationKey, invitation) }
+        return true
     }
 
     companion object {
