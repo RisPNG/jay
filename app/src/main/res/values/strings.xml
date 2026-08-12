@@ -82,7 +82,6 @@
     <string name="jay_social" translatable="false">Jay social</string>
     <string name="device_name" translatable="false">Device name</string>
     <string name="jay_server" translatable="false">Jay server</string>
-    <string name="server_privacy_notice" translatable="false">The selected Jay server can read group names, alarms, and activity. Changing servers removes this device’s current shared alarms. Use a server you trust.</string>
     <string name="clock_you_attribution" translatable="false">Jay is based on Clock You by You Apps and remains available under GPLv3.</string>
     <string name="jay_version" translatable="false">Jay Version</string>
     <string name="clock_you_version" translatable="false">Clock You Version</string>
