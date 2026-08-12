@@ -10,7 +10,6 @@ import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
 import kotlinx.coroutines.flow.Flow
 import com.bnyro.clock.social.domain.AlarmGroupName
-import com.bnyro.clock.social.domain.AlarmDeliveryCount
 import com.bnyro.clock.social.domain.SharedAlarmDelivery
 
 @Dao
@@ -33,17 +32,6 @@ interface SocialDao {
                 "JOIN social_groups sg ON sg.id = sal.groupId"
     )
     fun getAlarmGroupNamesStream(): Flow<List<AlarmGroupName>>
-
-    @Query(
-        "SELECT links.localAlarmId, " +
-                "(SELECT count(*) FROM shared_alarm_deliveries deliveries " +
-                "WHERE deliveries.alarmId = links.remoteAlarmId " +
-                "AND deliveries.revision = links.revision) AS deliveredCount, " +
-                "(SELECT count(*) FROM social_members members " +
-                "WHERE members.groupId = links.groupId) AS memberCount " +
-                "FROM shared_alarm_links links"
-    )
-    fun getAlarmDeliveryCountsStream(): Flow<List<AlarmDeliveryCount>>
 
     @Query("SELECT * FROM shared_alarm_links WHERE localAlarmId = :localAlarmId")
     suspend fun getAlarmLinkByLocalId(localAlarmId: Long): SharedAlarmLink?

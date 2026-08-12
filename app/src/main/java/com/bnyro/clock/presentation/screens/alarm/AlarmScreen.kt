@@ -53,8 +53,9 @@ fun AlarmScreen(
     val context = LocalContext.current
     val alarms by alarmModel.alarms.collectAsState()
     val filters by alarmModel.filters.collectAsState()
+    val alarmSourceIds by alarmModel.alarmSourceIds.collectAsState()
+    val groups by alarmModel.groups.collectAsState()
     val alarmGroupNames by alarmModel.alarmGroupNames.collectAsState()
-    val alarmDeliveryCounts by alarmModel.alarmDeliveryCounts.collectAsState()
     val alarmEditability by alarmModel.alarmEditability.collectAsState()
 
     val selectedAlarmIds = remember { mutableStateListOf<Long>() }
@@ -142,11 +143,14 @@ fun AlarmScreen(
             item {
                 if (alarmModel.showFilter) {
                     AlarmFilterSection(
-                        filters,
-                        { alarmModel.updateLabelFilter(it) },
-                        { alarmModel.updateWeekDayFilter(it) },
-                        { alarmModel.updateStartTimeFilter(it) },
-                        { alarmModel.updateEndTimeFilter(it) },
+                        filters = filters,
+                        groups = groups,
+                        selectedSourceIds = alarmSourceIds,
+                        onChangeLabel = { alarmModel.updateLabelFilter(it) },
+                        onClickWeekDay = { alarmModel.updateWeekDayFilter(it) },
+                        onChangeSources = { alarmModel.alarmSourceIds.value = it },
+                        onClickStartTime = { alarmModel.updateStartTimeFilter(it) },
+                        onClickEndTime = { alarmModel.updateEndTimeFilter(it) }
                     )
                 }
             }
@@ -160,7 +164,6 @@ fun AlarmScreen(
                 AlarmItem(
                     alarm = alarm,
                     groupName = alarmGroupNames[alarm.id],
-                    deliveryCount = alarmDeliveryCounts[alarm.id],
                     canEdit = alarmEditability[alarm.id] ?: true,
                     isSelected = isSelected,
                     isSelectionMode = isSelectionMode,

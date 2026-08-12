@@ -16,6 +16,7 @@ import com.bnyro.clock.domain.model.AlarmSortOrder
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.social.domain.canEditAlarms
+import com.bnyro.clock.social.domain.PERSONAL_ALARM_SOURCE_ID
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,16 +39,27 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
     var showFilter by mutableStateOf(false)
     var showSortOrder by mutableStateOf(false)
     val filters = MutableStateFlow(AlarmFilters())
+    val alarmSourceIds = MutableStateFlow<Set<String>?>(null)
     private val sortOrder = MutableStateFlow(AlarmSortOrder.HOUR_OF_DAY)
 
     val alarms: StateFlow<List<Alarm>> =
-        combine(alarmRepository.getAlarmsStream(), filters, sortOrder) { items, filter, sortOrder ->
+        combine(
+            alarmRepository.getAlarmsStream(),
+            filters,
+            sortOrder,
+            socialRepository.alarmGroupNames,
+            alarmSourceIds
+        ) { items, filter, sortOrder, alarmGroups, sourceIds ->
+            val alarmGroupsByAlarmId = alarmGroups.associateBy { it.localAlarmId }
             val filtered = items.filter { alarm ->
+                val sourceId = alarmGroupsByAlarmId[alarm.id]?.groupId
+                    ?: PERSONAL_ALARM_SOURCE_ID
                 (filter.startTime <= alarm.time && alarm.time <= filter.endTime)
                         && !Collections.disjoint(filter.weekDays, alarm.days)
                         && (alarm.label?.lowercase()?.contains(filter.label.lowercase())
                     ?: true) && (alarm.formattedTime.lowercase()
                     .contains(filter.label.lowercase()))
+                        && (sourceIds == null || sourceId in sourceIds)
 
             }
 
@@ -61,6 +73,11 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
             started = SharingStarted.WhileSubscribed(5000L),
             initialValue = listOf()
         )
+    val groups = socialRepository.groups.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyList()
+    )
     val alarmGroupNames = socialRepository.alarmGroupNames.map { names ->
         names.associate { it.localAlarmId to it.groupName }
     }.stateIn(
@@ -81,14 +98,6 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
         SharingStarted.WhileSubscribed(5_000),
         emptyMap()
     )
-    val alarmDeliveryCounts = socialRepository.alarmDeliveryCounts.map { counts ->
-        counts.associateBy { it.localAlarmId }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5_000),
-        emptyMap()
-    )
-
     fun updateAlarm(alarm: Alarm) {
         viewModelScope.launch {
             runCatching { socialRepository.updateAlarm(alarm) }
@@ -146,5 +155,6 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
 
     fun resetFilters() {
         filters.update { AlarmFilters() }
+        alarmSourceIds.update { null }
     }
 }

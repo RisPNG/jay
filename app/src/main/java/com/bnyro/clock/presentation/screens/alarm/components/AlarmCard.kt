@@ -31,13 +31,11 @@ import androidx.compose.ui.unit.sp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.util.AlarmHelper
-import com.bnyro.clock.social.domain.AlarmDeliveryCount
 
 @Composable
 fun AlarmCard(
     alarm: Alarm,
     groupName: String? = null,
-    deliveryCount: AlarmDeliveryCount? = null,
     canEdit: Boolean = true,
     onClick: () -> Unit,
     isAlarmEnabled: Boolean,
@@ -71,16 +69,6 @@ fun AlarmCard(
                         Spacer(modifier = Modifier.width(5.dp))
                         Text(text = it, overflow = TextOverflow.Ellipsis, maxLines = 1)
                     }
-                }
-                deliveryCount?.let {
-                    Text(
-                        text = stringResource(
-                            R.string.alarm_delivery_count,
-                            it.deliveredCount,
-                            it.memberCount
-                        ),
-                        modifier = Modifier.padding(start = 5.dp, end = 10.dp)
-                    )
                 }
                 alarm.label?.let {
                     Row(

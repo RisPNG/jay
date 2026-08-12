@@ -57,7 +57,6 @@ class SocialRepository(
     val members: Flow<List<SocialMember>> = socialDao.getMembersStream()
     val activity: Flow<List<SocialActivity>> = socialDao.getActivityStream()
     val alarmGroupNames = socialDao.getAlarmGroupNamesStream()
-    val alarmDeliveryCounts = socialDao.getAlarmDeliveryCountsStream()
 
     suspend fun synchronize(): SocialSyncResult = synchronizationMutex.withLock {
         withContext(Dispatchers.IO) {
