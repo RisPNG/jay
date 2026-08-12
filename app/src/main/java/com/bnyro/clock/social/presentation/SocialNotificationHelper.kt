@@ -10,6 +10,7 @@ import com.bnyro.clock.social.data.SocialSyncResult
 import com.bnyro.clock.social.domain.AlarmActivityKind
 import com.bnyro.clock.social.domain.AlarmChangeKind
 import com.bnyro.clock.util.NotificationHelper
+import com.bnyro.clock.util.TimeHelper
 
 object SocialNotificationHelper {
     @SuppressLint("MissingPermission")
@@ -49,28 +50,34 @@ object SocialNotificationHelper {
         }
 
         result.alarmChanges.filter { it.deviceId != result.deviceId }.forEach { change ->
-            val message = when (change.kind) {
-                AlarmChangeKind.CREATED -> R.string.member_created_alarm
-                AlarmChangeKind.EDITED -> R.string.member_edited_alarm
-                AlarmChangeKind.ENABLED -> R.string.member_enabled_alarm
-                AlarmChangeKind.DISABLED -> R.string.member_disabled_alarm
-                AlarmChangeKind.DELETED -> R.string.member_deleted_alarm
+            val action = when (change.kind) {
+                AlarmChangeKind.CREATED -> R.string.alarm_created_by_member
+                AlarmChangeKind.EDITED -> R.string.alarm_edited_by_member
+                AlarmChangeKind.ENABLED -> R.string.alarm_enabled_by_member
+                AlarmChangeKind.DISABLED -> R.string.alarm_disabled_by_member
+                AlarmChangeKind.DELETED -> R.string.alarm_deleted_by_member
             }
+            val alarmName = change.alarmLabel?.takeIf { it.isNotBlank() }
+                ?: context.getString(R.string.unnamed_shared_alarm)
+            val title = change.alarmTime?.let {
+                context.getString(
+                    R.string.shared_alarm_change_title,
+                    alarmName,
+                    TimeHelper.millisToFormatted(it)
+                )
+            } ?: alarmName
+            val message = context.getString(
+                action,
+                change.deviceName ?: context.getString(R.string.unknown_group_member),
+                change.groupName
+            )
             NotificationManagerCompat.from(context).notify(
                 change.sequence.hashCode(),
                 NotificationCompat.Builder(context, NotificationHelper.SOCIAL_CHANNEL)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle(context.getString(R.string.shared_alarm_change))
-                    .setContentText(
-                        context.getString(
-                            message,
-                            change.deviceName
-                                ?: context.getString(R.string.unknown_group_member),
-                            change.alarmLabel
-                                ?: context.getString(R.string.unnamed_shared_alarm),
-                            change.groupName
-                        )
-                    )
+                    .setContentTitle(title)
+                    .setContentText(message)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(message))
                     .setAutoCancel(true)
                     .build()
             )

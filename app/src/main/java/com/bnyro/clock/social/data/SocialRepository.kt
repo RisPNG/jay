@@ -203,6 +203,7 @@ class SocialRepository(
                     it.deviceId,
                     it.deviceName,
                     it.alarmLabel,
+                    it.alarmTime,
                     AlarmChangeKind.valueOf(it.kind.uppercase())
                 )
             }

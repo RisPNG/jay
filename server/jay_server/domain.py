@@ -42,14 +42,24 @@ def record_group_change(
     actor_device_id: str | None = None,
     action: str | None = None,
     entity_label: str | None = None,
+    entity_time: int | None = None,
 ) -> None:
     connection.execute(
         """
         INSERT INTO changes (
-            group_id, entity_type, entity_id, actor_device_id, action, entity_label
-        ) VALUES (%s, %s, %s, %s, %s, %s)
+            group_id, entity_type, entity_id, actor_device_id, action, entity_label,
+            entity_time
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
-        (group_id, entity_type, entity_id, actor_device_id, action, entity_label),
+        (
+            group_id,
+            entity_type,
+            entity_id,
+            actor_device_id,
+            action,
+            entity_label,
+            entity_time,
+        ),
     )
     connection.execute(
         "SELECT pg_notify('jay_changes', %s)",

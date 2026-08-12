@@ -408,6 +408,7 @@ def create_shared_alarm(
             device["id"],
             "created",
             alarm.label,
+            alarm.time,
         )
         push_tokens = get_group_push_tokens(connection, alarm.group_id, device["id"])
     send_group_sync(push_tokens)
@@ -469,6 +470,7 @@ def update_shared_alarm(
             device["id"],
             action,
             update.label,
+            update.time,
         )
         push_tokens = get_group_push_tokens(connection, alarm["group_id"], device["id"])
     send_group_sync(push_tokens)
@@ -483,7 +485,7 @@ def delete_shared_alarm(
 ) -> dict:
     with transaction() as connection:
         alarm = connection.execute(
-            "SELECT group_id, label FROM shared_alarms WHERE id = %s AND deleted = false",
+            "SELECT group_id, label, time FROM shared_alarms WHERE id = %s AND deleted = false",
             (alarm_id,),
         ).fetchone()
         if alarm is None:
@@ -509,6 +511,7 @@ def delete_shared_alarm(
             device["id"],
             "deleted",
             alarm["label"],
+            alarm["time"],
         )
         push_tokens = get_group_push_tokens(connection, alarm["group_id"], device["id"])
     send_group_sync(push_tokens)
@@ -627,6 +630,7 @@ def synchronize(
             """
             SELECT c.sequence, c.group_id, c.entity_id AS alarm_id,
                 c.action AS kind, c.entity_label AS alarm_label,
+                c.entity_time AS alarm_time,
                 c.actor_device_id AS device_id, d.name AS device_name,
                 g.name AS group_name
             FROM changes c
