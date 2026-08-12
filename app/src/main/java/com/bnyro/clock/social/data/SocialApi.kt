@@ -18,6 +18,10 @@ import com.bnyro.clock.social.domain.SyncResponse
 import com.bnyro.clock.social.domain.PushTokenUpdate
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
@@ -174,4 +178,14 @@ class SocialApi(
     }
 }
 
-class SocialApiException(val status: Int, message: String) : Exception(message)
+class SocialApiException(val status: Int, response: String) : Exception(
+    runCatching {
+        when (val detail = (Json.parseToJsonElement(response) as? JsonObject)?.get("detail")) {
+            is JsonPrimitive -> detail.contentOrNull
+            is JsonArray -> detail.mapNotNull {
+                ((it as? JsonObject)?.get("msg") as? JsonPrimitive)?.contentOrNull
+            }.joinToString("\n").ifBlank { null }
+            else -> null
+        }
+    }.getOrNull() ?: response.ifBlank { "Request failed with status $status" }
+)
