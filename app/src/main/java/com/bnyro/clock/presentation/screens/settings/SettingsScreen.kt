@@ -241,7 +241,6 @@ fun SettingsScreen(
             ) {
                 showServerDialog = true
             }
-            Text(stringResource(R.string.server_privacy_notice))
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
