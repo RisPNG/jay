@@ -28,6 +28,8 @@ enum class AlarmChangeKind {
     DELETED
 }
 
+const val PERSONAL_ALARM_SOURCE_ID = "personal"
+
 @Entity(tableName = "social_groups")
 data class SocialGroup(
     @androidx.room.PrimaryKey val id: String,
@@ -84,12 +86,6 @@ data class SharedAlarmDelivery(
     val deviceId: String,
     val revision: Int,
     val deliveredAt: String
-)
-
-data class AlarmDeliveryCount(
-    val localAlarmId: Long,
-    val deliveredCount: Int,
-    val memberCount: Int
 )
 
 data class SocialAlarmChange(

@@ -14,6 +14,7 @@ The intentional Clock You integration points are:
 
 - application startup and dependency construction;
 - the home navigation list;
+- the alarm list's group labels, editing permissions, and source filter;
 - the alarm editor's group selector;
 - alarm create, edit, and delete dispatch;
 - ringing, snooze, and early-dismiss actions;

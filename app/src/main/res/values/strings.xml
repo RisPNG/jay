@@ -87,7 +87,9 @@
     <string name="clock_you_version" translatable="false">Clock You Version</string>
     <string name="version_value" translatable="false">%1$s (%2$s)</string>
     <string name="recent_activity" translatable="false">Recent activity</string>
-    <string name="alarm_delivery_count" translatable="false">Delivered to %1$d of %2$d devices</string>
+    <string name="alarm_source" translatable="false">Alarm source</string>
+    <string name="select_all" translatable="false">Select all</string>
+    <string name="deselect_all" translatable="false">Deselect all</string>
     <string name="timer_use_big_start">Use big start button</string>
     <string name="export">Export Alarms</string>
     <string name="exportdesc">backup alarms to json file</string>
