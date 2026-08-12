@@ -96,6 +96,7 @@ data class SocialAlarmChange(
     val deviceId: String?,
     val deviceName: String?,
     val alarmLabel: String?,
+    val alarmTime: Long?,
     val kind: AlarmChangeKind
 )
 
@@ -254,6 +255,7 @@ data class AlarmChangeDto(
     @SerialName("device_id") val deviceId: String?,
     @SerialName("device_name") val deviceName: String?,
     @SerialName("alarm_label") val alarmLabel: String?,
+    @SerialName("alarm_time") val alarmTime: Long? = null,
     val kind: String
 )
 

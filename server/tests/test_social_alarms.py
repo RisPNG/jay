@@ -99,6 +99,7 @@ def test_group_alarm_lifecycle() -> None:
         assert first_sync.json()["groups"][0]["notify_snoozed"] is True
         assert first_sync.json()["groups"][0]["notify_dismissed"] is True
         assert first_sync.json()["alarm_changes"][0]["kind"] == "created"
+        assert first_sync.json()["alarm_changes"][0]["alarm_time"] == 19_800_000
         assert first_sync.json()["alarm_changes"][0]["device_name"] == "Cozy Otter"
         assert {item["name"] for item in first_sync.json()["members"]} == {
             "Quiet Mango",
@@ -137,6 +138,7 @@ def test_group_alarm_lifecycle() -> None:
         assert latest_sync.json()["alarms"][0]["time"] == 18_000_000
         assert latest_sync.json()["activity"] == []
         assert latest_sync.json()["alarm_changes"][0]["kind"] == "edited"
+        assert latest_sync.json()["alarm_changes"][0]["alarm_time"] == 18_000_000
         assert latest_sync.json()["alarm_changes"][0]["device_name"] == "Quiet Mango"
 
         disabled_update = update | {"enabled": False, "expected_revision": 2}
@@ -174,6 +176,7 @@ def test_group_alarm_lifecycle() -> None:
         )
         assert deleted_sync.json()["alarms"][0]["deleted"] is True
         assert deleted_sync.json()["alarm_changes"][0]["kind"] == "deleted"
+        assert deleted_sync.json()["alarm_changes"][0]["alarm_time"] == 18_000_000
 
 
 def test_leader_only_group_rejects_member_alarm_changes() -> None:
