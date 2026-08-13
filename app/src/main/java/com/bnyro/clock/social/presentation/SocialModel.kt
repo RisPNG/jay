@@ -104,10 +104,10 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateGroup(group: SocialGroup) {
+    fun saveGroupSettings(group: SocialGroup) {
         viewModelScope.launch {
             busy = true
-            runCatching { repository.updateGroup(group) }
+            runCatching { repository.saveGroupSettings(group) }
                 .onFailure { message = it.message ?: "Unable to update group" }
             busy = false
         }
@@ -141,31 +141,20 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteGroup(groupId: String) {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.deleteGroup(groupId) }
+                .onFailure { message = it.message ?: "Unable to delete group" }
+            busy = false
+        }
+    }
+
     fun updateMember(groupId: String, member: SocialMember, role: MemberRole) {
         viewModelScope.launch {
             busy = true
             runCatching { repository.updateMember(groupId, member.deviceId, role) }
                 .onFailure { message = it.message ?: "Unable to update member" }
-            busy = false
-        }
-    }
-
-    fun updateMemberNotificationSettings(
-        group: SocialGroup,
-        notifyMembership: Boolean,
-        notifyAdministrative: Boolean
-    ) {
-        viewModelScope.launch {
-            busy = true
-            runCatching {
-                repository.updateMemberNotificationSettings(
-                    group.copy(
-                        notifyMembership = notifyMembership,
-                        notifyAdministrative = notifyAdministrative
-                    )
-                )
-            }
-                .onFailure { message = it.message ?: "Unable to update notifications" }
             busy = false
         }
     }
