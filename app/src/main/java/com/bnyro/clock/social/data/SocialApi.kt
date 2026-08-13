@@ -1,6 +1,7 @@
 package com.bnyro.clock.social.data
 
 import com.bnyro.clock.social.domain.AlarmActivityRequest
+import com.bnyro.clock.social.domain.AlarmOccurrenceSchedule
 import com.bnyro.clock.social.domain.DeviceRegistration
 import com.bnyro.clock.social.domain.DeviceUpdate
 import com.bnyro.clock.social.domain.GroupCreate
@@ -10,6 +11,8 @@ import com.bnyro.clock.social.domain.InviteCreate
 import com.bnyro.clock.social.domain.InviteJoin
 import com.bnyro.clock.social.domain.InviteResponse
 import com.bnyro.clock.social.domain.MemberUpdate
+import com.bnyro.clock.social.domain.MemberNotificationUpdate
+import com.bnyro.clock.social.domain.ActivityPageDto
 import com.bnyro.clock.social.domain.PlayEntitlementStatus
 import com.bnyro.clock.social.domain.PlayEntitlementVerification
 import com.bnyro.clock.social.domain.SharedAlarmDelete
@@ -26,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URI
+import java.time.ZoneId
 
 class SocialApi(
     serverUrl: String,
@@ -38,7 +42,14 @@ class SocialApi(
         request(
             "/v1/devices/register",
             "POST",
-            json.encodeToString(DeviceRegistration(identity.id, identity.name, identity.token)),
+            json.encodeToString(
+                DeviceRegistration(
+                    identity.id,
+                    identity.name,
+                    identity.token,
+                    ZoneId.systemDefault().id
+                )
+            ),
             authenticated = false
         )
     }
@@ -96,6 +107,14 @@ class SocialApi(
         )
     }
 
+    fun updateMemberNotificationSettings(groupId: String, update: MemberNotificationUpdate) {
+        request(
+            "/v1/groups/$groupId/notification-settings",
+            "PATCH",
+            json.encodeToString(update)
+        )
+    }
+
     fun removeMember(groupId: String, deviceId: String) {
         request("/v1/groups/$groupId/members/$deviceId", "DELETE")
     }
@@ -120,6 +139,24 @@ class SocialApi(
     fun recordActivity(alarmId: String, activity: AlarmActivityRequest) {
         request("/v1/alarms/$alarmId/activity", "POST", json.encodeToString(activity))
     }
+
+    fun registerAlarmOccurrence(alarmId: String, occurrence: AlarmOccurrenceSchedule) {
+        request(
+            "/v1/alarms/$alarmId/occurrence",
+            "PUT",
+            json.encodeToString(occurrence)
+        )
+    }
+
+    fun getGroupActivity(groupId: String, before: Long?): ActivityPageDto =
+        json.decodeFromString(
+            request("/v1/groups/$groupId/activity${before?.let { "?before=$it" }.orEmpty()}")
+        )
+
+    fun getAlarmActivity(alarmId: String, before: Long?): ActivityPageDto =
+        json.decodeFromString(
+            request("/v1/alarms/$alarmId/activity${before?.let { "?before=$it" }.orEmpty()}")
+        )
 
     suspend fun listenForChanges(
         shouldContinue: () -> Boolean,

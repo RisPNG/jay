@@ -1,6 +1,6 @@
 # Jay server
 
-The Jay server synchronizes device identities, groups, alarm revisions, delivery acknowledgements, and snooze or dismissal activity. Authenticated server-sent events make changes appear immediately while Jay is open; Firebase and periodic synchronization recover changes while it is in the background. Android clients communicate with this API and never connect directly to PostgreSQL.
+The Jay server synchronizes device identities, groups, alarm revisions, delivery acknowledgements, and alarm outcomes. It tracks each member's expected alarm occurrences so a missing dismissal or snooze becomes an ignored outcome after the ringing deadline even when that device is offline. Authenticated server-sent events make changes appear immediately while Jay is open; Firebase and periodic synchronization recover changes while it is in the background. Android clients communicate with this API and never connect directly to PostgreSQL.
 
 ## Local development
 
@@ -33,7 +33,8 @@ The Android emulator can reach this local API at `http://10.0.2.2:8000`. Clearte
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection URL used by the API and migrations |
 | `PUBLIC_URL` | Public base URL included in generated invitations |
-| `INVITE_LIFETIME_HOURS` | Default lifetime of a one-use invitation |
+| `INVITE_LIFETIME_HOURS` | Default lifetime of a one-use invitation, 24 hours |
+| `ALARM_OCCURRENCE_MONITOR_ENABLED` | Processes missing alarm outcomes on this server instance, enabled by default |
 | `FIREBASE_CREDENTIALS_JSON` | Optional Firebase service-account JSON for immediate synchronization pushes |
 | `GOOGLE_PLAY_CREDENTIALS_JSON` | Optional Play Integrity service-account JSON for paid-app entitlement verification |
 | `PLAY_ENTITLEMENT_LIFETIME_HOURS` | Lifetime of a verified Play entitlement, defaulting to 48 hours |

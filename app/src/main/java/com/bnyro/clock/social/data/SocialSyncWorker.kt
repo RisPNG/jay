@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.bnyro.clock.App
 import com.bnyro.clock.social.presentation.SocialNotificationHelper
+import com.bnyro.clock.R
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
@@ -17,8 +18,19 @@ class SocialSyncWorker(context: Context, parameters: WorkerParameters) :
     override suspend fun doWork(): Result = try {
         val result = (applicationContext as App).container.socialRepository.synchronize()
         SocialNotificationHelper.notifySocialChanges(applicationContext, result)
+        androidx.core.app.NotificationManagerCompat.from(applicationContext).cancel(
+            SocialNotificationHelper.SYNC_FAILURE_NOTIFICATION_ID
+        )
         Result.success()
     } catch (_: Exception) {
+        if (runAttemptCount >= 2) {
+            SocialNotificationHelper.notifyDeviceIssue(
+                applicationContext,
+                SocialNotificationHelper.SYNC_FAILURE_NOTIFICATION_ID,
+                applicationContext.getString(R.string.social_sync_failure_title),
+                applicationContext.getString(R.string.social_sync_failure_message)
+            )
+        }
         Result.retry()
     }
 

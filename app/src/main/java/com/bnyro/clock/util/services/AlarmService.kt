@@ -37,7 +37,10 @@ import kotlinx.coroutines.runBlocking
 import java.util.Timer
 import java.util.TimerTask
 import com.bnyro.clock.social.data.SocialActivityWorker
+import com.bnyro.clock.social.data.SocialIgnoredAlarmWorker
 import com.bnyro.clock.social.domain.AlarmActivityKind
+import com.bnyro.clock.util.Preferences
+import androidx.work.WorkManager
 
 class AlarmService : Service() {
     private val notificationId = 5
@@ -45,6 +48,8 @@ class AlarmService : Service() {
     private var vibrator: Vibrator? = null
     private var mediaPlayer: MediaPlayer? = null
     private var currentAlarm: Alarm? = null
+    private var occurrenceId: String? = null
+    private var outcomeRecorded = false
 
     val timer = Timer()
     private var volume: Float = 0.1f
@@ -73,7 +78,16 @@ class AlarmService : Service() {
             when (intent?.getStringExtra(ACTION_EXTRA_KEY)) {
                 DISMISS_ACTION -> {
                     currentAlarm?.let {
-                        SocialActivityWorker.enqueue(this@AlarmService, it.id, AlarmActivityKind.DISMISSED)
+                        outcomeRecorded = true
+                        SocialActivityWorker.enqueue(
+                            this@AlarmService,
+                            it.id,
+                            AlarmActivityKind.DISMISSED,
+                            occurrenceId
+                        )
+                        WorkManager.getInstance(this@AlarmService).cancelUniqueWork(
+                            "jay_ignored_alarm_${it.id}"
+                        )
                     }
                     //maybe fixes a super shitty bug that was shitty kinda D:
                     currentAlarm?.let { alarm ->
@@ -85,7 +99,19 @@ class AlarmService : Service() {
                 }
                 SNOOZE_ACTION -> {
                     currentAlarm?.let {
-                        SocialActivityWorker.enqueue(this@AlarmService, it.id, AlarmActivityKind.SNOOZED)
+                        outcomeRecorded = true
+                        SocialActivityWorker.enqueue(
+                            this@AlarmService,
+                            it.id,
+                            AlarmActivityKind.SNOOZED,
+                            occurrenceId
+                        )
+                        SocialIgnoredAlarmWorker.schedule(
+                            this@AlarmService,
+                            it.id,
+                            System.currentTimeMillis() + it.snoozeMinutes * 60_000L,
+                            occurrenceId!!
+                        )
                     }
                     AlarmHelper.snooze(this@AlarmService, currentAlarm!!)
                     stopSelf()
@@ -132,13 +158,29 @@ class AlarmService : Service() {
 
         play(alarm)
         currentAlarm = alarm
+        occurrenceId = Preferences.instance.getString(
+            "jayAlarmOccurrence:${alarm.id}",
+            null
+        ) ?: "${alarm.id}:${System.currentTimeMillis()}"
+        outcomeRecorded = false
         val alarmActivityIntent = Intent(this, AlarmActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
             putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+            putExtra(EXTRA_OCCURRENCE_ID, occurrenceId)
         }
         startActivity(alarmActivityIntent)
         timer.schedule(object : TimerTask() {
             override fun run() {
+                currentAlarm?.takeUnless { outcomeRecorded }?.let {
+                    outcomeRecorded = true
+                    SocialActivityWorker.enqueue(
+                        this@AlarmService,
+                        it.id,
+                        AlarmActivityKind.IGNORED,
+                        occurrenceId,
+                        "timed_out"
+                    )
+                }
                 stopSelf()
             }
         }, AUTO_SNOOZE_MINUTES * 60 * 1000L, AUTO_SNOOZE_MINUTES * 60 * 1000L)
@@ -298,6 +340,7 @@ class AlarmService : Service() {
         const val DISMISS_ACTION = "DISMISS"
         const val SNOOZE_ACTION = "SNOOZE"
         const val CANCEL_SHARED_ALARM_INTENT_ACTION = "com.rispng.jay.CANCEL_SHARED_ALARM"
+        const val EXTRA_OCCURRENCE_ID = "com.rispng.jay.ALARM_OCCURRENCE_ID"
         const val AUTO_SNOOZE_MINUTES = 10
 
         private const val MAX_VOLUME: Float = 1.0f

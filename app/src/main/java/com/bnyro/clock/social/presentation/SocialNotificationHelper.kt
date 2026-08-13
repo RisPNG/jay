@@ -2,85 +2,154 @@ package com.bnyro.clock.social.presentation
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.app.PendingIntent
+import android.app.NotificationManager
+import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Permission
 import com.bnyro.clock.social.data.SocialSyncResult
-import com.bnyro.clock.social.domain.AlarmActivityKind
-import com.bnyro.clock.social.domain.AlarmChangeKind
 import com.bnyro.clock.util.NotificationHelper
-import com.bnyro.clock.util.TimeHelper
+import com.bnyro.clock.ui.MainActivity
+import java.time.Instant
 
 object SocialNotificationHelper {
+    @SuppressLint("MissingPermission")
+    fun notifyDeviceIssue(context: Context, id: Int, title: String, message: String) {
+        if (!Permission.NotificationPermission.hasPermission(context)) return
+        NotificationManagerCompat.from(context).notify(
+            id,
+            NotificationCompat.Builder(context, NotificationHelper.SOCIAL_CHANNEL)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setAutoCancel(true)
+                .build()
+        )
+    }
+
     @SuppressLint("MissingPermission")
     fun notifySocialChanges(context: Context, result: SocialSyncResult) {
         if (!Permission.NotificationPermission.hasPermission(context)) return
 
-        result.newActivity.filter { it.deviceId != result.deviceId }.forEach { activity ->
-            val action = when (activity.kind) {
-                AlarmActivityKind.SNOOZED -> context.getString(R.string.social_snoozed)
-                AlarmActivityKind.DISMISSED -> context.getString(R.string.social_dismissed)
+        val changes = result.changes.filter { change ->
+            if (change.actorDeviceId == result.deviceId) return@filter false
+            if (change.action == "invitation_created") return@filter false
+            val group = result.groups[change.groupId]
+            when (change.entityType) {
+                "alarm" -> group?.notifyAlarmChanges == true
+                "outcome" -> when (change.action) {
+                    "snoozed" -> group?.notifySnoozed == true
+                    "dismissed" -> group?.notifyDismissed == true
+                    "ignored" -> group?.notifyIgnored == true
+                    else -> false
+                }
+                "membership" -> change.subjectDeviceId == result.deviceId ||
+                    group?.notifyMembership == true
+                "administrative" -> change.subjectDeviceId == result.deviceId ||
+                    group?.notifyAdministrative == true
+                "group" -> group?.notifyAdministrative == true
+                else -> false
             }
-            NotificationManagerCompat.from(context).notify(
-                activity.id.hashCode(),
+        }
+        val direct = changes.filter {
+            it.subjectDeviceId == result.deviceId &&
+                it.action == "removed"
+        }
+        val grouped = (changes - direct.toSet()).groupBy { it.groupId }
+        val notificationManager = NotificationManagerCompat.from(context)
+
+        direct.forEach { change ->
+            val eventTime = Instant.parse(change.occurredAt).toEpochMilli()
+            notificationManager.notify(
+                change.sequence.hashCode(),
                 NotificationCompat.Builder(context, NotificationHelper.SOCIAL_CHANNEL)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle(context.getString(R.string.shared_alarm_activity))
-                    .setContentText(
-                        result.alarmLabels[activity.alarmId]
-                            ?.takeIf { it.isNotBlank() }
-                            ?.let {
-                                context.getString(
-                                    R.string.member_alarm_activity,
-                                    activity.deviceName,
-                                    action,
-                                    it
-                                )
-                            }
-                            ?: context.getString(
-                                R.string.member_unnamed_alarm_activity,
-                                activity.deviceName,
-                                action
-                            )
+                    .setContentTitle(change.presentationTitle(context, result.deviceId))
+                    .setContentText(change.presentationTime(context))
+                    .setContentIntent(
+                        PendingIntent.getActivity(
+                            context,
+                            change.sequence.hashCode(),
+                            Intent(context, MainActivity::class.java)
+                                .setAction(SHOW_SOCIAL_ACTIVITY_ACTION)
+                                .putExtra(EXTRA_SOCIAL_ENTITY_TYPE, change.entityType),
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        )
                     )
+                    .setWhen(eventTime)
+                    .setShowWhen(true)
                     .setAutoCancel(true)
                     .build()
             )
         }
 
-        result.alarmChanges.filter { it.deviceId != result.deviceId }.forEach { change ->
-            val action = when (change.kind) {
-                AlarmChangeKind.CREATED -> R.string.alarm_created_by_member
-                AlarmChangeKind.EDITED -> R.string.alarm_edited_by_member
-                AlarmChangeKind.ENABLED -> R.string.alarm_enabled_by_member
-                AlarmChangeKind.DISABLED -> R.string.alarm_disabled_by_member
-                AlarmChangeKind.DELETED -> R.string.alarm_deleted_by_member
-            }
-            val alarmName = change.alarmLabel?.takeIf { it.isNotBlank() }
-                ?: context.getString(R.string.unnamed_shared_alarm)
-            val title = change.alarmTime?.let {
-                context.getString(
-                    R.string.shared_alarm_change_title,
-                    alarmName,
-                    TimeHelper.millisToFormatted(it)
-                )
-            } ?: alarmName
-            val message = context.getString(
-                action,
-                change.deviceName ?: context.getString(R.string.unknown_group_member),
-                change.groupName
+        grouped.forEach { (groupId, groupChanges) ->
+            val newest = groupChanges.last()
+            val eventTime = Instant.parse(newest.occurredAt).toEpochMilli()
+            val notificationId = groupId.hashCode()
+            val accumulation = context.getSharedPreferences(
+                "jay_social_notification_accumulation",
+                Context.MODE_PRIVATE
             )
-            NotificationManagerCompat.from(context).notify(
-                change.sequence.hashCode(),
+            val isActive = (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .activeNotifications.any { it.id == notificationId }
+            val updateCount = groupChanges.size + if (isActive) {
+                accumulation.getInt(groupId, 0)
+            } else {
+                0
+            }
+            val title = if (updateCount == 1) {
+                newest.presentationTitle(context, result.deviceId)
+            } else {
+                context.getString(
+                    R.string.social_updates_in_group,
+                    updateCount,
+                    newest.groupName
+                )
+            }
+            val message = if (updateCount == 1) {
+                newest.presentationTime(context)
+            } else {
+                groupChanges.takeLast(3).joinToString("\n") {
+                    it.presentationTitle(context, result.deviceId)
+                }
+            }
+            notificationManager.notify(
+                notificationId,
                 NotificationCompat.Builder(context, NotificationHelper.SOCIAL_CHANNEL)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setContentTitle(title)
                     .setContentText(message)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                    .setContentIntent(
+                        PendingIntent.getActivity(
+                            context,
+                            groupId.hashCode(),
+                            Intent(context, MainActivity::class.java)
+                                .setAction(SHOW_SOCIAL_ACTIVITY_ACTION)
+                                .putExtra(
+                                    EXTRA_SOCIAL_ENTITY_TYPE,
+                                    if (groupChanges.all {
+                                            it.entityType in setOf("alarm", "outcome")
+                                        }) "alarm" else "group"
+                                ),
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                        )
+                    )
+                    .setWhen(eventTime)
+                    .setShowWhen(true)
                     .setAutoCancel(true)
                     .build()
             )
+            accumulation.edit().putInt(groupId, updateCount).apply()
         }
     }
+
+    const val SHOW_SOCIAL_ACTIVITY_ACTION = "com.rispng.jay.SHOW_SOCIAL_ACTIVITY"
+    const val EXTRA_SOCIAL_ENTITY_TYPE = "com.rispng.jay.SOCIAL_ENTITY_TYPE"
+    const val SYNC_FAILURE_NOTIFICATION_ID = 190_001
+    const val ENTITLEMENT_NOTIFICATION_ID = 190_002
 }

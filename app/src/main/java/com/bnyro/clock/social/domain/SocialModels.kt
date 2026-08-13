@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.Index
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 enum class AlarmPermission {
     EVERYONE,
@@ -17,15 +18,8 @@ enum class MemberRole {
 
 enum class AlarmActivityKind {
     SNOOZED,
-    DISMISSED
-}
-
-enum class AlarmChangeKind {
-    CREATED,
-    EDITED,
-    ENABLED,
-    DISABLED,
-    DELETED
+    DISMISSED,
+    IGNORED
 }
 
 const val PERSONAL_ALARM_SOURCE_ID = "personal"
@@ -35,8 +29,12 @@ data class SocialGroup(
     @androidx.room.PrimaryKey val id: String,
     val name: String,
     val alarmPermission: AlarmPermission,
+    val notifyAlarmChanges: Boolean,
     val notifySnoozed: Boolean,
     val notifyDismissed: Boolean,
+    val notifyIgnored: Boolean,
+    val notifyMembership: Boolean,
+    val notifyAdministrative: Boolean,
     val role: MemberRole
 )
 
@@ -62,42 +60,34 @@ data class SharedAlarmLink(
     val revision: Int
 )
 
-@Entity(tableName = "social_activity")
-data class SocialActivity(
-    @androidx.room.PrimaryKey val id: String,
-    val alarmId: String,
-    val groupId: String,
-    val alarmRevision: Int,
-    val deviceId: String,
-    val deviceName: String,
-    val kind: AlarmActivityKind,
-    val occurredAt: String
-)
-
 data class AlarmGroupName(
     val localAlarmId: Long,
+    val remoteAlarmId: String,
     val groupId: String,
     val groupName: String
 )
 
-@Entity(tableName = "shared_alarm_deliveries", primaryKeys = ["alarmId", "deviceId"])
-data class SharedAlarmDelivery(
-    val alarmId: String,
-    val deviceId: String,
-    val revision: Int,
-    val deliveredAt: String
-)
-
-data class SocialAlarmChange(
+data class SocialChange(
     val sequence: Long,
-    val alarmId: String,
     val groupId: String,
     val groupName: String,
-    val deviceId: String?,
-    val deviceName: String?,
-    val alarmLabel: String?,
-    val alarmTime: Long?,
-    val kind: AlarmChangeKind
+    val entityType: String,
+    val entityId: String,
+    val action: String,
+    val entityLabel: String?,
+    val entityTime: Long?,
+    val actorDeviceId: String?,
+    val actorName: String?,
+    val subjectDeviceId: String?,
+    val subjectName: String?,
+    val recipientDeviceId: String?,
+    val details: JsonObject?,
+    val occurredAt: String
+)
+
+data class SocialActivityPage(
+    val items: List<SocialChange>,
+    val nextBefore: Long?
 )
 
 @Serializable
@@ -110,7 +100,8 @@ data class DeviceNameWords(
 data class DeviceRegistration(
     val id: String,
     val name: String,
-    val token: String
+    val token: String,
+    @SerialName("time_zone") val timeZone: String
 )
 
 @Serializable
@@ -134,16 +125,26 @@ data class PlayEntitlementStatus(
 data class GroupCreate(
     val name: String,
     @SerialName("alarm_permission") val alarmPermission: String,
+    @SerialName("notify_alarm_changes") val notifyAlarmChanges: Boolean,
     @SerialName("notify_snoozed") val notifySnoozed: Boolean,
-    @SerialName("notify_dismissed") val notifyDismissed: Boolean
+    @SerialName("notify_dismissed") val notifyDismissed: Boolean,
+    @SerialName("notify_ignored") val notifyIgnored: Boolean
 )
 
 @Serializable
 data class GroupUpdate(
     val name: String,
     @SerialName("alarm_permission") val alarmPermission: String,
+    @SerialName("notify_alarm_changes") val notifyAlarmChanges: Boolean,
     @SerialName("notify_snoozed") val notifySnoozed: Boolean,
-    @SerialName("notify_dismissed") val notifyDismissed: Boolean
+    @SerialName("notify_dismissed") val notifyDismissed: Boolean,
+    @SerialName("notify_ignored") val notifyIgnored: Boolean
+)
+
+@Serializable
+data class MemberNotificationUpdate(
+    @SerialName("notify_membership") val notifyMembership: Boolean,
+    @SerialName("notify_administrative") val notifyAdministrative: Boolean
 )
 
 @Serializable
@@ -177,9 +178,20 @@ data class SharedAlarmDelete(@SerialName("expected_revision") val expectedRevisi
 
 @Serializable
 data class AlarmActivityRequest(
+    val id: String,
     @SerialName("alarm_revision") val alarmRevision: Int,
     val kind: String,
-    @SerialName("occurred_at") val occurredAt: String
+    @SerialName("occurred_at") val occurredAt: String,
+    @SerialName("occurrence_id") val occurrenceId: String? = null,
+    val reason: String? = null
+)
+
+@Serializable
+data class AlarmOccurrenceSchedule(
+    @SerialName("alarm_revision") val alarmRevision: Int,
+    @SerialName("occurrence_id") val occurrenceId: String,
+    @SerialName("trigger_at") val triggerAt: String,
+    @SerialName("deadline_at") val deadlineAt: String
 )
 
 @Serializable
@@ -202,8 +214,12 @@ data class SocialGroupDto(
     val id: String,
     val name: String,
     @SerialName("alarm_permission") val alarmPermission: String,
+    @SerialName("notify_alarm_changes") val notifyAlarmChanges: Boolean,
     @SerialName("notify_snoozed") val notifySnoozed: Boolean,
     @SerialName("notify_dismissed") val notifyDismissed: Boolean,
+    @SerialName("notify_ignored") val notifyIgnored: Boolean,
+    @SerialName("notify_membership") val notifyMembership: Boolean,
+    @SerialName("notify_administrative") val notifyAdministrative: Boolean,
     val role: String
 )
 
@@ -235,28 +251,28 @@ data class SharedAlarmDto(
 )
 
 @Serializable
-data class SocialActivityDto(
-    val id: String,
-    @SerialName("alarm_id") val alarmId: String,
+data class SocialChangeDto(
+    val sequence: Long,
     @SerialName("group_id") val groupId: String,
-    @SerialName("alarm_revision") val alarmRevision: Int,
-    @SerialName("device_id") val deviceId: String,
-    @SerialName("device_name") val deviceName: String,
-    val kind: String,
+    @SerialName("group_name") val groupName: String,
+    @SerialName("entity_type") val entityType: String,
+    @SerialName("entity_id") val entityId: String,
+    val action: String,
+    @SerialName("entity_label") val entityLabel: String? = null,
+    @SerialName("entity_time") val entityTime: Long? = null,
+    @SerialName("actor_device_id") val actorDeviceId: String? = null,
+    @SerialName("actor_name") val actorName: String? = null,
+    @SerialName("subject_device_id") val subjectDeviceId: String? = null,
+    @SerialName("subject_name") val subjectName: String? = null,
+    @SerialName("recipient_device_id") val recipientDeviceId: String? = null,
+    val details: JsonObject? = null,
     @SerialName("occurred_at") val occurredAt: String
 )
 
 @Serializable
-data class AlarmChangeDto(
-    val sequence: Long,
-    @SerialName("alarm_id") val alarmId: String,
-    @SerialName("group_id") val groupId: String,
-    @SerialName("group_name") val groupName: String,
-    @SerialName("device_id") val deviceId: String?,
-    @SerialName("device_name") val deviceName: String?,
-    @SerialName("alarm_label") val alarmLabel: String?,
-    @SerialName("alarm_time") val alarmTime: Long? = null,
-    val kind: String
+data class ActivityPageDto(
+    val items: List<SocialChangeDto>,
+    @SerialName("next_before") val nextBefore: Long? = null
 )
 
 @Serializable
@@ -265,15 +281,5 @@ data class SyncResponse(
     val groups: List<SocialGroupDto>,
     val members: List<SocialMemberDto>,
     val alarms: List<SharedAlarmDto>,
-    val activity: List<SocialActivityDto>,
-    @SerialName("alarm_changes") val alarmChanges: List<AlarmChangeDto> = emptyList(),
-    val deliveries: List<DeliveryDto> = emptyList()
-)
-
-@Serializable
-data class DeliveryDto(
-    @SerialName("alarm_id") val alarmId: String,
-    @SerialName("device_id") val deviceId: String,
-    val revision: Int,
-    @SerialName("delivered_at") val deliveredAt: String
+    val changes: List<SocialChangeDto> = emptyList()
 )

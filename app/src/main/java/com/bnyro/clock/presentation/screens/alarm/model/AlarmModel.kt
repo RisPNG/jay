@@ -17,6 +17,7 @@ import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.social.domain.canEditAlarms
 import com.bnyro.clock.social.domain.PERSONAL_ALARM_SOURCE_ID
+import com.bnyro.clock.social.domain.SocialChange
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,11 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
 
     var showFilter by mutableStateOf(false)
     var showSortOrder by mutableStateOf(false)
+    var alarmActivity by mutableStateOf<List<SocialChange>>(emptyList())
+        private set
+    var alarmActivityNextBefore by mutableStateOf<Long?>(null)
+        private set
+    var selectedActivityAlarmId by mutableStateOf<String?>(null)
     val filters = MutableStateFlow(AlarmFilters())
     val alarmSourceIds = MutableStateFlow<Set<String>?>(null)
     private val sortOrder = MutableStateFlow(AlarmSortOrder.HOUR_OF_DAY)
@@ -85,6 +91,13 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
         SharingStarted.WhileSubscribed(5_000),
         emptyMap()
     )
+    val remoteAlarmIds = socialRepository.alarmGroupNames.map { names ->
+        names.associate { it.localAlarmId to it.remoteAlarmId }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyMap()
+    )
     val alarmEditability = combine(
         socialRepository.alarmGroupNames,
         socialRepository.groups
@@ -105,6 +118,20 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loadAlarmActivity(alarmId: String, more: Boolean = false) {
+        viewModelScope.launch {
+            runCatching {
+                socialRepository.getAlarmActivity(
+                    alarmId,
+                    if (more) alarmActivityNextBefore else null
+                )
+            }.onSuccess {
+                selectedActivityAlarmId = alarmId
+                alarmActivity = if (more) alarmActivity + it.items else it.items
+                alarmActivityNextBefore = it.nextBefore
+            }
+        }
+    }
 
     fun copyAlarm(alarm: Alarm) {
         viewModelScope.launch {

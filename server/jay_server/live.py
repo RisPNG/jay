@@ -38,10 +38,18 @@ class LiveChangeBroker:
                 ) as listener_connection, await AsyncConnection.connect(
                     database_url, autocommit=True
                 ) as lookup_connection:
+                    pending_notifications: asyncio.Queue[str] = asyncio.Queue()
+                    listener_connection.add_notify_handler(
+                        lambda notification: pending_notifications.put_nowait(
+                            notification.payload
+                        )
+                    )
                     await listener_connection.execute("LISTEN jay_changes")
                     while True:
-                        async for notification in listener_connection.notifies(timeout=30):
-                            change = json.loads(notification.payload)
+                        await asyncio.sleep(1)
+                        await listener_connection.execute("SELECT 1")
+                        while not pending_notifications.empty():
+                            change = json.loads(pending_notifications.get_nowait())
                             members = await lookup_connection.execute(
                                 "SELECT device_id FROM group_members WHERE group_id = %s",
                                 (change["group_id"],),
