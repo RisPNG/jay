@@ -50,6 +50,7 @@ import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.social.presentation.presentationTime
 import com.bnyro.clock.social.presentation.presentationTitle
 import com.bnyro.clock.social.presentation.presentationDetails
+import com.bnyro.clock.util.AlarmHelper
 
 @Composable
 fun AlarmScreen(
@@ -203,7 +204,7 @@ fun AlarmScreen(
                             alarmModel.updateAlarm(updatedAlarm)
 
                             if (updatedAlarm.enabled) {
-                                alarmModel.createToast(updatedAlarm, context)
+                                AlarmHelper.showAlarmScheduledToast(context, updatedAlarm)
                             }
                         }
                     }
