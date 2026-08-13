@@ -303,6 +303,18 @@ def update_group(
 
 
 @app.delete("/v1/groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_group(group_id: UUID, device: dict = Depends(authenticated_device)) -> None:
+    with transaction() as connection:
+        require_group_leader(connection, group_id, device["id"])
+        push_tokens = get_group_push_tokens(connection, group_id, device["id"])
+        connection.execute("DELETE FROM groups WHERE id = %s", (group_id,))
+    send_group_sync(push_tokens)
+
+
+@app.delete(
+    "/v1/groups/{group_id}/membership",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 def leave_group(group_id: UUID, device: dict = Depends(authenticated_device)) -> None:
     with transaction() as connection:
         membership = require_group_member(connection, group_id, device["id"])
@@ -1098,7 +1110,7 @@ def get_group_activity(
             WHERE c.group_id = %s
               AND (%s::bigint IS NULL OR c.sequence < %s::bigint)
               AND c.action IS NOT NULL
-              AND c.entity_type NOT IN ('outcome', 'delivery')
+              AND c.entity_type IN ('group', 'membership', 'administrative')
             ORDER BY c.sequence DESC
             LIMIT %s
             """,

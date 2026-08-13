@@ -88,60 +88,133 @@ fun SocialChange.presentationTitle(context: Context, deviceId: String): String {
     }
 }
 
-fun SocialChange.presentationDetails(context: Context): String? {
-    val detailItems = when {
-        action == "edited" -> buildList {
-            if (details?.get("previous_label") != details?.get("label")) add("name")
-            if (details?.get("previous_time") != details?.get("time")) add("time")
-            if (details?.get("previous_days") != details?.get("days")) add("days")
-            if (details?.get("previous_repeat") != details?.get("repeat")) add("repeat")
-            if (details?.get("previous_snooze_enabled") != details?.get("snooze_enabled")) {
-                add("snooze")
-            }
-            if (details?.get("previous_snooze_minutes") != details?.get("snooze_minutes")) {
-                add("snooze duration")
-            }
-            if (details?.get("previous_sound_enabled") != details?.get("sound_enabled")) {
-                add("sound")
-            }
-            if (details?.get("previous_vibrate") != details?.get("vibrate")) add("vibration")
-            if (
-                details?.get("previous_vibration_pattern") != details?.get("vibration_pattern") ||
-                details?.get("previous_vibration_pattern_name") !=
-                details?.get("vibration_pattern_name")
-            ) add("vibration pattern")
-        }
-        action == "updated" -> buildList {
-            if (details?.get("previous_name") != details?.get("name")) add("group name")
-            if (
-                details?.get("previous_alarm_permission") != details?.get("alarm_permission")
-            ) add("alarm permissions")
-            if (
-                details?.get("previous_notify_alarm_changes") !=
-                details?.get("notify_alarm_changes")
-            ) add("alarm-change notifications")
-            if (
-                details?.get("previous_notify_snoozed") != details?.get("notify_snoozed")
-            ) add("snooze notifications")
-            if (
-                details?.get("previous_notify_dismissed") != details?.get("notify_dismissed")
-            ) add("dismissal notifications")
-            if (
-                details?.get("previous_notify_ignored") != details?.get("notify_ignored")
-            ) add("ignored-alarm notifications")
-        }
-        action == "ignored" -> listOfNotNull(
-            (details?.get("reason") as? JsonPrimitive)?.contentOrNull?.replace('_', ' ')
+fun SocialChange.groupLogTitle(context: Context): String {
+    val actor = actorName ?: context.getString(R.string.unknown_group_member)
+    val subject = subjectName ?: entityLabel ?: context.getString(R.string.unknown_group_member)
+    return when (action) {
+        "created" -> context.getString(R.string.group_log_created, actor)
+        "joined" -> context.getString(R.string.group_log_joined, subject)
+        "left" -> context.getString(R.string.group_log_left, subject)
+        "removed" -> context.getString(R.string.group_log_removed, actor, subject)
+        "promoted" -> context.getString(R.string.group_log_promoted, actor, subject)
+        "demoted" -> context.getString(R.string.group_log_demoted, actor, subject)
+        "renamed" -> context.getString(
+            R.string.group_log_member_renamed,
+            (details?.get("previous_name") as? JsonPrimitive)?.contentOrNull ?: actor,
+            subject
         )
+        "updated" -> when {
+            details?.get("previous_alarm_permission") != details?.get("alarm_permission") ->
+                context.getString(R.string.group_log_permissions_updated, actor)
+            details?.get("previous_name") != details?.get("name") -> context.getString(
+                R.string.group_log_renamed,
+                actor,
+                (details?.get("previous_name") as? JsonPrimitive)?.contentOrNull ?: groupName,
+                (details?.get("name") as? JsonPrimitive)?.contentOrNull ?: groupName
+            )
+            else -> context.getString(R.string.group_log_notifications_updated, actor)
+        }
+        "invitation_created" -> context.getString(R.string.group_log_invitation_created, actor)
+        else -> context.getString(R.string.group_activity_updated, groupName)
+    }
+}
+
+fun SocialChange.alarmLogTitle(context: Context): String {
+    val actor = actorName ?: context.getString(R.string.unknown_group_member)
+    val subject = subjectName ?: context.getString(R.string.unknown_group_member)
+    return when (action) {
+        "created" -> context.getString(R.string.alarm_log_created, actor)
+        "edited" -> context.getString(R.string.alarm_log_edited, actor)
+        "enabled" -> context.getString(R.string.alarm_log_enabled, actor)
+        "disabled" -> context.getString(R.string.alarm_log_disabled, actor)
+        "deleted" -> context.getString(R.string.alarm_log_deleted, actor)
+        "snoozed" -> context.getString(R.string.alarm_log_snoozed, actor)
+        "dismissed" -> context.getString(R.string.alarm_log_dismissed, actor)
+        "ignored" -> context.getString(R.string.alarm_log_ignored, actor)
+        "delivered" -> context.getString(R.string.alarm_log_delivered, subject)
+        "corrected" -> context.getString(R.string.alarm_log_corrected)
+        else -> context.getString(R.string.group_activity_updated, groupName)
+    }
+}
+
+fun SocialChange.logDetails(context: Context): String? {
+    val detailItems = when {
+        entityType == "alarm" && action == "created" -> buildList {
+            entityLabel?.takeIf { it.isNotBlank() }?.let {
+                add(context.getString(R.string.alarm_log_name, it))
+            }
+            entityTime?.let {
+                add(context.getString(R.string.alarm_log_time, TimeHelper.millisToFormatted(it)))
+            }
+        }
+        entityType == "alarm" && action == "edited" -> buildList {
+            if (details?.get("previous_label") != details?.get("label")) {
+                add(
+                    context.getString(
+                        R.string.alarm_log_name_changed,
+                        (details?.get("previous_label") as? JsonPrimitive)?.contentOrNull
+                            ?: context.getString(R.string.unnamed_shared_alarm),
+                        (details?.get("label") as? JsonPrimitive)?.contentOrNull
+                            ?: context.getString(R.string.unnamed_shared_alarm)
+                    )
+                )
+            }
+            if (details?.get("previous_time") != details?.get("time")) {
+                val previousTime = (details?.get("previous_time") as? JsonPrimitive)?.contentOrNull
+                    ?.toLongOrNull()
+                val time = (details?.get("time") as? JsonPrimitive)?.contentOrNull?.toLongOrNull()
+                if (previousTime != null && time != null) {
+                    add(
+                        context.getString(
+                            R.string.alarm_log_time_changed,
+                            TimeHelper.millisToFormatted(previousTime),
+                            TimeHelper.millisToFormatted(time)
+                        )
+                    )
+                }
+            }
+            val otherChanges = buildList {
+                if (details?.get("previous_days") != details?.get("days")) {
+                    add(context.getString(R.string.days))
+                }
+                if (details?.get("previous_repeat") != details?.get("repeat")) {
+                    add(context.getString(R.string.repeat))
+                }
+                if (details?.get("previous_snooze_enabled") != details?.get("snooze_enabled")) {
+                    add(context.getString(R.string.snooze))
+                }
+                if (details?.get("previous_snooze_minutes") != details?.get("snooze_minutes")) {
+                    add(context.getString(R.string.alarm_log_snooze_duration))
+                }
+                if (details?.get("previous_sound_enabled") != details?.get("sound_enabled")) {
+                    add(context.getString(R.string.sound))
+                }
+                if (details?.get("previous_vibrate") != details?.get("vibrate")) {
+                    add(context.getString(R.string.vibrate))
+                }
+                if (
+                    details?.get("previous_vibration_pattern") != details?.get("vibration_pattern") ||
+                    details?.get("previous_vibration_pattern_name") !=
+                    details?.get("vibration_pattern_name")
+                ) add(context.getString(R.string.alarm_log_vibration_pattern))
+            }
+            if (otherChanges.isNotEmpty()) {
+                add(
+                    context.getString(
+                        R.string.alarm_log_other_changes,
+                        otherChanges.joinToString(", ")
+                    )
+                )
+            }
+        }
         action == "corrected" -> listOfNotNull(
             (details?.get("corrected_by") as? JsonPrimitive)?.contentOrNull?.let {
-                "Corrected by a later $it report"
+                context.getString(R.string.alarm_log_correction, it)
             }
         )
         else -> emptyList()
     }
-    return detailItems.takeIf { it.isNotEmpty() }?.joinToString(", ")
-        ?.replaceFirstChar { it.uppercase() }
+    return detailItems.takeIf { it.isNotEmpty() }?.joinToString("\n")
 }
 
 fun SocialChange.presentationTime(context: Context): String {

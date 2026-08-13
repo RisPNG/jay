@@ -88,6 +88,10 @@ class SocialApi(
     }
 
     fun leaveGroup(groupId: String) {
+        request("/v1/groups/$groupId/membership", "DELETE")
+    }
+
+    fun deleteGroup(groupId: String) {
         request("/v1/groups/$groupId", "DELETE")
     }
 
