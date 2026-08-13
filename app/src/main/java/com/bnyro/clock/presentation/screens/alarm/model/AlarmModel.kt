@@ -12,6 +12,8 @@ import com.bnyro.clock.domain.model.AlarmFilters
 import com.bnyro.clock.domain.model.AlarmSortOrder
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
+import com.bnyro.clock.social.data.SocialActivityWorker
+import com.bnyro.clock.social.domain.AlarmActivityKind
 import com.bnyro.clock.social.domain.PERSONAL_ALARM_SOURCE_ID
 import com.bnyro.clock.social.domain.SocialChange
 import com.bnyro.clock.social.domain.canEditAlarms
@@ -124,6 +126,17 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
                 alarmActivity = if (more) alarmActivity + it.items else it.items
                 alarmActivityNextBefore = it.nextBefore
             }
+        }
+    }
+
+    fun dismissUpcomingAlarm(alarm: Alarm) {
+        SocialActivityWorker.enqueue(
+            getApplication(),
+            alarm.id,
+            AlarmActivityKind.DISMISSED
+        )
+        viewModelScope.launch {
+            createUpdateDeleteAlarmUseCase.dismissUpcomingAlarm(alarm)
         }
     }
 
