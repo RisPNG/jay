@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - jay
+      - jay-testing
 
 jobs:
   prerelease:
-    if: ${{ !startsWith(github.event.head_commit.message, 'Release ') }}
+    if: ${{ github.ref_name == 'jay-testing' || !startsWith(github.event.head_commit.message, 'Release ') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -28,6 +29,23 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Prepare prerelease metadata
+        run: |
+          version_name=$(awk -F= '$1 == "jayVersionName" { print $2 }' gradle.properties)
+          version_code=$((100000 + GITHUB_RUN_NUMBER))
+          short_sha=${GITHUB_SHA:0:7}
+          if [[ "$GITHUB_REF_NAME" == "jay-testing" ]]; then
+            prerelease_version="${version_name}BE-pre.${GITHUB_RUN_NUMBER}.${short_sha}"
+            release_title="${short_sha}-BE"
+          else
+            prerelease_version="${version_name}-pre.${GITHUB_RUN_NUMBER}.g${short_sha}"
+            release_title="$short_sha"
+          fi
+          printf 'VERSION_CODE=%s\n' "$version_code" >> "$GITHUB_ENV"
+          printf 'PRERELEASE_VERSION=%s\n' "$prerelease_version" >> "$GITHUB_ENV"
+          printf 'ARTIFACT_NAME=jay-%s.apk\n' "$prerelease_version" >> "$GITHUB_ENV"
+          printf 'RELEASE_TITLE=%s\n' "$release_title" >> "$GITHUB_ENV"
+
       - name: Restore prerelease signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.PRERELEASE_KEYSTORE_BASE64 }}
@@ -38,28 +56,20 @@ jobs:
 
       - name: Test and build
         run: |
-          version_name=$(awk -F= '$1 == "jayVersionName" { print $2 }' gradle.properties)
-          version_code=$((100000 + GITHUB_RUN_NUMBER))
-          short_sha=${GITHUB_SHA:0:7}
-          prerelease_version="${version_name}-pre.${GITHUB_RUN_NUMBER}.g${short_sha}"
           ./gradlew testDebugUnitTest assembleDebug \
-            -PjayVersionCode="$version_code" \
-            -PjayVersionName="$prerelease_version" \
+            -PjayVersionCode="$VERSION_CODE" \
+            -PjayVersionName="$PRERELEASE_VERSION" \
             --no-daemon
 
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version_name=$(awk -F= '$1 == "jayVersionName" { print $2 }' gradle.properties)
-          short_sha=${GITHUB_SHA:0:7}
-          prerelease_version="${version_name}-pre.${GITHUB_RUN_NUMBER}.g${short_sha}"
-          artifact_name="jay-${prerelease_version}.apk"
           commit_message=$(git log -1 --pretty=%B)
           release_notes=$(printf 'Automated prerelease for commit %s.\n\n%s\n' "$GITHUB_SHA" "$commit_message")
-          cp app/build/outputs/apk/debug/app-debug.apk "$artifact_name"
-          gh release create "v${prerelease_version}" "$artifact_name" \
+          cp app/build/outputs/apk/debug/app-debug.apk "$ARTIFACT_NAME"
+          gh release create "v${PRERELEASE_VERSION}" "$ARTIFACT_NAME" \
             --target "$GITHUB_SHA" \
-            --title "$short_sha" \
+            --title "$RELEASE_TITLE" \
             --notes "$release_notes" \
             --prerelease
