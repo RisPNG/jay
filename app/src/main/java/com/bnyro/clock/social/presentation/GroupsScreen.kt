@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -46,7 +47,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.bnyro.clock.R
 import com.bnyro.clock.navigation.TopBarScaffold
 import com.bnyro.clock.presentation.screens.settings.components.SettingsCategory
@@ -136,7 +139,11 @@ fun GroupsScreen(
                         .clickable { selectedGroup = group }
                 ) {
                     Column(Modifier.padding(16.dp)) {
-                        Text(group.name)
+                        Text(
+                            text = group.name,
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1
+                        )
                         Text(
                             if (group.alarmPermission == AlarmPermission.EVERYONE) {
                                 stringResource(R.string.everyone_can_edit_alarms)
@@ -263,7 +270,11 @@ fun GroupsScreen(
             mutableStateOf(group.notifyAdministrative)
         }
         AlertDialog(
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .fillMaxWidth(0.9f),
             onDismissRequest = { selectedGroup = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
             title = {
                 Row(
                     Modifier.fillMaxWidth(),
@@ -398,11 +409,11 @@ fun GroupsScreen(
                         FilledTonalButton(
                             onClick = { showDeleteConfirmation = true },
                             colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 contentColor = MaterialTheme.colorScheme.error
                             )
                         ) {
-                            Text(stringResource(R.string.delete_group))
+                            Text(stringResource(R.string.delete))
                         }
                     }
                     Spacer(Modifier.weight(1f))
@@ -447,11 +458,11 @@ fun GroupsScreen(
                             selectedGroup = null
                         },
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             contentColor = MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Text(stringResource(R.string.delete_group))
+                        Text(stringResource(R.string.delete))
                     }
                 },
                 dismissButton = {

@@ -13,8 +13,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -37,9 +39,9 @@ fun AlarmCard(
     alarm: Alarm,
     groupName: String? = null,
     canEdit: Boolean = true,
-    onClick: () -> Unit,
     isAlarmEnabled: Boolean,
-    onEnable: (Boolean) -> Unit
+    onEnable: (Boolean) -> Unit,
+    onActivity: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -60,31 +62,38 @@ fun AlarmCard(
                 val relativeTimeString = DateUtils.getRelativeTimeSpanString(
                     AlarmHelper.getAlarmTime(alarm),
                 )
-                groupName?.let {
-                    Row(
-                        modifier = Modifier.padding(start = 5.dp, end = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Groups, null)
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(text = it, overflow = TextOverflow.Ellipsis, maxLines = 1)
-                    }
-                }
-                alarm.label?.let {
+                if (groupName != null || alarm.label != null) {
                     Row(
                         modifier = Modifier
-                            .padding(start = 5.dp, end = 10.dp)
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .padding(start = 5.dp, end = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.Label, null)
-                        Spacer(modifier = Modifier.width(5.dp))
-
-                        Text(
-                            text = it,
-                            overflow = TextOverflow.Ellipsis,
-                            maxLines = 1
-                        )
+                        groupName?.let {
+                            Icon(Icons.Default.Groups, null)
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = it,
+                                modifier = Modifier.weight(1f, fill = false),
+                                overflow = TextOverflow.Ellipsis,
+                                maxLines = 1
+                            )
+                        }
+                        onActivity?.let {
+                            IconButton(onClick = it) {
+                                Icon(Icons.Rounded.History, stringResource(R.string.alarm_logs))
+                            }
+                        }
+                        alarm.label?.let {
+                            Icon(Icons.AutoMirrored.Filled.Label, null)
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = it,
+                                modifier = Modifier.weight(1f, fill = false),
+                                overflow = TextOverflow.Ellipsis,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(5.dp))
