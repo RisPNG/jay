@@ -2,6 +2,8 @@
 
 Jay is a source-level Clock You extension, not a runtime Android plugin. Android application features cannot be injected into another APK while safely sharing its Room database, alarm services, activities, and manifest components.
 
+## Ownership boundary
+
 The repository keeps the extension boundary narrow:
 
 - `server/` owns the complete Jay server and PostgreSQL protocol.
@@ -20,9 +22,17 @@ The intentional Clock You integration points are:
 - ringing, snooze, and early-dismiss actions;
 - settings, launcher branding, dependencies, resources, and manifest declarations.
 
+Base clock behavior belongs to Clock You. Develop improvements to alarms, clocks, timers, stopwatches, settings, onboarding, notifications, pickers, and other generally useful Clock You behavior on focused branches from `main`, then submit them upstream. Social groups, shared alarms, membership, synchronization, social notifications, entitlements, and the Jay server belong to `jay-group-addon`. A social feature may modify a Clock You-owned file only at an integration point above and should reuse the existing Clock You domain behavior rather than create a parallel implementation.
+
+## Branch responsibilities
+
 Keep an upstream remote pointing to Clock You and preserve `main` as a branch containing only upstream history. Maintain the social extension on `jay-group-addon`, based on the latest `main`, with changes outside the social package limited to the integration points above. `jay-group-addon` does not publish releases.
 
 Use `jay` as the complete integration branch. Merge `jay-group-addon` and every active Clock You contribution branch into `jay` for combined testing. Ordinary pushes to `jay` publish prereleases, while commits beginning exactly with `Release ` publish stable releases. No other branch publishes a release.
+
+Changes should originate on the branch that owns them. If combined testing exposes a Clock You defect, fix its contribution branch; if it exposes a social defect, fix `jay-group-addon`; then merge the corrected branch back into `jay`. Avoid leaving a fix only on `jay`, because that makes its eventual upstream or add-on ownership ambiguous.
+
+## Updating upstream
 
 For each update:
 
