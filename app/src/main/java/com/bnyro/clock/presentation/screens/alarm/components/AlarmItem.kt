@@ -144,7 +144,7 @@ fun AlarmItem(
                         onClick = it,
                         modifier = Modifier.align(Alignment.TopEnd)
                     ) {
-                        Icon(Icons.Rounded.History, stringResource(R.string.alarm_activity))
+                        Icon(Icons.Rounded.History, stringResource(R.string.alarm_logs))
                     }
                 }
             }

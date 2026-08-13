@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
@@ -48,9 +47,8 @@ import com.bnyro.clock.presentation.screens.alarm.components.AlarmFilterSection
 import com.bnyro.clock.presentation.screens.alarm.components.AlarmItem
 import com.bnyro.clock.presentation.screens.alarm.model.AlarmModel
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
-import com.bnyro.clock.social.presentation.presentationTime
-import com.bnyro.clock.social.presentation.presentationTitle
-import com.bnyro.clock.social.presentation.presentationDetails
+import com.bnyro.clock.social.presentation.SocialLogEntry
+import com.bnyro.clock.social.presentation.alarmLogTitle
 import com.bnyro.clock.util.AlarmHelper
 
 @Composable
@@ -249,7 +247,7 @@ fun AlarmScreen(
         if (alarmModel.selectedActivityAlarmId != null) {
             AlertDialog(
                 onDismissRequest = { alarmModel.selectedActivityAlarmId = null },
-                title = { Text(stringResource(R.string.alarm_activity)) },
+                title = { Text(stringResource(R.string.alarm_logs)) },
                 text = {
                     Column(
                         Modifier.verticalScroll(rememberScrollState())
@@ -258,10 +256,7 @@ fun AlarmScreen(
                             Text(stringResource(R.string.no_activity))
                         }
                         alarmModel.alarmActivity.forEach { change ->
-                            Text(change.presentationTitle(context, ""))
-                            change.presentationDetails(context)?.let { Text(it) }
-                            Text(change.presentationTime(context))
-                            Spacer(Modifier.height(12.dp))
+                            SocialLogEntry(change, change.alarmLogTitle(context))
                         }
                         if (alarmModel.alarmActivityNextBefore != null) {
                             OutlinedButton(onClick = {
@@ -274,8 +269,8 @@ fun AlarmScreen(
                     }
                 },
                 confirmButton = {
-                    Button(onClick = { alarmModel.selectedActivityAlarmId = null }) {
-                        Text(stringResource(android.R.string.ok))
+                    DialogButton(label = R.string.close) {
+                        alarmModel.selectedActivityAlarmId = null
                     }
                 }
             )

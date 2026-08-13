@@ -213,7 +213,7 @@ def test_group_alarm_lifecycle() -> None:
         )
         assert deleted_change["entity_time"] == 18_000_000
 
-        left = client.delete(f"/v1/groups/{group_id}", headers=member)
+        left = client.delete(f"/v1/groups/{group_id}/membership", headers=member)
         assert left.status_code == 204
         left_sync = client.get(
             f"/v1/sync?since={deleted_sync.json()['cursor']}", headers=leader
@@ -229,12 +229,13 @@ def test_group_alarm_lifecycle() -> None:
 
         group_activity = client.get(f"/v1/groups/{group_id}/activity", headers=leader)
         assert group_activity.status_code == 200
-        assert {item["action"] for item in group_activity.json()["items"]} >= {
-            "created", "joined", "edited", "disabled", "enabled", "deleted", "left"
+        assert {item["action"] for item in group_activity.json()["items"]} == {
+            "created", "joined", "invitation_created", "left"
         }
-        assert "snoozed" not in {
-            item["action"] for item in group_activity.json()["items"]
-        }
+        assert all(
+            item["entity_type"] in {"group", "membership", "administrative"}
+            for item in group_activity.json()["items"]
+        )
         first_group_activity_page = client.get(
             f"/v1/groups/{group_id}/activity?limit=1", headers=leader
         ).json()
@@ -254,6 +255,67 @@ def test_group_alarm_lifecycle() -> None:
         assert {item["action"] for item in alarm_activity.json()["items"]} >= {
             "created", "snoozed", "edited", "disabled", "enabled", "deleted", "delivered"
         }
+
+
+def test_any_group_leader_can_delete_group() -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_occurrences, alarm_deliveries, shared_alarms, "
+                "group_invites, group_members, groups, devices CASCADE"
+            )
+
+        creator = register_device(client, "Quiet Cedar", "creator-secret-that-is-long-enough")
+        member = register_device(client, "Silver Fern", "member-secret-that-is-long-enough")
+        group_id = client.post(
+            "/v1/groups",
+            headers=creator,
+            json={"name": "House", "alarm_permission": "everyone"},
+        ).json()["id"]
+        invitation = client.post(
+            f"/v1/groups/{group_id}/invites", headers=creator, json={}
+        ).json()
+        client.post(
+            "/v1/groups/join",
+            headers=member,
+            json={"token": invitation["token"]},
+        )
+        alarm_id = client.post(
+            "/v1/alarms", headers=member, json=alarm_payload(group_id)
+        ).json()["id"]
+        client.get("/v1/sync", headers=creator)
+
+        assert client.delete(f"/v1/groups/{group_id}", headers=member).status_code == 403
+        promoted = client.patch(
+            f"/v1/groups/{group_id}/members/{member['X-Jay-Device-ID']}",
+            headers=creator,
+            json={"role": "leader"},
+        )
+        assert promoted.status_code == 200
+        assert client.delete(f"/v1/groups/{group_id}", headers=member).status_code == 204
+        assert client.get("/v1/sync", headers=creator).json()["groups"] == []
+        with transaction() as connection:
+            for table in (
+                "groups",
+                "group_members",
+                "group_invites",
+                "shared_alarms",
+                "alarm_activity",
+                "alarm_occurrences",
+                "changes",
+            ):
+                assert connection.execute(
+                    f"SELECT count(*) AS count FROM {table} WHERE "
+                    f"{'id' if table == 'groups' else 'group_id'} = %s",
+                    (group_id,),
+                ).fetchone()["count"] == 0
+            assert connection.execute(
+                "SELECT count(*) AS count FROM alarm_deliveries WHERE alarm_id = %s",
+                (alarm_id,),
+            ).fetchone()["count"] == 0
+            assert connection.execute(
+                "SELECT count(*) AS count FROM devices"
+            ).fetchone()["count"] == 2
 
 
 def test_leader_only_group_rejects_member_alarm_changes() -> None:
