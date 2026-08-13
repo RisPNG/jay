@@ -13,11 +13,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -123,8 +121,6 @@ fun AlarmItem(
                     alarm = alarm,
                     groupName = groupName,
                     canEdit = canEdit,
-                    onClick = {
-                    },
                     isAlarmEnabled = isAlarmEnabled,
                     canDismiss = canDismiss && !isSelectionMode,
                     onDismiss = {
@@ -137,16 +133,9 @@ fun AlarmItem(
                             alarm.enabled = enabled
                             onUpdateAlarm.invoke(alarm)
                         }
-                    }
+                    },
+                    onActivity = onActivity
                 )
-                onActivity?.let {
-                    IconButton(
-                        onClick = it,
-                        modifier = Modifier.align(Alignment.TopEnd)
-                    ) {
-                        Icon(Icons.Rounded.History, stringResource(R.string.alarm_logs))
-                    }
-                }
             }
         },
         backgroundContent = {
