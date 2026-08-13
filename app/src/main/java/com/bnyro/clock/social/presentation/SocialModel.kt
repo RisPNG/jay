@@ -41,6 +41,8 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         private set
     var invitation by mutableStateOf<String?>(null)
         private set
+    var deviceId by mutableStateOf<String?>(null)
+        private set
     var deviceName by mutableStateOf(
         Preferences.instance.getString(Preferences.jayDeviceNameKey, null).orEmpty()
     )
@@ -61,7 +63,8 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             busy = true
             runCatching { repository.synchronize() }
-                .onSuccess {
+                .onSuccess { result ->
+                    deviceId = result.deviceId
                     deviceName = Preferences.instance.getString(
                         Preferences.jayDeviceNameKey,
                         deviceName
@@ -158,7 +161,10 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 repository.changeServer(url)
                 repository.synchronize()
-            }.onSuccess { serverUrl = url.trimEnd('/') }
+            }.onSuccess { result ->
+                deviceId = result.deviceId
+                serverUrl = url.trimEnd('/')
+            }
                 .onFailure { message = it.message ?: "Unable to change server" }
             busy = false
         }

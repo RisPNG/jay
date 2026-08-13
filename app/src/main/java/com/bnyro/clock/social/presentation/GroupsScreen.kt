@@ -293,7 +293,10 @@ fun GroupsScreen(
                                     }
                                 )
                             }
-                            if (group.role == MemberRole.LEADER) {
+                            if (
+                                group.role == MemberRole.LEADER &&
+                                member.deviceId != socialModel.deviceId
+                            ) {
                                 Switch(
                                     checked = member.role == MemberRole.LEADER,
                                     onCheckedChange = {
