@@ -27,7 +27,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +41,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.AlarmFilters
+import com.bnyro.clock.presentation.components.DialogButton
+import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.social.domain.PERSONAL_ALARM_SOURCE_ID
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.util.AlarmHelper
@@ -147,11 +148,11 @@ private fun AlarmSourceRow(
                 text = stringResource(R.string.alarm_source),
                 modifier = Modifier.weight(1f)
             )
-            TextButton(onClick = { onChangeSources(null) }) {
-                Text(stringResource(R.string.select_all))
+            DialogButton(R.string.select_all, DialogButtonStyle.SECONDARY) {
+                onChangeSources(null)
             }
-            TextButton(onClick = { onChangeSources(emptySet()) }) {
-                Text(stringResource(R.string.deselect_all))
+            DialogButton(R.string.deselect_all, DialogButtonStyle.SECONDARY) {
+                onChangeSources(emptySet())
             }
         }
 
@@ -258,6 +259,7 @@ fun TimeRangeRow(
     onClickStartTime: () -> Unit,
     onClickEndTime: () -> Unit
 ) {
+    val context = LocalContext.current
 
     Row(
         modifier = Modifier
@@ -274,7 +276,7 @@ fun TimeRangeRow(
         Spacer(modifier = Modifier.width(16.dp))
 
         Button(onClick = onClickStartTime, modifier = Modifier.weight(1f)) {
-            Text(text = TimeHelper.millisToFormatted(startTime))
+            Text(text = TimeHelper.millisToFormatted(context, startTime))
         }
 
         Icon(
@@ -284,7 +286,7 @@ fun TimeRangeRow(
         )
 
         Button(onClick = onClickEndTime, modifier = Modifier.weight(1f)) {
-            Text(text = TimeHelper.millisToFormatted(endTime))
+            Text(text = TimeHelper.millisToFormatted(context, endTime))
         }
 
     }

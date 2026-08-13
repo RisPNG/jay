@@ -8,12 +8,12 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.AlarmClock
-import android.text.format.DateUtils
 import androidx.core.app.NotificationCompat
 import com.bnyro.clock.App
 import com.bnyro.clock.R
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.AlarmHelper
+import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -62,10 +62,10 @@ class PreAlarmReceiver : BroadcastReceiver() {
                 if (alarm != null) {
                     val targetAlarmTimeMs = AlarmHelper.getAlarmTime(alarm)
 
-                    val formattedTime = DateUtils.formatDateTime(
+                    val formattedTime = TimeHelper.formatTime(
                         context,
-                        targetAlarmTimeMs,
-                        DateUtils.FORMAT_SHOW_TIME
+                        java.time.Instant.ofEpochMilli(targetAlarmTimeMs)
+                            .atZone(java.time.ZoneId.systemDefault())
                     )
 
                     withContext(Dispatchers.Main) {
