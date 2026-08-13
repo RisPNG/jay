@@ -187,7 +187,7 @@ fun SettingsScreen(
             }
 
             ButtonGroupPref(
-                title = "Plus Button Position",
+                title = stringResource(R.string.plus_button_position),
                 options = SettingsModel.FabAlignment.entries.map {
                     it.name.lowercase().replaceFirstChar { char -> char.uppercase() }
                 },
