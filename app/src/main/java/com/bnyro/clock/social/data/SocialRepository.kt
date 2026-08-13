@@ -680,7 +680,10 @@ class SocialRepository(
                 occurrenceId,
                 Instant.ofEpochMilli(triggerAt).toString(),
                 Instant.ofEpochMilli(
-                    triggerAt + AlarmService.AUTO_SNOOZE_MINUTES * 60_000L
+                    triggerAt + Preferences.instance.getInt(
+                        Preferences.alarmTimeoutMinutesKey,
+                        AlarmService.ALARM_TIMEOUT_MINUTES
+                    ) * 60_000L
                 ).toString()
             )
         )
