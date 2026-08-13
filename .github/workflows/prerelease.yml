@@ -4,11 +4,10 @@ on:
   push:
     branches:
       - jay
-      - jay-testing
 
 jobs:
   prerelease:
-    if: ${{ github.ref_name == 'jay-testing' || !startsWith(github.event.head_commit.message, 'Release ') }}
+    if: ${{ !startsWith(github.event.head_commit.message, 'Release ') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -34,17 +33,11 @@ jobs:
           version_name=$(awk -F= '$1 == "jayVersionName" { print $2 }' gradle.properties)
           version_code=$((100000 + GITHUB_RUN_NUMBER))
           short_sha=${GITHUB_SHA:0:7}
-          if [[ "$GITHUB_REF_NAME" == "jay-testing" ]]; then
-            prerelease_version="${version_name}BE-pre.${GITHUB_RUN_NUMBER}.${short_sha}"
-            release_title="${short_sha}-BE"
-          else
-            prerelease_version="${version_name}-pre.${GITHUB_RUN_NUMBER}.g${short_sha}"
-            release_title="$short_sha"
-          fi
+          prerelease_version="${version_name}-pre.${GITHUB_RUN_NUMBER}.g${short_sha}"
           printf 'VERSION_CODE=%s\n' "$version_code" >> "$GITHUB_ENV"
           printf 'PRERELEASE_VERSION=%s\n' "$prerelease_version" >> "$GITHUB_ENV"
           printf 'ARTIFACT_NAME=jay-%s.apk\n' "$prerelease_version" >> "$GITHUB_ENV"
-          printf 'RELEASE_TITLE=%s\n' "$release_title" >> "$GITHUB_ENV"
+          printf 'RELEASE_TITLE=%s\n' "$short_sha" >> "$GITHUB_ENV"
 
       - name: Restore prerelease signing key
         env:
