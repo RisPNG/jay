@@ -23,6 +23,7 @@ object Preferences {
     const val jayDeviceNameKey = "jayDeviceName"
     const val jaySyncCursorKey = "jaySyncCursor"
     const val jayPendingInvitationKey = "jayPendingInvitation"
+    const val volumeButtonActionKey = "volumeButtonAction"
 
 
     fun init(context: Context) {
