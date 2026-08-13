@@ -1,6 +1,5 @@
 package com.bnyro.clock.presentation.screens.alarm.components
 
-import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.util.AlarmHelper
+import com.bnyro.clock.util.TimeHelper
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun AlarmCard(
@@ -60,9 +61,7 @@ fun AlarmCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                val relativeTimeString = DateUtils.getRelativeTimeSpanString(
-                    AlarmHelper.getAlarmTime(alarm),
-                )
+                val millisRemaining = AlarmHelper.getAlarmTime(alarm) - System.currentTimeMillis()
                 groupName?.let {
                     Row(
                         modifier = Modifier.padding(start = 5.dp, end = 10.dp),
@@ -98,7 +97,14 @@ fun AlarmCard(
                 )
                 Text(
                     modifier = Modifier.padding(start = 6.dp),
-                    text = "$relativeTimeString"
+                    text = if (millisRemaining <= 0) {
+                        stringResource(R.string.alarm_starting_now)
+                    } else {
+                        stringResource(
+                            R.string.alarm_starts_in,
+                            TimeHelper.durationToFormatted(context, millisRemaining.milliseconds)
+                        )
+                    }
                 )
             }
 
