@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -18,13 +19,18 @@ import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -43,6 +49,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.navigation.TopBarScaffold
+import com.bnyro.clock.presentation.screens.settings.components.SettingsCategory
 import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.social.domain.MemberRole
 import com.bnyro.clock.social.domain.SocialGroup
@@ -232,6 +239,7 @@ fun GroupsScreen(
     }
 
     selectedGroup?.let { group ->
+        var showDeleteConfirmation by remember(group.id) { mutableStateOf(false) }
         var name by remember(group.id, group.name) { mutableStateOf(group.name) }
         var permission by remember(group.id, group.alarmPermission) {
             mutableStateOf(group.alarmPermission)
@@ -256,14 +264,29 @@ fun GroupsScreen(
         }
         AlertDialog(
             onDismissRequest = { selectedGroup = null },
-            title = { Text(group.name) },
+            title = {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(group.name, Modifier.weight(1f))
+                    IconButton(onClick = {
+                        socialModel.loadGroupActivity(group.id)
+                        activityGroup = group
+                        selectedGroup = null
+                    }) {
+                        Icon(Icons.Rounded.History, stringResource(R.string.group_logs))
+                    }
+                }
+            },
             text = {
                 Column(
                     Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (group.role == MemberRole.LEADER) {
+                        SettingsCategory(stringResource(R.string.group_section))
                         OutlinedTextField(
+                            modifier = Modifier.fillMaxWidth(),
                             value = name,
                             onValueChange = { name = it },
                             label = { Text(stringResource(R.string.group_name)) }
@@ -274,6 +297,11 @@ fun GroupsScreen(
                         ) {
                             permission = if (it) AlarmPermission.LEADERS else AlarmPermission.EVERYONE
                         }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        SettingsCategory(stringResource(R.string.alarm_notifications))
                         GroupSwitch(
                             stringResource(R.string.notify_alarm_changes),
                             notifyAlarmChanges
@@ -287,49 +315,33 @@ fun GroupsScreen(
                         GroupSwitch(stringResource(R.string.notify_ignored), notifyIgnored) {
                             notifyIgnored = it
                         }
-                        Button(
-                            onClick = {
-                                socialModel.updateGroup(
-                                    group.copy(
-                                        name = name.trim(),
-                                        alarmPermission = permission,
-                                        notifyAlarmChanges = notifyAlarmChanges,
-                                        notifySnoozed = notifySnoozed,
-                                        notifyDismissed = notifyDismissed,
-                                        notifyIgnored = notifyIgnored
-                                    )
-                                )
-                            },
-                            enabled = name.isNotBlank()
-                        ) { Text(stringResource(R.string.save)) }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     }
+                    SettingsCategory(stringResource(R.string.activity_notifications))
                     GroupSwitch(
                         stringResource(R.string.notify_membership_activity),
                         notifyMembership
                     ) {
                         notifyMembership = it
-                        socialModel.updateMemberNotificationSettings(
-                            group,
-                            it,
-                            notifyAdministrative
-                        )
                     }
                     GroupSwitch(
                         stringResource(R.string.notify_administrative_activity),
                         notifyAdministrative
                     ) {
                         notifyAdministrative = it
-                        socialModel.updateMemberNotificationSettings(
-                            group,
-                            notifyMembership,
-                            it
-                        )
                     }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    SettingsCategory(stringResource(R.string.members))
                     Button(onClick = { socialModel.createInvite(group.id) }) {
                         Icon(Icons.Default.Share, null)
                         Text(stringResource(R.string.invite_member))
                     }
-                    Text(stringResource(R.string.members))
                     members.filter { it.groupId == group.id }.forEach { member ->
                         Row(
                             Modifier.fillMaxWidth(),
@@ -366,51 +378,104 @@ fun GroupsScreen(
                             }
                         }
                     }
-                    OutlinedButton(onClick = {
-                        socialModel.loadGroupActivity(group.id)
-                        activityGroup = group
-                        selectedGroup = null
-                    }) {
-                        Text(stringResource(R.string.activity_history))
-                    }
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(onClick = {
                         socialModel.leaveGroup(group.id)
                         selectedGroup = null
                     }) { Text(stringResource(R.string.leave_group)) }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 }
             },
             confirmButton = {
-                Button(onClick = { selectedGroup = null }) {
-                    Text(stringResource(android.R.string.ok))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (group.role == MemberRole.LEADER) {
+                        FilledTonalButton(
+                            onClick = { showDeleteConfirmation = true },
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text(stringResource(R.string.delete_group))
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    OutlinedButton(onClick = { selectedGroup = null }) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            socialModel.saveGroupSettings(
+                                group.copy(
+                                    name = name.trim(),
+                                    alarmPermission = permission,
+                                    notifyAlarmChanges = notifyAlarmChanges,
+                                    notifySnoozed = notifySnoozed,
+                                    notifyDismissed = notifyDismissed,
+                                    notifyIgnored = notifyIgnored,
+                                    notifyMembership = notifyMembership,
+                                    notifyAdministrative = notifyAdministrative
+                                )
+                            )
+                            selectedGroup = null
+                        },
+                        enabled = group.role != MemberRole.LEADER || name.isNotBlank()
+                    ) {
+                        Text(stringResource(R.string.save))
+                    }
                 }
             }
         )
+
+        if (showDeleteConfirmation) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirmation = false },
+                title = { Text(stringResource(R.string.delete_group)) },
+                text = { Text(stringResource(R.string.delete_group_confirmation)) },
+                confirmButton = {
+                    FilledTonalButton(
+                        onClick = {
+                            socialModel.deleteGroup(group.id)
+                            showDeleteConfirmation = false
+                            selectedGroup = null
+                        },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text(stringResource(R.string.delete_group))
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { showDeleteConfirmation = false }) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                }
+            )
+        }
     }
 
     activityGroup?.let { group ->
         AlertDialog(
             onDismissRequest = { activityGroup = null },
-            title = { Text(stringResource(R.string.activity_history)) },
+            title = { Text(stringResource(R.string.group_logs)) },
             text = {
                 Column(
-                    Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    Modifier.verticalScroll(rememberScrollState())
                 ) {
                     if (socialModel.groupActivity.isEmpty() && !socialModel.busy) {
                         Text(stringResource(R.string.no_activity))
                     }
                     socialModel.groupActivity.forEach { change ->
-                        Column(
-                            Modifier.clickable(enabled = change.entityType == "alarm") {
-                                socialModel.loadAlarmActivity(change.entityId)
-                                activityGroup = null
-                            }
-                        ) {
-                            Text(change.presentationTitle(context, socialModel.deviceId.orEmpty()))
-                            change.presentationDetails(context)?.let { Text(it) }
-                            Text(change.presentationTime(context))
-                        }
+                        SocialLogEntry(change, change.groupLogTitle(context))
                     }
                     if (socialModel.groupActivityNextBefore != null) {
                         OutlinedButton(
@@ -421,7 +486,7 @@ fun GroupsScreen(
             },
             confirmButton = {
                 Button(onClick = { activityGroup = null }) {
-                    Text(stringResource(android.R.string.ok))
+                    Text(stringResource(R.string.close))
                 }
             }
         )
@@ -430,18 +495,13 @@ fun GroupsScreen(
     if (socialModel.activityAlarmId != null) {
         AlertDialog(
             onDismissRequest = { socialModel.activityAlarmId = null },
-            title = { Text(stringResource(R.string.alarm_activity)) },
+            title = { Text(stringResource(R.string.alarm_logs)) },
             text = {
                 Column(
-                    Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    Modifier.verticalScroll(rememberScrollState())
                 ) {
                     socialModel.alarmActivity.forEach { change ->
-                        Column {
-                            Text(change.presentationTitle(context, socialModel.deviceId.orEmpty()))
-                            change.presentationDetails(context)?.let { Text(it) }
-                            Text(change.presentationTime(context))
-                        }
+                        SocialLogEntry(change, change.alarmLogTitle(context))
                     }
                     if (socialModel.alarmActivityNextBefore != null) {
                         OutlinedButton(onClick = {
@@ -455,7 +515,7 @@ fun GroupsScreen(
             },
             confirmButton = {
                 Button(onClick = { socialModel.activityAlarmId = null }) {
-                    Text(stringResource(android.R.string.ok))
+                    Text(stringResource(R.string.close))
                 }
             }
         )

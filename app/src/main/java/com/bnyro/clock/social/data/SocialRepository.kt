@@ -264,23 +264,34 @@ class SocialRepository(
         synchronize()
     }
 
-    suspend fun updateGroup(group: SocialGroup) = withContext(Dispatchers.IO) {
+    suspend fun saveGroupSettings(group: SocialGroup) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
             Preferences.jayServerUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).updateGroup(
-            group.id,
-            GroupUpdate(
-                group.name,
-                group.alarmPermission.name.lowercase(),
-                group.notifyAlarmChanges,
-                group.notifySnoozed,
-                group.notifyDismissed,
-                group.notifyIgnored
+        SocialApi(serverUrl, identity).apply {
+            if (group.role == MemberRole.LEADER) {
+                updateGroup(
+                    group.id,
+                    GroupUpdate(
+                        group.name,
+                        group.alarmPermission.name.lowercase(),
+                        group.notifyAlarmChanges,
+                        group.notifySnoozed,
+                        group.notifyDismissed,
+                        group.notifyIgnored
+                    )
+                )
+            }
+            updateMemberNotificationSettings(
+                group.id,
+                MemberNotificationUpdate(
+                    group.notifyMembership,
+                    group.notifyAdministrative
+                )
             )
-        )
+        }
         synchronize()
     }
 
@@ -334,6 +345,16 @@ class SocialRepository(
         synchronize()
     }
 
+    suspend fun deleteGroup(groupId: String) = withContext(Dispatchers.IO) {
+        val serverUrl = Preferences.instance.getString(
+            Preferences.jayServerUrlKey,
+            DEFAULT_SERVER_URL
+        ) ?: DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+        SocialApi(serverUrl, identity).deleteGroup(groupId)
+        synchronize()
+    }
+
     suspend fun updateMember(groupId: String, deviceId: String, role: MemberRole) =
         withContext(Dispatchers.IO) {
             val serverUrl = Preferences.instance.getString(
@@ -345,23 +366,6 @@ class SocialRepository(
                 groupId,
                 deviceId,
                 role.name.lowercase()
-            )
-            synchronize()
-        }
-
-    suspend fun updateMemberNotificationSettings(group: SocialGroup) =
-        withContext(Dispatchers.IO) {
-            val serverUrl = Preferences.instance.getString(
-                Preferences.jayServerUrlKey,
-                DEFAULT_SERVER_URL
-            ) ?: DEFAULT_SERVER_URL
-            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            SocialApi(serverUrl, identity).updateMemberNotificationSettings(
-                group.id,
-                MemberNotificationUpdate(
-                    group.notifyMembership,
-                    group.notifyAdministrative
-                )
             )
             synchronize()
         }
