@@ -41,9 +41,10 @@ jobs:
           version_name=$(awk -F= '$1 == "jayVersionName" { print $2 }' gradle.properties)
           version_code=$((100000 + GITHUB_RUN_NUMBER))
           short_sha=${GITHUB_SHA:0:7}
+          prerelease_version="${version_name}-pre.${GITHUB_RUN_NUMBER}.g${short_sha}"
           ./gradlew testDebugUnitTest assembleDebug \
             -PjayVersionCode="$version_code" \
-            -PjayVersionName="${version_name}-pre.${GITHUB_RUN_NUMBER}.${short_sha}" \
+            -PjayVersionName="$prerelease_version" \
             --no-daemon
 
       - name: Publish prerelease
@@ -52,10 +53,13 @@ jobs:
         run: |
           version_name=$(awk -F= '$1 == "jayVersionName" { print $2 }' gradle.properties)
           short_sha=${GITHUB_SHA:0:7}
-          artifact_name="jay-${version_name}-prerelease-${short_sha}.apk"
+          prerelease_version="${version_name}-pre.${GITHUB_RUN_NUMBER}.g${short_sha}"
+          artifact_name="jay-${prerelease_version}.apk"
+          commit_message=$(git log -1 --pretty=%B)
+          release_notes=$(printf 'Automated prerelease for commit %s.\n\n%s\n' "$GITHUB_SHA" "$commit_message")
           cp app/build/outputs/apk/debug/app-debug.apk "$artifact_name"
-          gh release create "prerelease-${short_sha}" "$artifact_name" \
+          gh release create "v${prerelease_version}" "$artifact_name" \
             --target "$GITHUB_SHA" \
             --title "$short_sha" \
-            --notes "Automated prerelease for commit ${GITHUB_SHA}." \
+            --notes "$release_notes" \
             --prerelease

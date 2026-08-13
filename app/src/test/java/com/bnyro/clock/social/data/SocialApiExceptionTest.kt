@@ -8,10 +8,10 @@ class SocialApiExceptionTest {
     fun stringDetailBecomesMessage() {
         val exception = SocialApiException(
             409,
-            """{"detail":"Promote another leader before leaving the group"}"""
+            """{"detail":"Use Leave group to remove yourself"}"""
         )
 
-        assertEquals("Promote another leader before leaving the group", exception.message)
+        assertEquals("Use Leave group to remove yourself", exception.message)
     }
 
     @Test

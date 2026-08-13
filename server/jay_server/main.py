@@ -350,7 +350,10 @@ def remove_member(
     with transaction() as connection:
         require_group_leader(connection, group_id, device["id"])
         if member_id == device["id"]:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Use the leave-group endpoint")
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Use Leave group to remove yourself",
+            )
         removed_token = connection.execute(
             "SELECT push_token FROM devices WHERE id = %s", (member_id,)
         ).fetchone()
