@@ -269,7 +269,7 @@ fun AlarmScreen(
                     }
                 },
                 confirmButton = {
-                    DialogButton(label = R.string.close) {
+                    DialogButton(label = R.string.close, style = DialogButtonStyle.PRIMARY) {
                         alarmModel.selectedActivityAlarmId = null
                     }
                 }
