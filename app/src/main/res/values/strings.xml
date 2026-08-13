@@ -93,8 +93,8 @@
     <string name="leaders_can_edit_alarms">Only leaders can edit alarms</string>
     <string name="notify_snoozed">Notify group on snooze</string>
     <string name="notify_dismissed">Notify group on dismiss</string>
-    <string name="notify_alarm_changes">Notify group about alarm changes</string>
-    <string name="notify_ignored">Notify group about ignored alarms</string>
+    <string name="notify_alarm_changes">Notify group on alarm changes</string>
+    <string name="notify_ignored">Notify group on ignore</string>
     <string name="notify_membership_activity">Membership activity</string>
     <string name="notify_administrative_activity">Administrative activity</string>
     <string name="activity_history">Activity history</string>
