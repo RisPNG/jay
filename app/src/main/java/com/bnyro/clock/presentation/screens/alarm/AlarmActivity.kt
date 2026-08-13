@@ -27,6 +27,8 @@ import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.services.AlarmService
 import com.bnyro.clock.social.data.SocialActivityWorker
 import com.bnyro.clock.social.domain.AlarmActivityKind
+import com.bnyro.clock.social.data.SocialIgnoredAlarmWorker
+import androidx.work.WorkManager
 import kotlinx.coroutines.runBlocking
 
 class AlarmActivity : ComponentActivity() {
@@ -114,7 +116,13 @@ class AlarmActivity : ComponentActivity() {
         handleIntent(intent)
     }
     private fun dismiss() {
-        SocialActivityWorker.enqueue(this, alarm.id, AlarmActivityKind.DISMISSED)
+        SocialActivityWorker.enqueue(
+            this,
+            alarm.id,
+            AlarmActivityKind.DISMISSED,
+            intent.getStringExtra(AlarmService.EXTRA_OCCURRENCE_ID)
+        )
+        WorkManager.getInstance(this).cancelUniqueWork("jay_ignored_alarm_${alarm.id}")
         stopService(
             Intent(
                 this@AlarmActivity.applicationContext,
@@ -125,7 +133,19 @@ class AlarmActivity : ComponentActivity() {
     }
 
     private fun snooze(minutes: Int = alarm.snoozeMinutes) {
-        SocialActivityWorker.enqueue(this, alarm.id, AlarmActivityKind.SNOOZED)
+        SocialActivityWorker.enqueue(
+            this,
+            alarm.id,
+            AlarmActivityKind.SNOOZED,
+            intent.getStringExtra(AlarmService.EXTRA_OCCURRENCE_ID)
+        )
+        SocialIgnoredAlarmWorker.schedule(
+            this,
+            alarm.id,
+            System.currentTimeMillis() + minutes * 60_000L,
+            intent.getStringExtra(AlarmService.EXTRA_OCCURRENCE_ID)
+                ?: "${alarm.id}:${System.currentTimeMillis()}"
+        )
         stopService(
             Intent(
                 this@AlarmActivity.applicationContext,

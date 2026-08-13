@@ -117,6 +117,12 @@ class MainActivity : ComponentActivity() {
             AlarmClock.ACTION_SET_ALARM, AlarmClock.ACTION_SHOW_ALARMS -> HomeRoutes.Alarm
             AlarmClock.ACTION_SET_TIMER, AlarmClock.ACTION_SHOW_TIMERS -> HomeRoutes.Timer
             Intent.ACTION_VIEW -> HomeRoutes.Groups
+            SocialNotificationHelper.SHOW_SOCIAL_ACTIVITY_ACTION -> {
+                if (
+                    intent.getStringExtra(SocialNotificationHelper.EXTRA_SOCIAL_ENTITY_TYPE) in
+                    setOf("alarm", "outcome")
+                ) HomeRoutes.Alarm else HomeRoutes.Groups
+            }
             else -> homeRoutes.first {
                 Preferences.instance.getString(
                     Preferences.startTabKey,

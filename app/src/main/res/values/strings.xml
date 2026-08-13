@@ -48,14 +48,33 @@
     <string name="shared_alarm_activity" translatable="false">Shared alarm activity</string>
     <string name="member_alarm_activity" translatable="false">%1$s %2$s “%3$s”</string>
     <string name="member_unnamed_alarm_activity" translatable="false">%1$s %2$s a shared alarm</string>
-    <string name="shared_alarm_change_title" translatable="false">%1$s at %2$s</string>
-    <string name="alarm_created_by_member" translatable="false">Created by %1$s in %2$s</string>
-    <string name="alarm_edited_by_member" translatable="false">Edited by %1$s in %2$s</string>
-    <string name="alarm_enabled_by_member" translatable="false">Enabled by %1$s in %2$s</string>
-    <string name="alarm_disabled_by_member" translatable="false">Disabled by %1$s in %2$s</string>
-    <string name="alarm_deleted_by_member" translatable="false">Deleted by %1$s in %2$s</string>
-    <string name="unnamed_shared_alarm" translatable="false">Shared alarm</string>
+    <string name="social_alarm_activity_title" translatable="false">%1$s %2$s “%3$s” in %4$s</string>
+    <string name="shared_alarm_change_title" translatable="false">%1$s %2$s “%3$s” at %4$s in %5$s</string>
+    <string name="social_event_date_time" translatable="false">%1$s at %2$s</string>
+    <string name="social_created" translatable="false">created</string>
+    <string name="social_edited" translatable="false">edited</string>
+    <string name="social_enabled" translatable="false">enabled</string>
+    <string name="social_disabled" translatable="false">disabled</string>
+    <string name="social_deleted" translatable="false">deleted</string>
+    <string name="unnamed_shared_alarm" translatable="false">a shared alarm</string>
     <string name="unknown_group_member" translatable="false">A group member</string>
+    <string name="member_joined_group" translatable="false">%1$s joined %2$s</string>
+    <string name="member_left_group" translatable="false">%1$s left %2$s</string>
+    <string name="member_removed_from_group" translatable="false">%1$s removed %2$s from %3$s</string>
+    <string name="you_were_removed_from_group" translatable="false">You were removed from %1$s by %2$s</string>
+    <string name="member_promoted_in_group" translatable="false">%1$s made %2$s a leader in %3$s</string>
+    <string name="you_were_promoted_in_group" translatable="false">%1$s made you a leader in %2$s</string>
+    <string name="member_demoted_in_group" translatable="false">%1$s made %2$s a member in %3$s</string>
+    <string name="you_were_demoted_in_group" translatable="false">%1$s made you a member in %2$s</string>
+    <string name="member_renamed" translatable="false">%1$s renamed themselves to %2$s in %3$s</string>
+    <string name="group_alarm_permissions_updated" translatable="false">%1$s changed alarm permissions in %2$s</string>
+    <string name="group_renamed" translatable="false">%1$s renamed %2$s to %3$s</string>
+    <string name="group_notification_policy_updated" translatable="false">%1$s changed alarm notifications in %2$s</string>
+    <string name="group_invitation_created" translatable="false">%1$s created a 24-hour invitation</string>
+    <string name="alarm_delivered_to_member" translatable="false">%1$s was delivered to %2$s</string>
+    <string name="ignored_alarm_corrected" translatable="false">Ignored report for “%1$s” corrected in %2$s</string>
+    <string name="group_activity_updated" translatable="false">Activity updated in %1$s</string>
+    <string name="social_updates_in_group" translatable="false">%1$d updates in %2$s</string>
     <string name="social_snoozed" translatable="false">snoozed</string>
     <string name="social_dismissed" translatable="false">dismissed</string>
     <string name="groups" translatable="false">Groups</string>
@@ -74,6 +93,20 @@
     <string name="leaders_can_edit_alarms" translatable="false">Only leaders can edit alarms</string>
     <string name="notify_snoozed" translatable="false">Notify group on snooze</string>
     <string name="notify_dismissed" translatable="false">Notify group on dismiss</string>
+    <string name="notify_alarm_changes" translatable="false">Notify group about alarm changes</string>
+    <string name="notify_ignored" translatable="false">Notify group about ignored alarms</string>
+    <string name="notify_membership_activity" translatable="false">Membership activity</string>
+    <string name="notify_administrative_activity" translatable="false">Administrative activity</string>
+    <string name="activity_history" translatable="false">Activity history</string>
+    <string name="load_more" translatable="false">Load more</string>
+    <string name="no_activity" translatable="false">No activity yet</string>
+    <string name="alarm_activity" translatable="false">Alarm activity</string>
+    <string name="social_ignored" translatable="false">ignored</string>
+    <string name="social_sync_failure_title" translatable="false">Shared alarms may be out of date</string>
+    <string name="social_sync_failure_message" translatable="false">Jay has repeatedly been unable to synchronize this device.</string>
+    <string name="play_entitlement_lost_title" translatable="false">Play access needs attention</string>
+    <string name="play_entitlement_lost_message" translatable="false">This device can no longer upload or select group-distributed sounds.</string>
+    <string name="play_entitlement_refresh_failed_message" translatable="false">Jay could not renew this device’s Play access before it expired.</string>
     <string name="remove_member" translatable="false">Remove member</string>
     <string name="no_groups" translatable="false">Create a group or join one with an invitation.</string>
     <string name="sync" translatable="false">Synchronize</string>

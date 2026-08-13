@@ -18,12 +18,14 @@ class MemberRole(StrEnum):
 class ActivityKind(StrEnum):
     SNOOZED = "snoozed"
     DISMISSED = "dismissed"
+    IGNORED = "ignored"
 
 
 class DeviceRegistration(BaseModel):
     id: str = Field(pattern=r"^[a-f0-9]{64}$")
     name: str = Field(min_length=1, max_length=64)
     token: str = Field(min_length=32, max_length=256)
+    time_zone: str | None = Field(default=None, min_length=1, max_length=100)
 
 
 class DeviceUpdate(BaseModel):
@@ -41,15 +43,24 @@ class PlayEntitlementVerification(BaseModel):
 class GroupCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     alarm_permission: AlarmPermission = AlarmPermission.EVERYONE
+    notify_alarm_changes: bool = True
     notify_snoozed: bool = True
     notify_dismissed: bool = True
+    notify_ignored: bool = True
 
 
 class GroupUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     alarm_permission: AlarmPermission
+    notify_alarm_changes: bool
     notify_snoozed: bool
     notify_dismissed: bool
+    notify_ignored: bool
+
+
+class MemberNotificationUpdate(BaseModel):
+    notify_membership: bool
+    notify_administrative: bool
 
 
 class InviteCreate(BaseModel):
@@ -105,6 +116,16 @@ class SharedAlarmDelete(BaseModel):
 
 
 class AlarmActivityCreate(BaseModel):
+    id: UUID
     alarm_revision: int = Field(gt=0)
     kind: ActivityKind
     occurred_at: datetime
+    occurrence_id: str | None = Field(default=None, max_length=200)
+    reason: str | None = Field(default=None, max_length=40)
+
+
+class AlarmOccurrenceSchedule(BaseModel):
+    alarm_revision: int = Field(gt=0)
+    occurrence_id: str = Field(min_length=1, max_length=200)
+    trigger_at: datetime
+    deadline_at: datetime

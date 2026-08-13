@@ -46,7 +46,6 @@ import com.bnyro.clock.navigation.TopBarScaffold
 import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.social.domain.MemberRole
 import com.bnyro.clock.social.domain.SocialGroup
-import com.bnyro.clock.social.domain.AlarmActivityKind
 import com.bnyro.clock.util.Preferences
 
 @Composable
@@ -58,10 +57,10 @@ fun GroupsScreen(
     val shareInvitationTitle = stringResource(R.string.share_group_invitation)
     val groups by socialModel.groups.collectAsState()
     val members by socialModel.members.collectAsState()
-    val activity by socialModel.activity.collectAsState()
     var showCreate by remember { mutableStateOf(false) }
     var showJoin by remember { mutableStateOf(false) }
     var selectedGroup by remember { mutableStateOf<SocialGroup?>(null) }
+    var activityGroup by remember { mutableStateOf<SocialGroup?>(null) }
 
     LaunchedEffect(Unit) {
         Preferences.instance.getString(Preferences.jayPendingInvitationKey, null)?.let {
@@ -147,8 +146,10 @@ fun GroupsScreen(
     if (showCreate) {
         var name by remember { mutableStateOf("") }
         var leadersOnly by remember { mutableStateOf(false) }
+        var notifyAlarmChanges by remember { mutableStateOf(true) }
         var notifySnoozed by remember { mutableStateOf(true) }
         var notifyDismissed by remember { mutableStateOf(true) }
+        var notifyIgnored by remember { mutableStateOf(true) }
         AlertDialog(
             onDismissRequest = { showCreate = false },
             title = { Text(stringResource(R.string.create_group)) },
@@ -162,11 +163,18 @@ fun GroupsScreen(
                     GroupSwitch(stringResource(R.string.leaders_only), leadersOnly) {
                         leadersOnly = it
                     }
+                    GroupSwitch(
+                        stringResource(R.string.notify_alarm_changes),
+                        notifyAlarmChanges
+                    ) { notifyAlarmChanges = it }
                     GroupSwitch(stringResource(R.string.notify_snoozed), notifySnoozed) {
                         notifySnoozed = it
                     }
                     GroupSwitch(stringResource(R.string.notify_dismissed), notifyDismissed) {
                         notifyDismissed = it
+                    }
+                    GroupSwitch(stringResource(R.string.notify_ignored), notifyIgnored) {
+                        notifyIgnored = it
                     }
                 }
             },
@@ -176,8 +184,10 @@ fun GroupsScreen(
                         socialModel.createGroup(
                             name.trim(),
                             if (leadersOnly) AlarmPermission.LEADERS else AlarmPermission.EVERYONE,
+                            notifyAlarmChanges,
                             notifySnoozed,
-                            notifyDismissed
+                            notifyDismissed,
+                            notifyIgnored
                         )
                         showCreate = false
                     },
@@ -226,11 +236,23 @@ fun GroupsScreen(
         var permission by remember(group.id, group.alarmPermission) {
             mutableStateOf(group.alarmPermission)
         }
+        var notifyAlarmChanges by remember(group.id, group.notifyAlarmChanges) {
+            mutableStateOf(group.notifyAlarmChanges)
+        }
         var notifySnoozed by remember(group.id, group.notifySnoozed) {
             mutableStateOf(group.notifySnoozed)
         }
         var notifyDismissed by remember(group.id, group.notifyDismissed) {
             mutableStateOf(group.notifyDismissed)
+        }
+        var notifyIgnored by remember(group.id, group.notifyIgnored) {
+            mutableStateOf(group.notifyIgnored)
+        }
+        var notifyMembership by remember(group.id, group.notifyMembership) {
+            mutableStateOf(group.notifyMembership)
+        }
+        var notifyAdministrative by remember(group.id, group.notifyAdministrative) {
+            mutableStateOf(group.notifyAdministrative)
         }
         AlertDialog(
             onDismissRequest = { selectedGroup = null },
@@ -252,11 +274,18 @@ fun GroupsScreen(
                         ) {
                             permission = if (it) AlarmPermission.LEADERS else AlarmPermission.EVERYONE
                         }
+                        GroupSwitch(
+                            stringResource(R.string.notify_alarm_changes),
+                            notifyAlarmChanges
+                        ) { notifyAlarmChanges = it }
                         GroupSwitch(stringResource(R.string.notify_snoozed), notifySnoozed) {
                             notifySnoozed = it
                         }
                         GroupSwitch(stringResource(R.string.notify_dismissed), notifyDismissed) {
                             notifyDismissed = it
+                        }
+                        GroupSwitch(stringResource(R.string.notify_ignored), notifyIgnored) {
+                            notifyIgnored = it
                         }
                         Button(
                             onClick = {
@@ -264,13 +293,37 @@ fun GroupsScreen(
                                     group.copy(
                                         name = name.trim(),
                                         alarmPermission = permission,
+                                        notifyAlarmChanges = notifyAlarmChanges,
                                         notifySnoozed = notifySnoozed,
-                                        notifyDismissed = notifyDismissed
+                                        notifyDismissed = notifyDismissed,
+                                        notifyIgnored = notifyIgnored
                                     )
                                 )
                             },
                             enabled = name.isNotBlank()
                         ) { Text(stringResource(R.string.save)) }
+                    }
+                    GroupSwitch(
+                        stringResource(R.string.notify_membership_activity),
+                        notifyMembership
+                    ) {
+                        notifyMembership = it
+                        socialModel.updateMemberNotificationSettings(
+                            group,
+                            it,
+                            notifyAdministrative
+                        )
+                    }
+                    GroupSwitch(
+                        stringResource(R.string.notify_administrative_activity),
+                        notifyAdministrative
+                    ) {
+                        notifyAdministrative = it
+                        socialModel.updateMemberNotificationSettings(
+                            group,
+                            notifyMembership,
+                            it
+                        )
                     }
                     Button(onClick = { socialModel.createInvite(group.id) }) {
                         Icon(Icons.Default.Share, null)
@@ -313,22 +366,12 @@ fun GroupsScreen(
                             }
                         }
                     }
-                    val groupActivity = activity.filter { it.groupId == group.id }
-                    if (groupActivity.isNotEmpty()) {
-                        Text(stringResource(R.string.recent_activity))
-                        groupActivity.take(20).forEach { item ->
-                            Text(
-                                stringResource(
-                                    R.string.member_alarm_activity,
-                                    item.deviceName,
-                                    if (item.kind == AlarmActivityKind.SNOOZED) {
-                                        stringResource(R.string.social_snoozed)
-                                    } else {
-                                        stringResource(R.string.social_dismissed)
-                                    }
-                                )
-                            )
-                        }
+                    OutlinedButton(onClick = {
+                        socialModel.loadGroupActivity(group.id)
+                        activityGroup = group
+                        selectedGroup = null
+                    }) {
+                        Text(stringResource(R.string.activity_history))
                     }
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(onClick = {
@@ -339,6 +382,79 @@ fun GroupsScreen(
             },
             confirmButton = {
                 Button(onClick = { selectedGroup = null }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            }
+        )
+    }
+
+    activityGroup?.let { group ->
+        AlertDialog(
+            onDismissRequest = { activityGroup = null },
+            title = { Text(stringResource(R.string.activity_history)) },
+            text = {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (socialModel.groupActivity.isEmpty() && !socialModel.busy) {
+                        Text(stringResource(R.string.no_activity))
+                    }
+                    socialModel.groupActivity.forEach { change ->
+                        Column(
+                            Modifier.clickable(enabled = change.entityType == "alarm") {
+                                socialModel.loadAlarmActivity(change.entityId)
+                                activityGroup = null
+                            }
+                        ) {
+                            Text(change.presentationTitle(context, socialModel.deviceId.orEmpty()))
+                            change.presentationDetails(context)?.let { Text(it) }
+                            Text(change.presentationTime(context))
+                        }
+                    }
+                    if (socialModel.groupActivityNextBefore != null) {
+                        OutlinedButton(
+                            onClick = { socialModel.loadGroupActivity(group.id, more = true) }
+                        ) { Text(stringResource(R.string.load_more)) }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { activityGroup = null }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            }
+        )
+    }
+
+    if (socialModel.activityAlarmId != null) {
+        AlertDialog(
+            onDismissRequest = { socialModel.activityAlarmId = null },
+            title = { Text(stringResource(R.string.alarm_activity)) },
+            text = {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    socialModel.alarmActivity.forEach { change ->
+                        Column {
+                            Text(change.presentationTitle(context, socialModel.deviceId.orEmpty()))
+                            change.presentationDetails(context)?.let { Text(it) }
+                            Text(change.presentationTime(context))
+                        }
+                    }
+                    if (socialModel.alarmActivityNextBefore != null) {
+                        OutlinedButton(onClick = {
+                            socialModel.loadAlarmActivity(
+                                socialModel.activityAlarmId!!,
+                                more = true
+                            )
+                        }) { Text(stringResource(R.string.load_more)) }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { socialModel.activityAlarmId = null }) {
                     Text(stringResource(android.R.string.ok))
                 }
             }

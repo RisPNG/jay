@@ -11,6 +11,7 @@ import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.social.domain.MemberRole
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
+import com.bnyro.clock.social.domain.SocialChange
 import com.bnyro.clock.util.Preferences
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,17 +31,21 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         SharingStarted.WhileSubscribed(5_000),
         emptyList()
     )
-    val activity = repository.activity.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5_000),
-        emptyList()
-    )
     var busy by mutableStateOf(false)
         private set
     var message by mutableStateOf<String?>(null)
         private set
     var invitation by mutableStateOf<String?>(null)
         private set
+    var groupActivity by mutableStateOf<List<SocialChange>>(emptyList())
+        private set
+    var groupActivityNextBefore by mutableStateOf<Long?>(null)
+        private set
+    var alarmActivity by mutableStateOf<List<SocialChange>>(emptyList())
+        private set
+    var alarmActivityNextBefore by mutableStateOf<Long?>(null)
+        private set
+    var activityAlarmId by mutableStateOf<String?>(null)
     var deviceId by mutableStateOf<String?>(null)
         private set
     var deviceName by mutableStateOf(
@@ -78,13 +83,22 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
     fun createGroup(
         name: String,
         permission: AlarmPermission,
+        notifyAlarmChanges: Boolean,
         notifySnoozed: Boolean,
-        notifyDismissed: Boolean
+        notifyDismissed: Boolean,
+        notifyIgnored: Boolean
     ) {
         viewModelScope.launch {
             busy = true
             runCatching {
-                repository.createGroup(name, permission, notifySnoozed, notifyDismissed)
+                repository.createGroup(
+                    name,
+                    permission,
+                    notifyAlarmChanges,
+                    notifySnoozed,
+                    notifyDismissed,
+                    notifyIgnored
+                )
             }.onFailure { message = it.message ?: "Unable to create group" }
             busy = false
         }
@@ -132,6 +146,59 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
             busy = true
             runCatching { repository.updateMember(groupId, member.deviceId, role) }
                 .onFailure { message = it.message ?: "Unable to update member" }
+            busy = false
+        }
+    }
+
+    fun updateMemberNotificationSettings(
+        group: SocialGroup,
+        notifyMembership: Boolean,
+        notifyAdministrative: Boolean
+    ) {
+        viewModelScope.launch {
+            busy = true
+            runCatching {
+                repository.updateMemberNotificationSettings(
+                    group.copy(
+                        notifyMembership = notifyMembership,
+                        notifyAdministrative = notifyAdministrative
+                    )
+                )
+            }
+                .onFailure { message = it.message ?: "Unable to update notifications" }
+            busy = false
+        }
+    }
+
+    fun loadGroupActivity(groupId: String, more: Boolean = false) {
+        viewModelScope.launch {
+            busy = true
+            runCatching {
+                repository.getGroupActivity(
+                    groupId,
+                    if (more) groupActivityNextBefore else null
+                )
+            }.onSuccess {
+                groupActivity = if (more) groupActivity + it.items else it.items
+                groupActivityNextBefore = it.nextBefore
+            }.onFailure { message = it.message ?: "Unable to load activity" }
+            busy = false
+        }
+    }
+
+    fun loadAlarmActivity(alarmId: String, more: Boolean = false) {
+        viewModelScope.launch {
+            busy = true
+            runCatching {
+                repository.getAlarmActivity(
+                    alarmId,
+                    if (more) alarmActivityNextBefore else null
+                )
+            }.onSuccess {
+                activityAlarmId = alarmId
+                alarmActivity = if (more) alarmActivity + it.items else it.items
+                alarmActivityNextBefore = it.nextBefore
+            }.onFailure { message = it.message ?: "Unable to load alarm activity" }
             busy = false
         }
     }

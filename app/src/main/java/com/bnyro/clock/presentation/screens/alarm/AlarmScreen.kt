@@ -1,11 +1,14 @@
 package com.bnyro.clock.presentation.screens.alarm
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -16,10 +19,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -42,6 +47,9 @@ import com.bnyro.clock.presentation.screens.alarm.components.AlarmFilterSection
 import com.bnyro.clock.presentation.screens.alarm.components.AlarmItem
 import com.bnyro.clock.presentation.screens.alarm.model.AlarmModel
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
+import com.bnyro.clock.social.presentation.presentationTime
+import com.bnyro.clock.social.presentation.presentationTitle
+import com.bnyro.clock.social.presentation.presentationDetails
 
 @Composable
 fun AlarmScreen(
@@ -57,6 +65,7 @@ fun AlarmScreen(
     val groups by alarmModel.groups.collectAsState()
     val alarmGroupNames by alarmModel.alarmGroupNames.collectAsState()
     val alarmEditability by alarmModel.alarmEditability.collectAsState()
+    val remoteAlarmIds by alarmModel.remoteAlarmIds.collectAsState()
 
     val selectedAlarmIds = remember { mutableStateListOf<Long>() }
     val isSelectionMode = selectedAlarmIds.isNotEmpty()
@@ -186,6 +195,9 @@ fun AlarmScreen(
                     onDeleteAlarm = { alarmItem ->
                         alarmModel.deleteAlarm(alarmItem)
                     },
+                    onActivity = remoteAlarmIds[alarm.id]?.let { remoteAlarmId ->
+                        { alarmModel.loadAlarmActivity(remoteAlarmId) }
+                    },
                     onUpdateAlarm = { updatedAlarm ->
                         if (!isSelectionMode) {
                             alarmModel.updateAlarm(updatedAlarm)
@@ -224,6 +236,41 @@ fun AlarmScreen(
                 dismissButton = {
                     DialogButton(label = android.R.string.cancel) {
                         wannadeletequestion = false
+                    }
+                }
+            )
+        }
+
+        if (alarmModel.selectedActivityAlarmId != null) {
+            AlertDialog(
+                onDismissRequest = { alarmModel.selectedActivityAlarmId = null },
+                title = { Text(stringResource(R.string.alarm_activity)) },
+                text = {
+                    Column(
+                        Modifier.verticalScroll(rememberScrollState())
+                    ) {
+                        if (alarmModel.alarmActivity.isEmpty()) {
+                            Text(stringResource(R.string.no_activity))
+                        }
+                        alarmModel.alarmActivity.forEach { change ->
+                            Text(change.presentationTitle(context, ""))
+                            change.presentationDetails(context)?.let { Text(it) }
+                            Text(change.presentationTime(context))
+                            Spacer(Modifier.height(12.dp))
+                        }
+                        if (alarmModel.alarmActivityNextBefore != null) {
+                            OutlinedButton(onClick = {
+                                alarmModel.loadAlarmActivity(
+                                    alarmModel.selectedActivityAlarmId!!,
+                                    more = true
+                                )
+                            }) { Text(stringResource(R.string.load_more)) }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { alarmModel.selectedActivityAlarmId = null }) {
+                        Text(stringResource(android.R.string.ok))
                     }
                 }
             )

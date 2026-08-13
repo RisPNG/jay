@@ -4,29 +4,31 @@ import android.content.Context
 import android.content.Intent
 import android.util.Base64
 import androidx.room.withTransaction
+import androidx.work.WorkManager
 import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.social.domain.AlarmActivityKind
 import com.bnyro.clock.social.domain.AlarmActivityRequest
-import com.bnyro.clock.social.domain.AlarmChangeKind
+import com.bnyro.clock.social.domain.AlarmOccurrenceSchedule
 import com.bnyro.clock.social.domain.AlarmPermission
+import com.bnyro.clock.social.domain.SocialActivityPage
 import com.bnyro.clock.social.domain.GroupCreate
 import com.bnyro.clock.social.domain.GroupUpdate
 import com.bnyro.clock.social.domain.MemberRole
+import com.bnyro.clock.social.domain.MemberNotificationUpdate
 import com.bnyro.clock.social.domain.SharedAlarmLink
 import com.bnyro.clock.social.domain.SharedAlarmRequest
-import com.bnyro.clock.social.domain.SocialActivity
-import com.bnyro.clock.social.domain.SocialAlarmChange
+import com.bnyro.clock.social.domain.SocialChange
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
-import com.bnyro.clock.social.domain.SharedAlarmDelivery
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.AlarmService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -38,9 +40,8 @@ import java.security.MessageDigest
 import java.time.Instant
 
 data class SocialSyncResult(
-    val newActivity: List<SocialActivity>,
-    val alarmLabels: Map<String, String?>,
-    val alarmChanges: List<SocialAlarmChange>,
+    val changes: List<SocialChange>,
+    val groups: Map<String, SocialGroup>,
     val deviceId: String
 )
 
@@ -55,7 +56,6 @@ class SocialRepository(
 
     val groups: Flow<List<SocialGroup>> = socialDao.getGroupsStream()
     val members: Flow<List<SocialMember>> = socialDao.getMembersStream()
-    val activity: Flow<List<SocialActivity>> = socialDao.getActivityStream()
     val alarmGroupNames = socialDao.getAlarmGroupNamesStream()
 
     suspend fun synchronize(): SocialSyncResult = synchronizationMutex.withLock {
@@ -68,10 +68,10 @@ class SocialRepository(
             val api = SocialApi(serverUrl, identity)
             api.register()
             val previousCursor = Preferences.instance.getLong(Preferences.jaySyncCursorKey, 0)
+            val knownGroupIds = groups.first().map { it.id }.toSet()
             val response = api.synchronize(previousCursor)
             val remoteGroupIds = response.groups.map { it.id }.toSet()
             val remoteAlarmIds = response.alarms.map { it.id }.toSet()
-            val previousActivityIds = socialDao.getActivityIds().toSet()
 
             socialDao.getAlarmLinks().filter {
                 it.groupId !in remoteGroupIds || it.remoteAlarmId !in remoteAlarmIds
@@ -85,6 +85,9 @@ class SocialRepository(
                     alarmUseCase.deleteAlarm(it)
                 }
                 socialDao.deleteAlarmLink(link.remoteAlarmId)
+                WorkManager.getInstance(context).cancelUniqueWork(
+                    "jay_ignored_alarm_${link.localAlarmId}"
+                )
             }
 
             response.alarms.forEach { remote ->
@@ -100,6 +103,9 @@ class SocialRepository(
                             alarmUseCase.deleteAlarm(alarm)
                         }
                         socialDao.deleteAlarmLink(remote.id)
+                        WorkManager.getInstance(context).cancelUniqueWork(
+                            "jay_ignored_alarm_${it.localAlarmId}"
+                        )
                     }
                 } else if (link == null) {
                     val localId = alarmUseCase.createAlarm(
@@ -120,6 +126,9 @@ class SocialRepository(
                     socialDao.putAlarmLink(
                         SharedAlarmLink(remote.id, localId, remote.groupId, remote.revision)
                     )
+                    alarmRepository.getAlarmById(localId)?.let {
+                        scheduleIgnoredOutcome(it, remote.id, remote.revision)
+                    }
                 } else if (remote.revision > link.revision) {
                     alarmRepository.getAlarmById(link.localAlarmId)?.let { local ->
                         context.sendBroadcast(
@@ -144,36 +153,30 @@ class SocialRepository(
                         )
                     }
                     socialDao.putAlarmLink(link.copy(revision = remote.revision))
+                    alarmRepository.getAlarmById(link.localAlarmId)?.let {
+                        scheduleIgnoredOutcome(it, remote.id, remote.revision)
+                    }
                 }
             }
 
-            val synchronizedActivity = response.activity.map {
-                SocialActivity(
+            val synchronizedGroups = response.groups.map {
+                SocialGroup(
                     it.id,
-                    it.alarmId,
-                    it.groupId,
-                    it.alarmRevision,
-                    it.deviceId,
-                    it.deviceName,
-                    AlarmActivityKind.valueOf(it.kind.uppercase()),
-                    it.occurredAt
+                    it.name,
+                    AlarmPermission.valueOf(it.alarmPermission.uppercase()),
+                    it.notifyAlarmChanges,
+                    it.notifySnoozed,
+                    it.notifyDismissed,
+                    it.notifyIgnored,
+                    it.notifyMembership,
+                    it.notifyAdministrative,
+                    MemberRole.valueOf(it.role.uppercase())
                 )
             }
             socialDatabase.withTransaction {
                 socialDao.clearMembers()
-                socialDao.clearDeliveries()
-                socialDao.clearActivity()
                 socialDao.clearGroups()
-                socialDao.putGroups(response.groups.map {
-                    SocialGroup(
-                        it.id,
-                        it.name,
-                        AlarmPermission.valueOf(it.alarmPermission.uppercase()),
-                        it.notifySnoozed,
-                        it.notifyDismissed,
-                        MemberRole.valueOf(it.role.uppercase())
-                    )
-                })
+                socialDao.putGroups(synchronizedGroups)
                 socialDao.putMembers(response.members.map {
                     SocialMember(
                         it.groupId,
@@ -182,36 +185,30 @@ class SocialRepository(
                         MemberRole.valueOf(it.role.uppercase())
                     )
                 })
-                socialDao.putDeliveries(response.deliveries.map {
-                    SharedAlarmDelivery(
-                        it.alarmId,
-                        it.deviceId,
-                        it.revision,
-                        it.deliveredAt
-                    )
-                })
-                socialDao.putActivity(synchronizedActivity)
             }
 
-            val newActivity = synchronizedActivity.filter { it.id !in previousActivityIds }
-            val alarmChanges = response.alarmChanges.map {
-                SocialAlarmChange(
-                    it.sequence,
-                    it.alarmId,
-                    it.groupId,
-                    it.groupName,
-                    it.deviceId,
-                    it.deviceName,
-                    it.alarmLabel,
-                    it.alarmTime,
-                    AlarmChangeKind.valueOf(it.kind.uppercase())
-                )
-            }
             Preferences.edit { putLong(Preferences.jaySyncCursorKey, response.cursor) }
             SocialSyncResult(
-                if (previousCursor == 0L) emptyList() else newActivity,
-                response.alarms.associate { it.id to it.label },
-                if (previousCursor == 0L) emptyList() else alarmChanges,
+                if (previousCursor == 0L) emptyList() else response.changes.map {
+                    SocialChange(
+                        it.sequence,
+                        it.groupId,
+                        it.groupName,
+                        it.entityType,
+                        it.entityId,
+                        it.action,
+                        it.entityLabel,
+                        it.entityTime,
+                        it.actorDeviceId,
+                        it.actorName,
+                        it.subjectDeviceId,
+                        it.subjectName,
+                        it.recipientDeviceId,
+                        it.details,
+                        it.occurredAt
+                    )
+                }.filter { it.groupId in knownGroupIds },
+                synchronizedGroups.associateBy { it.id },
                 identity.id
             )
         }
@@ -241,8 +238,10 @@ class SocialRepository(
     suspend fun createGroup(
         name: String,
         permission: AlarmPermission,
+        notifyAlarmChanges: Boolean,
         notifySnoozed: Boolean,
-        notifyDismissed: Boolean
+        notifyDismissed: Boolean,
+        notifyIgnored: Boolean
     ) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
             Preferences.jayServerUrlKey,
@@ -255,8 +254,10 @@ class SocialRepository(
                 GroupCreate(
                     name,
                     permission.name.lowercase(),
+                    notifyAlarmChanges,
                     notifySnoozed,
-                    notifyDismissed
+                    notifyDismissed,
+                    notifyIgnored
                 )
             )
         }
@@ -274,8 +275,10 @@ class SocialRepository(
             GroupUpdate(
                 group.name,
                 group.alarmPermission.name.lowercase(),
+                group.notifyAlarmChanges,
                 group.notifySnoozed,
-                group.notifyDismissed
+                group.notifyDismissed,
+                group.notifyIgnored
             )
         )
         synchronize()
@@ -346,6 +349,87 @@ class SocialRepository(
             synchronize()
         }
 
+    suspend fun updateMemberNotificationSettings(group: SocialGroup) =
+        withContext(Dispatchers.IO) {
+            val serverUrl = Preferences.instance.getString(
+                Preferences.jayServerUrlKey,
+                DEFAULT_SERVER_URL
+            ) ?: DEFAULT_SERVER_URL
+            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+            SocialApi(serverUrl, identity).updateMemberNotificationSettings(
+                group.id,
+                MemberNotificationUpdate(
+                    group.notifyMembership,
+                    group.notifyAdministrative
+                )
+            )
+            synchronize()
+        }
+
+    suspend fun getGroupActivity(groupId: String, before: Long? = null): SocialActivityPage =
+        withContext(Dispatchers.IO) {
+            val serverUrl = Preferences.instance.getString(
+                Preferences.jayServerUrlKey,
+                DEFAULT_SERVER_URL
+            ) ?: DEFAULT_SERVER_URL
+            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+            val page = SocialApi(serverUrl, identity).getGroupActivity(groupId, before)
+            SocialActivityPage(
+                page.items.map {
+                    SocialChange(
+                        it.sequence,
+                        it.groupId,
+                        it.groupName,
+                        it.entityType,
+                        it.entityId,
+                        it.action,
+                        it.entityLabel,
+                        it.entityTime,
+                        it.actorDeviceId,
+                        it.actorName,
+                        it.subjectDeviceId,
+                        it.subjectName,
+                        it.recipientDeviceId,
+                        it.details,
+                        it.occurredAt
+                    )
+                },
+                page.nextBefore
+            )
+        }
+
+    suspend fun getAlarmActivity(alarmId: String, before: Long? = null): SocialActivityPage =
+        withContext(Dispatchers.IO) {
+            val serverUrl = Preferences.instance.getString(
+                Preferences.jayServerUrlKey,
+                DEFAULT_SERVER_URL
+            ) ?: DEFAULT_SERVER_URL
+            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+            val page = SocialApi(serverUrl, identity).getAlarmActivity(alarmId, before)
+            SocialActivityPage(
+                page.items.map {
+                    SocialChange(
+                        it.sequence,
+                        it.groupId,
+                        it.groupName,
+                        it.entityType,
+                        it.entityId,
+                        it.action,
+                        it.entityLabel,
+                        it.entityTime,
+                        it.actorDeviceId,
+                        it.actorName,
+                        it.subjectDeviceId,
+                        it.subjectName,
+                        it.recipientDeviceId,
+                        it.details,
+                        it.occurredAt
+                    )
+                },
+                page.nextBefore
+            )
+        }
+
     suspend fun removeMember(groupId: String, deviceId: String) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
             Preferences.jayServerUrlKey,
@@ -384,6 +468,9 @@ class SocialRepository(
                 socialDao.putAlarmLink(
                     SharedAlarmLink(response.id, localId, groupId, response.revision ?: 1)
                 )
+                alarmRepository.getAlarmById(localId)?.let {
+                    scheduleIgnoredOutcome(it, response.id, response.revision ?: 1)
+                }
                 localId
             }
         }
@@ -422,9 +509,9 @@ class SocialRepository(
                         .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
                 )
                 alarmUseCase.updateAlarm(alarm)
-                socialDao.putAlarmLink(
-                    link.copy(revision = response.revision ?: link.revision + 1)
-                )
+                val revision = response.revision ?: link.revision + 1
+                socialDao.putAlarmLink(link.copy(revision = revision))
+                scheduleIgnoredOutcome(alarm, link.remoteAlarmId, revision)
             }
         }
     }
@@ -445,12 +532,20 @@ class SocialRepository(
                         .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
                 )
                 socialDao.deleteAlarmLink(link.remoteAlarmId)
+                WorkManager.getInstance(context).cancelUniqueWork("jay_ignored_alarm_${alarm.id}")
             }
             alarmUseCase.deleteAlarm(alarm)
         }
     }
 
-    suspend fun recordActivity(localAlarmId: Long, kind: AlarmActivityKind) =
+    suspend fun recordActivity(
+        localAlarmId: Long,
+        kind: AlarmActivityKind,
+        eventId: String,
+        occurredAt: String,
+        occurrenceId: String?,
+        reason: String?
+    ) =
         withContext(Dispatchers.IO) {
             val link = socialDao.getAlarmLinkByLocalId(localAlarmId) ?: return@withContext
             val serverUrl = Preferences.instance.getString(
@@ -461,9 +556,12 @@ class SocialRepository(
             SocialApi(serverUrl, identity).recordActivity(
                 link.remoteAlarmId,
                 AlarmActivityRequest(
+                    eventId,
                     link.revision,
                     kind.name.lowercase(),
-                    Instant.now().toString()
+                    occurredAt,
+                    occurrenceId,
+                    reason
                 )
             )
         }
@@ -521,7 +619,7 @@ class SocialRepository(
                     .build()
             )
         ).token()
-        SocialApi(serverUrl, identity).apply {
+        SocialApi(serverUrl, identity).run {
             register()
             updatePlayEntitlement(integrityToken)
         }
@@ -539,17 +637,53 @@ class SocialRepository(
                 alarmUseCase.deleteAlarm(it)
             }
             socialDao.deleteAlarmLink(link.remoteAlarmId)
+            WorkManager.getInstance(context).cancelUniqueWork(
+                "jay_ignored_alarm_${link.localAlarmId}"
+            )
         }
         socialDatabase.withTransaction {
             socialDao.clearMembers()
-            socialDao.clearDeliveries()
-            socialDao.clearActivity()
             socialDao.clearGroups()
         }
         Preferences.edit {
             putString(Preferences.jayServerUrlKey, serverUrl.trimEnd('/'))
             putLong(Preferences.jaySyncCursorKey, 0)
         }
+    }
+
+    private suspend fun scheduleIgnoredOutcome(
+        alarm: Alarm,
+        remoteAlarmId: String,
+        revision: Int
+    ) {
+        if (!alarm.enabled) {
+            WorkManager.getInstance(context).cancelUniqueWork("jay_ignored_alarm_${alarm.id}")
+            return
+        }
+        val triggerAt = AlarmHelper.getAlarmTime(alarm)
+        val occurrenceId = triggerAt.toString()
+        SocialIgnoredAlarmWorker.schedule(
+            context,
+            alarm.id,
+            triggerAt,
+            occurrenceId
+        )
+        val serverUrl = Preferences.instance.getString(
+            Preferences.jayServerUrlKey,
+            DEFAULT_SERVER_URL
+        ) ?: DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+        SocialApi(serverUrl, identity).registerAlarmOccurrence(
+            remoteAlarmId,
+            AlarmOccurrenceSchedule(
+                revision,
+                occurrenceId,
+                Instant.ofEpochMilli(triggerAt).toString(),
+                Instant.ofEpochMilli(
+                    triggerAt + AlarmService.AUTO_SNOOZE_MINUTES * 60_000L
+                ).toString()
+            )
+        )
     }
 
     companion object {

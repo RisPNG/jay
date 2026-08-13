@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -46,7 +48,8 @@ fun AlarmItem(
     onClick: (Alarm) -> Unit,
     onLongClick: (Alarm) -> Unit,
     onUpdateAlarm: (Alarm) -> Unit,
-    onDeleteAlarm: (Alarm) -> Unit
+    onDeleteAlarm: (Alarm) -> Unit,
+    onActivity: (() -> Unit)? = null
 ) {
     var showDeletionDialog by remember { mutableStateOf(false) }
     var isAlarmEnabled by remember { mutableStateOf(alarm.enabled) }
@@ -107,6 +110,14 @@ fun AlarmItem(
                         }
                     }
                 )
+                onActivity?.let {
+                    IconButton(
+                        onClick = it,
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        Icon(Icons.Rounded.History, stringResource(R.string.alarm_activity))
+                    }
+                }
             }
         },
         backgroundContent = {

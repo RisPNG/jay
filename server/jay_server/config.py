@@ -5,10 +5,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://jay:jay@127.0.0.1:5432/jay"
     public_url: str = "http://127.0.0.1:8000"
-    invite_lifetime_hours: int = 72
+    invite_lifetime_hours: int = 24
     firebase_credentials_json: str | None = None
     google_play_credentials_json: str | None = None
     play_entitlement_lifetime_hours: int = 48
+    alarm_occurrence_monitor_enabled: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

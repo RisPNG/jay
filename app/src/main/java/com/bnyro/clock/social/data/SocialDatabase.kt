@@ -4,21 +4,19 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.bnyro.clock.social.domain.SharedAlarmLink
-import com.bnyro.clock.social.domain.SocialActivity
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
-import com.bnyro.clock.social.domain.SharedAlarmDelivery
 
 @Database(
     entities = [
         SocialGroup::class,
         SocialMember::class,
-        SharedAlarmLink::class,
-        SocialActivity::class,
-        SharedAlarmDelivery::class
+        SharedAlarmLink::class
     ],
-    version = 1
+    version = 2
 )
 abstract class SocialDatabase : RoomDatabase() {
     abstract fun socialDao(): SocialDao
@@ -28,9 +26,33 @@ abstract class SocialDatabase : RoomDatabase() {
         private var instance: SocialDatabase? = null
 
         fun getDatabase(context: Context): SocialDatabase = instance ?: synchronized(this) {
-            Room.databaseBuilder(context, SocialDatabase::class.java, "jay_social").build().also {
-                instance = it
-            }
+            Room.databaseBuilder(context, SocialDatabase::class.java, "jay_social")
+                .addMigrations(
+                    object : Migration(1, 2) {
+                        override fun migrate(db: SupportSQLiteDatabase) {
+                            db.execSQL("DROP TABLE social_activity")
+                            db.execSQL("DROP TABLE shared_alarm_deliveries")
+                            db.execSQL(
+                                "ALTER TABLE social_groups ADD COLUMN notifyAlarmChanges " +
+                                    "INTEGER NOT NULL DEFAULT 1"
+                            )
+                            db.execSQL(
+                                "ALTER TABLE social_groups ADD COLUMN notifyIgnored " +
+                                    "INTEGER NOT NULL DEFAULT 1"
+                            )
+                            db.execSQL(
+                                "ALTER TABLE social_groups ADD COLUMN notifyMembership " +
+                                    "INTEGER NOT NULL DEFAULT 1"
+                            )
+                            db.execSQL(
+                                "ALTER TABLE social_groups ADD COLUMN notifyAdministrative " +
+                                    "INTEGER NOT NULL DEFAULT 1"
+                            )
+                        }
+                    }
+                )
+                .build()
+                .also { instance = it }
         }
     }
 }

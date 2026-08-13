@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from psycopg import Connection
+from psycopg.types.json import Jsonb
 
 
 def require_group_member(connection: Connection, group_id: UUID, device_id: str) -> dict:
@@ -43,13 +44,24 @@ def record_group_change(
     action: str | None = None,
     entity_label: str | None = None,
     entity_time: int | None = None,
-) -> None:
-    connection.execute(
+    subject_device_id: str | None = None,
+    recipient_device_id: str | None = None,
+    details: dict | None = None,
+) -> int:
+    change = connection.execute(
         """
         INSERT INTO changes (
             group_id, entity_type, entity_id, actor_device_id, action, entity_label,
-            entity_time
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            entity_time, subject_device_id, recipient_device_id, group_label,
+            actor_label, subject_label, details
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s,
+            (SELECT name FROM groups WHERE id = %s),
+            (SELECT name FROM devices WHERE id = %s),
+            (SELECT name FROM devices WHERE id = %s),
+            %s
+        )
+        RETURNING sequence
         """,
         (
             group_id,
@@ -59,8 +71,14 @@ def record_group_change(
             action,
             entity_label,
             entity_time,
+            subject_device_id,
+            recipient_device_id,
+            group_id,
+            actor_device_id,
+            subject_device_id,
+            Jsonb(details) if details is not None else None,
         ),
-    )
+    ).fetchone()
     connection.execute(
         "SELECT pg_notify('jay_changes', %s)",
         (
@@ -73,10 +91,14 @@ def record_group_change(
             ),
         ),
     )
+    return change["sequence"]
 
 
 def get_group_push_tokens(
-    connection: Connection, group_id: UUID, excluding_device_id: str
+    connection: Connection,
+    group_id: UUID,
+    excluding_device_id: str,
+    category: str | None = None,
 ) -> list[str]:
     return [
         row["push_token"]
@@ -85,8 +107,15 @@ def get_group_push_tokens(
             SELECT d.push_token
             FROM group_members gm
             JOIN devices d ON d.id = gm.device_id
-            WHERE gm.group_id = %s AND gm.device_id != %s AND d.push_token IS NOT NULL
+            WHERE gm.group_id = %s
+              AND gm.device_id != %s
+              AND d.push_token IS NOT NULL
+              AND (
+                %s::text IS NULL
+                OR (%s::text = 'membership' AND gm.notify_membership)
+                OR (%s::text = 'administrative' AND gm.notify_administrative)
+              )
             """,
-            (group_id, excluding_device_id),
+            (group_id, excluding_device_id, category, category, category),
         ).fetchall()
     ]
