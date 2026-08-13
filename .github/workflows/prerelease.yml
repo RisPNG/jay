@@ -33,7 +33,8 @@ jobs:
           version_name=$(awk -F= '$1 == "jayVersionName" { print $2 }' gradle.properties)
           version_code=$((100000 + GITHUB_RUN_NUMBER))
           short_sha=${GITHUB_SHA:0:7}
-          prerelease_version="${version_name}-pre.${GITHUB_RUN_NUMBER}.g${short_sha}"
+          printf -v padded_run '%05d' "$GITHUB_RUN_NUMBER"
+          prerelease_version="${version_name}-pre.r${padded_run}.g${short_sha}"
           printf 'VERSION_CODE=%s\n' "$version_code" >> "$GITHUB_ENV"
           printf 'PRERELEASE_VERSION=%s\n' "$prerelease_version" >> "$GITHUB_ENV"
           printf 'ARTIFACT_NAME=jay-%s.apk\n' "$prerelease_version" >> "$GITHUB_ENV"
