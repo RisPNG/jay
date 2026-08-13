@@ -33,6 +33,7 @@ import com.bnyro.clock.presentation.screens.alarm.AlarmActivity
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.NotificationHelper
+import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.runBlocking
 import java.util.Timer
 import java.util.TimerTask
@@ -207,9 +208,12 @@ class AlarmService : Service() {
                                     getString(
                                         R.string.named_alarm_missed,
                                         it,
-                                        alarm.formattedTime
+                                        TimeHelper.millisToFormatted(this@AlarmService, alarm.time)
                                     )
-                                } ?: getString(R.string.alarm_missed, alarm.formattedTime)
+                                } ?: getString(
+                                    R.string.alarm_missed,
+                                    TimeHelper.millisToFormatted(this@AlarmService, alarm.time)
+                                )
                             )
                             .setContentText(
                                 resources.getQuantityString(
@@ -342,9 +346,12 @@ class AlarmService : Service() {
                     context.getString(
                         R.string.ringing_named_alarm,
                         it,
-                        alarm.formattedTime
+                        TimeHelper.millisToFormatted(context, alarm.time)
                     )
-                } ?: context.getString(R.string.ringing_alarm, alarm.formattedTime)
+                } ?: context.getString(
+                    R.string.ringing_alarm,
+                    TimeHelper.millisToFormatted(context, alarm.time)
+                )
             )
             setAutoCancel(true)
             priority = NotificationCompat.PRIORITY_MAX
