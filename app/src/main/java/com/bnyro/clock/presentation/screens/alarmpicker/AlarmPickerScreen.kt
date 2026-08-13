@@ -24,6 +24,11 @@ fun AlarmPickerScreen(onNavigateBack: () -> Unit) {
         },
         currentGroupId = viewModel.groupId,
         canSave = currentGroup == null || currentGroup.canEditAlarms,
+        onDelete = { alarm ->
+            viewModel.deleteAlarm(alarm) {
+                onNavigateBack.invoke()
+            }
+        },
         onSave = { alarm, groupId ->
             if (alarm.id == 0L) {
                 viewModel.createAlarm(alarm.copy(enabled = true), groupId) {

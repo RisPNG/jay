@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.presentation.components.DialogButton
+import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.util.AlarmHelper
 import kotlinx.coroutines.delay
 
@@ -162,6 +163,7 @@ fun AlarmItem(
                     imageVector = Icons.Rounded.DeleteOutline,
                     contentDescription = null,
                     modifier = Modifier.padding(start = 16.dp),
+                    tint = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
         }
@@ -173,13 +175,13 @@ fun AlarmItem(
             title = { Text(text = stringResource(R.string.delete_alarm)) },
             text = { Text(text = stringResource(R.string.irreversible)) },
             confirmButton = {
-                DialogButton(label = android.R.string.ok) {
+                DialogButton(label = R.string.delete, style = DialogButtonStyle.DESTRUCTIVE) {
                     onDeleteAlarm(alarm)
                     showDeletionDialog = false
                 }
             },
             dismissButton = {
-                DialogButton(label = android.R.string.cancel) {
+                DialogButton(label = android.R.string.cancel, style = DialogButtonStyle.SECONDARY) {
                     showDeletionDialog = false
                 }
             }
