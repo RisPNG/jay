@@ -1,13 +1,14 @@
 package com.bnyro.clock.presentation.screens.alarmpicker
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bnyro.clock.presentation.screens.alarmpicker.components.AlarmPicker
 import com.bnyro.clock.presentation.screens.alarmpicker.model.AlarmPickerModel
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import com.bnyro.clock.social.domain.canEditAlarms
+import com.bnyro.clock.util.AlarmHelper
 
 @Composable
 fun AlarmPickerScreen(onNavigateBack: () -> Unit) {
@@ -26,12 +27,12 @@ fun AlarmPickerScreen(onNavigateBack: () -> Unit) {
         onSave = { alarm, groupId ->
             if (alarm.id == 0L) {
                 viewModel.createAlarm(alarm.copy(enabled = true), groupId) {
-                    viewModel.createToast(alarm, context)
+                    AlarmHelper.showAlarmScheduledToast(context, alarm)
                     onNavigateBack.invoke()
                 }
             } else {
                 viewModel.updateAlarm(alarm.copy(enabled = true)) {
-                    viewModel.createToast(alarm, context)
+                    AlarmHelper.showAlarmScheduledToast(context, alarm)
                     onNavigateBack.invoke()
                 }
             }
