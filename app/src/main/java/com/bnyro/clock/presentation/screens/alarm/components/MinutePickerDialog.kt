@@ -19,6 +19,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.presentation.components.DialogButton
+import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.presentation.screens.timer.components.ScrollTimePicker
 
 @Composable
@@ -30,7 +31,7 @@ fun MinutePickerDialog(
 ) {
     var newTime = remember { currentTime }
     AlertDialog(onDismissRequest, confirmButton = {
-        DialogButton(label = android.R.string.ok) {
+        DialogButton(label = R.string.save, style = DialogButtonStyle.PRIMARY) {
             onTimeSet(newTime)
         }
     }, title = { Text(text = stringResource(title)) }, text = {

@@ -91,4 +91,21 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
         }
     }
 
+    fun deleteAlarm(alarm: Alarm, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                socialRepository.deleteAlarm(alarm)
+                onDeleted()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                socialRepository.synchronize()
+                Toast.makeText(
+                    getApplication(),
+                    exception.message ?: "Unable to delete alarm",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
 }
