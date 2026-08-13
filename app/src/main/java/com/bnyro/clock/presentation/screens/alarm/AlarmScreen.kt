@@ -196,6 +196,9 @@ fun AlarmScreen(
                     onDeleteAlarm = { alarmItem ->
                         alarmModel.deleteAlarm(alarmItem)
                     },
+                    onDismissAlarm = { alarmItem ->
+                        alarmModel.dismissUpcomingAlarm(alarmItem)
+                    },
                     onActivity = remoteAlarmIds[alarm.id]?.let { remoteAlarmId ->
                         { alarmModel.loadAlarmActivity(remoteAlarmId) }
                     },
