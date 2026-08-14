@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -15,7 +15,7 @@ import com.bnyro.clock.presentation.screens.alarmpicker.model.AlarmPickerModel
 
 @Composable
 fun AlarmReceiverDialog(context: Context, alarm: Alarm) {
-    var showDialog by remember {
+    var showDialog by rememberSaveable {
         mutableStateOf(true)
     }
 
