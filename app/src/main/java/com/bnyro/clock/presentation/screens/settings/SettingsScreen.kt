@@ -1,12 +1,19 @@
 package com.bnyro.clock.presentation.screens.settings
 
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,16 +21,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -32,19 +43,26 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.R
+import com.bnyro.clock.domain.model.PickerStyle
+import com.bnyro.clock.domain.model.VolumeButtonAction
 import com.bnyro.clock.navigation.homeRoutes
 import com.bnyro.clock.presentation.components.ClickableIcon
+import com.bnyro.clock.presentation.screens.alarm.components.MinutePickerDialog
 import com.bnyro.clock.presentation.screens.settings.components.ButtonGroupPref
 import com.bnyro.clock.presentation.screens.settings.components.ColorPref
 import com.bnyro.clock.presentation.screens.settings.components.IconPreference
@@ -55,11 +73,14 @@ import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import com.bnyro.clock.util.Preferences
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bnyro.clock.social.presentation.SocialModel
+import com.bnyro.clock.util.services.AlarmService
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
-    onClickBack: () -> Unit, settingsModel: SettingsModel, timerModel: TimerModel
+    onClickBack: () -> Unit,
+    settingsModel: SettingsModel,
+    timerModel: TimerModel
 ) {
     val context = LocalContext.current
     val socialModel: SocialModel = viewModel()
@@ -69,6 +90,15 @@ fun SettingsScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState()
     )
+    var showAlarmTimeoutDialog by remember { mutableStateOf(false) }
+    var alarmTimeoutMinutes by remember {
+        mutableIntStateOf(
+            Preferences.instance.getInt(
+                Preferences.alarmTimeoutMinutesKey,
+                AlarmService.ALARM_TIMEOUT_MINUTES
+            )
+        )
+    }
 
     val documentPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -85,17 +115,19 @@ fun SettingsScreen(
     )
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection), topBar = {
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
             LargeTopAppBar(
-                title = {
-                    Text(stringResource(R.string.settings))
-                }, navigationIcon = {
+                title = { Text(stringResource(R.string.settings)) },
+                navigationIcon = {
                     ClickableIcon(imageVector = Icons.AutoMirrored.Filled.ArrowBack) {
                         onClickBack.invoke()
                     }
-                }, scrollBehavior = scrollBehavior
+                },
+                scrollBehavior = scrollBehavior
             )
-        }) { pv ->
+        }
+    ) { pv ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -105,55 +137,80 @@ fun SettingsScreen(
         ) {
             val uriHandler = LocalUriHandler.current
             SettingsCategory(stringResource(R.string.appearance))
+
             ButtonGroupPref(
-                title = stringResource(R.string.theme), options = SettingsModel.Theme.entries.map {
-                    stringResource(it.resId)
-                }, values = SettingsModel.Theme.entries, currentValue = settingsModel.themeMode
+                title = stringResource(R.string.theme),
+                options = SettingsModel.Theme.entries.map { stringResource(it.resId) },
+                values = SettingsModel.Theme.entries,
+                currentValue = settingsModel.themeMode
             ) {
                 settingsModel.themeMode = it
                 Preferences.edit { putString(Preferences.themeKey, it.name) }
             }
+
             ButtonGroupPref(
                 title = stringResource(R.string.color_scheme),
-                options = SettingsModel.ColorTheme.entries.map {
-                    stringResource(it.resId)
-                },
+                options = SettingsModel.ColorTheme.entries.map { stringResource(it.resId) },
                 values = SettingsModel.ColorTheme.entries,
                 currentValue = settingsModel.colorTheme
             ) {
                 settingsModel.colorTheme = it
                 Preferences.edit { putString(Preferences.colorThemeKey, it.name) }
             }
+
             AnimatedVisibility(
                 visible = settingsModel.colorTheme == SettingsModel.ColorTheme.CATPPUCCIN
             ) {
                 ColorPref(
-                    selectedColor = settingsModel.customColor, onSelect = {
+                    selectedColor = settingsModel.customColor,
+                    onSelect = {
                         settingsModel.customColor = it
                         Preferences.edit { putInt(Preferences.customColorKey, it) }
-                    })
+                    }
+                )
             }
-            ButtonGroupPref(
-                title = "Name",
-                options = SettingsModel.AppName.entries.map {
-                    if (it == SettingsModel.AppName.DEFAULT) "Jay" else "Clock"
-                },
-                values = SettingsModel.AppName.entries,
-                currentValue = settingsModel.appName
-            ) { selectedName ->
-                settingsModel.updateAppName(context, selectedName)
+            //apereance advanced
+            ExpandableSection(title = stringResource(R.string.advanced_settings)) {
+                ButtonGroupPref(
+                    title = "Name",
+                    options = SettingsModel.AppName.entries.map {
+                        if (it == SettingsModel.AppName.DEFAULT) "Jay" else "Clock"
+                    },
+                    values = SettingsModel.AppName.entries,
+                    currentValue = settingsModel.appName
+                ) { selectedName ->
+                    settingsModel.updateAppName(context, selectedName)
+                }
+
+
+
+                ButtonGroupPref(
+                    title = stringResource(R.string.plus_button_position),
+                    options = SettingsModel.FabAlignment.entries.map {
+                        it.name.lowercase().replaceFirstChar { char -> char.uppercase() }
+                    },
+                    values = SettingsModel.FabAlignment.entries,
+                    currentValue = settingsModel.fabAlignment
+                ) { alignment ->
+                    settingsModel.updateFabAlignment(alignment)
+                }
+
+                SwitchPref(
+                    prefKey = "timer_BIG_start_button",
+                    title = stringResource(R.string.timer_use_big_start),
+                    defaultValue = false
+                )
             }
-            SwitchPref(
-                prefKey = "timer_BIG_start_button",
-                title = stringResource(R.string.timer_use_big_start),
-                defaultValue = false
-            )
+
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
             )
-            SettingsCategory(title = stringResource(R.string.behavior))
 
+
+            //bahavr
+
+            SettingsCategory(title = stringResource(R.string.behavior))
 
             ButtonGroupPref(
                 title = stringResource(R.string.start_tab),
@@ -164,62 +221,112 @@ fun SettingsScreen(
                 settingsModel.homeTab = it
                 Preferences.edit { putString(Preferences.startTabKey, it.route) }
             }
-            val tabItems = listOf(
-                "alarm" to R.string.alarm,
-                "clock" to R.string.clock,
-                "timer" to R.string.timer,
-                "stopwatch" to R.string.stopwatch,
-                "groups" to R.string.groups
-            )
-            val activeTabs = tabItems.map { it.first }.filter { key ->
-                Preferences.instance.getBoolean("show_tab_$key", true)
-            }
             ButtonGroupPref(
-                title = stringResource(R.string.show_clock_bottom_tab),
-                options = tabItems.map { stringResource(it.second) },
-                values = tabItems.map { it.first },
-                currentValue = settingsModel.enabledTabs
-            ) { selectedKey ->
-                val key = selectedKey as String
-                val currentState = Preferences.instance.getBoolean("show_tab_$key", true)
-                settingsModel.toggleTab(key, !currentState)
+                title = stringResource(R.string.alarm_picker_style),
+                options = PickerStyle.entries.map {
+                    stringResource(
+                        when (it) {
+                            PickerStyle.WHEEL -> R.string.wheel
+                            PickerStyle.NUMBER_PAD -> R.string.number_pad
+                            PickerStyle.CLOCK -> R.string.clock
+                        }
+                    )
+                },
+                values = PickerStyle.entries,
+                currentValue = settingsModel.alarmPickerStyle
+            ) {
+                settingsModel.alarmPickerStyle = it
+                Preferences.edit { putString(Preferences.alarmPickerStyleKey, it.name) }
             }
 
             ButtonGroupPref(
-                title = "Plus Button Position",
-                options = SettingsModel.FabAlignment.entries.map {
-                    it.name.lowercase().replaceFirstChar { char -> char.uppercase() }
+                title = stringResource(R.string.timer_picker_style),
+                options = PickerStyle.entries.map {
+                    stringResource(
+                        when (it) {
+                            PickerStyle.WHEEL -> R.string.wheel
+                            PickerStyle.NUMBER_PAD -> R.string.number_pad
+                            PickerStyle.CLOCK -> R.string.clock
+                        }
+                    )
                 },
-                values = SettingsModel.FabAlignment.entries,
-                currentValue = settingsModel.fabAlignment
-            ) { alignment ->
-                settingsModel.updateFabAlignment(alignment)
-            }
-            SwitchPref(
-                prefKey = Preferences.showSecondsKey,
-                title = stringResource(R.string.show_seconds),
-                defaultValue = true
-            )
-            SwitchPref(
-                prefKey = Preferences.timerUsePickerKey,
-                title = stringResource(R.string.timer_use_time_picker),
-                defaultValue = false
+                values = PickerStyle.entries,
+                currentValue = settingsModel.timerPickerStyle
             ) {
-                // reset the timer model state to prevent issues when changing the time picker layout
+                settingsModel.timerPickerStyle = it
+                Preferences.edit { putString(Preferences.timerPickerStyleKey, it.name) }
                 timerModel.timePickerFakeUnits = 0
                 timerModel.timePickerSeconds = 0
             }
-            SwitchPref(
-                prefKey = Preferences.timerShowExamplesKey,
-                title = stringResource(R.string.show_timer_quick_selection),
-                defaultValue = true
-            )
 
-            SwitchPref(
-                prefKey = "alarm_use_scroll_picker",     //ik its dumb but this actually is the way to enable the numpad not the other way around
-                title = stringResource(R.string.alarm_use_time_picker),
-                defaultValue = false
-            )
+
+
+            ButtonGroupPref(
+                title = stringResource(R.string.volume_buttons_during_alarm),
+                options = listOf(
+                    stringResource(R.string.snooze),
+                    stringResource(R.string.dismiss),
+                    stringResource(R.string.control_volume),
+                    stringResource(R.string.do_nothing)
+                ),
+                values = VolumeButtonAction.entries,
+                currentValue = settingsModel.volumeButtonAction
+            ) { action ->
+                settingsModel.volumeButtonAction = action
+                Preferences.edit {
+                    putString(Preferences.volumeButtonActionKey, action.name)
+                }
+            }
+
+            //behav advanc
+            ExpandableSection(title = stringResource(R.string.advanced_settings)) {
+
+
+
+
+
+                val tabItems = listOf(
+                    "alarm" to R.string.alarm,
+                    "clock" to R.string.clock,
+                    "timer" to R.string.timer,
+                    "stopwatch" to R.string.stopwatch,
+                    "groups" to R.string.groups
+                )
+                ButtonGroupPref(
+                    title = stringResource(R.string.show_clock_bottom_tab),
+                    options = tabItems.map { stringResource(it.second) },
+                    values = tabItems.map { it.first },
+                    currentValue = settingsModel.enabledTabs
+                ) { selectedKey ->
+                    val key = selectedKey as String
+                    val currentState = Preferences.instance.getBoolean("show_tab_$key", true)
+                    settingsModel.toggleTab(key, !currentState)
+                }
+
+                SwitchPref(
+                    prefKey = Preferences.showSecondsKey,
+                    title = stringResource(R.string.show_seconds),
+                    defaultValue = true
+                )
+
+                SwitchPref(
+                    prefKey = Preferences.timerShowExamplesKey,
+                    title = stringResource(R.string.show_timer_quick_selection),
+                    defaultValue = true
+                )
+
+                IconPreference(
+                    title = stringResource(R.string.timeout_after),
+                    summary = pluralStringResource(
+                        R.plurals.minutes,
+                        alarmTimeoutMinutes,
+                        alarmTimeoutMinutes
+                    ),
+                    imageVector = Icons.Rounded.Timer
+                ) {
+                    showAlarmTimeoutDialog = true
+                }
+            }
 
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
@@ -247,6 +354,7 @@ fun SettingsScreen(
             )
 
 
+
             SettingsCategory(stringResource(R.string.migrate_title))
             IconPreference(
                 title = stringResource(R.string.Import_Alarms),
@@ -262,7 +370,6 @@ fun SettingsScreen(
             ) {
                 exportDocumentLauncher.launch("jay_export.json")
             }
-
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
@@ -359,5 +466,59 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+    if (showAlarmTimeoutDialog) {
+        MinutePickerDialog(
+            onDismissRequest = { showAlarmTimeoutDialog = false },
+            currentTime = alarmTimeoutMinutes,
+            title = R.string.select_alarm_timeout,
+            onTimeSet = {
+                alarmTimeoutMinutes = it
+                Preferences.edit { putInt(Preferences.alarmTimeoutMinutesKey, it) }
+                showAlarmTimeoutDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun ExpandableSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    initialExpanded: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    var expanded by rememberSaveable { mutableStateOf(initialExpanded) }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 12.dp, horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.secondary
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                content()
+            }
+        }
     }
 }

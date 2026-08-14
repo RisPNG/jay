@@ -1,20 +1,19 @@
 package com.bnyro.clock.presentation.screens.alarm.model
 
 import android.app.Application
-import android.content.Context
-import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bnyro.clock.App
-import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.AlarmFilters
 import com.bnyro.clock.domain.model.AlarmSortOrder
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
+import com.bnyro.clock.social.data.SocialActivityWorker
+import com.bnyro.clock.social.domain.AlarmActivityKind
 import com.bnyro.clock.social.domain.canEditAlarms
 import com.bnyro.clock.social.domain.PERSONAL_ALARM_SOURCE_ID
 import com.bnyro.clock.social.domain.SocialChange
@@ -63,7 +62,7 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
                 (filter.startTime <= alarm.time && alarm.time <= filter.endTime)
                         && !Collections.disjoint(filter.weekDays, alarm.days)
                         && (alarm.label?.lowercase()?.contains(filter.label.lowercase())
-                    ?: true) && (alarm.formattedTime.lowercase()
+                    ?: true) && (TimeHelper.millisToFormatted(getApplication(), alarm.time).lowercase()
                     .contains(filter.label.lowercase()))
                         && (sourceIds == null || sourceId in sourceIds)
 
@@ -133,6 +132,13 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun dismissUpcomingAlarm(alarm: Alarm) {
+        SocialActivityWorker.enqueue(getApplication(), alarm.id, AlarmActivityKind.DISMISSED)
+        viewModelScope.launch {
+            createUpdateDeleteAlarmUseCase.dismissUpcomingAlarm(alarm)
+        }
+    }
+
     fun copyAlarm(alarm: Alarm) {
         viewModelScope.launch {
             createUpdateDeleteAlarmUseCase.createAlarm(alarm.copy(id = 0L))
@@ -140,18 +146,6 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-
-    fun createToast(alarm: Alarm, context: Context) {
-        val millisRemainingForAlarm =
-            (AlarmHelper.getAlarmTime(alarm) - System.currentTimeMillis())
-        val formattedDuration =
-            TimeHelper.durationToFormatted(context, millisRemainingForAlarm.milliseconds)
-        Toast.makeText(
-            context,
-            context.resources.getString(R.string.alarm_will_play, formattedDuration),
-            Toast.LENGTH_SHORT
-        ).show()
-    }
 
     fun deleteAlarm(alarm: Alarm) {
         viewModelScope.launch {

@@ -1,6 +1,7 @@
 package com.bnyro.clock
 
 import android.app.Application
+import androidx.work.Configuration
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -19,9 +20,13 @@ import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
 import java.util.concurrent.TimeUnit
 
-class App : Application() {
+class App : Application(), Configuration.Provider {
     lateinit var container: AppContainer
     private val database by lazy { AppDatabase.getDatabase(this) }
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().build()
+
     override fun onCreate() {
         super.onCreate()
 
@@ -32,7 +37,8 @@ class App : Application() {
         if (
             BuildConfig.JAY_FIREBASE_APPLICATION_ID.isNotBlank() &&
             BuildConfig.JAY_FIREBASE_PROJECT_ID.isNotBlank() &&
-            BuildConfig.JAY_FIREBASE_API_KEY.isNotBlank()
+            BuildConfig.JAY_FIREBASE_API_KEY.isNotBlank() &&
+            FirebaseApp.getApps(this).isEmpty()
         ) {
             FirebaseApp.initializeApp(
                 this,

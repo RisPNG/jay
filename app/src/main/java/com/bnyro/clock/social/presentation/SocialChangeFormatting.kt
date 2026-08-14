@@ -21,7 +21,7 @@ fun SocialChange.presentationTitle(context: Context, deviceId: String): String {
                 actor,
                 action,
                 alarm,
-                TimeHelper.millisToFormatted(it),
+                TimeHelper.millisToFormatted(context, it),
                 groupName
             )
         } ?: context.getString(
@@ -37,7 +37,7 @@ fun SocialChange.presentationTitle(context: Context, deviceId: String): String {
                 actor,
                 action,
                 alarm,
-                TimeHelper.millisToFormatted(it),
+                TimeHelper.millisToFormatted(context, it),
                 groupName
             )
         } ?: context.getString(
@@ -144,7 +144,7 @@ fun SocialChange.logDetails(context: Context): String? {
                 add(context.getString(R.string.alarm_log_name, it))
             }
             entityTime?.let {
-                add(context.getString(R.string.alarm_log_time, TimeHelper.millisToFormatted(it)))
+                add(context.getString(R.string.alarm_log_time, TimeHelper.millisToFormatted(context, it)))
             }
         }
         entityType == "alarm" && action == "edited" -> buildList {
@@ -167,8 +167,8 @@ fun SocialChange.logDetails(context: Context): String? {
                     add(
                         context.getString(
                             R.string.alarm_log_time_changed,
-                            TimeHelper.millisToFormatted(previousTime),
-                            TimeHelper.millisToFormatted(time)
+                            TimeHelper.millisToFormatted(context, previousTime),
+                            TimeHelper.millisToFormatted(context, time)
                         )
                     )
                 }

@@ -1,6 +1,5 @@
 package com.bnyro.clock.presentation.screens.alarm.components
 
-import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,7 +31,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
+import com.bnyro.clock.presentation.components.DialogButton
+import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.util.AlarmHelper
+import com.bnyro.clock.util.TimeHelper
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun AlarmCard(
@@ -41,7 +44,9 @@ fun AlarmCard(
     canEdit: Boolean = true,
     isAlarmEnabled: Boolean,
     onEnable: (Boolean) -> Unit,
-    onActivity: (() -> Unit)? = null
+    onActivity: (() -> Unit)? = null,
+    canDismiss: Boolean,
+    onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -59,9 +64,7 @@ fun AlarmCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                val relativeTimeString = DateUtils.getRelativeTimeSpanString(
-                    AlarmHelper.getAlarmTime(alarm),
-                )
+                val millisRemaining = AlarmHelper.getAlarmTime(alarm) - System.currentTimeMillis()
                 if (groupName != null || alarm.label != null) {
                     Row(
                         modifier = Modifier
@@ -98,61 +101,77 @@ fun AlarmCard(
                 }
                 Spacer(modifier = Modifier.height(5.dp))
                 Text(
-                    text = alarm.formattedTime,
+                    text = TimeHelper.millisToFormatted(context, alarm.time),
                     style = MaterialTheme.typography.headlineLarge,
                     fontSize = 36.sp
                 )
                 Text(
-                    modifier = Modifier.padding(start = 6.dp),
-                    text = "$relativeTimeString"
+                    text = if (millisRemaining <= 0) {
+                        stringResource(R.string.alarm_starting_now)
+                    } else {
+                        stringResource(
+                            R.string.alarm_starts_in,
+                            TimeHelper.durationToFormatted(context, millisRemaining.milliseconds)
+                        )
+                    }
                 )
             }
 
-            Row(Modifier.padding(horizontal = 8.dp)) {
-                when {
-                    !alarm.repeat -> {
-                        Text(text = stringResource(R.string.one_time))
-                    }
+            Column(horizontalAlignment = Alignment.End) {
+                if (canDismiss) {
+                    DialogButton(R.string.dismiss, DialogButtonStyle.SECONDARY, onDismiss)
+                }
 
-                    alarm.isRepeatEveryday -> {
-                        Text(text = stringResource(R.string.repeating))
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(horizontal = 8.dp)) {
+                        when {
+                            !alarm.repeat -> {
+                                Text(text = stringResource(R.string.one_time))
+                            }
 
-                    alarm.isWeekends -> {
-                        Text(text = stringResource(R.string.weekends))
-                    }
+                            alarm.isRepeatEveryday -> {
+                                Text(text = stringResource(R.string.repeating))
+                            }
 
-                    alarm.isWeekdays -> {
-                        Text(text = stringResource(R.string.weekdays))
-                    }
+                            alarm.isWeekends -> {
+                                Text(text = stringResource(R.string.weekends))
+                            }
 
-                    else -> {
-                        val daysOfWeek = remember {
-                            AlarmHelper.getDaysOfWeekByLocale(context)
+                            alarm.isWeekdays -> {
+                                Text(text = stringResource(R.string.weekdays))
+                            }
+
+                            else -> {
+                                val daysOfWeek = remember {
+                                    AlarmHelper.getDaysOfWeekByLocale(context)
+                                }
+                                daysOfWeek.forEach { (day, index) ->
+                                    val enabled = alarm.days.contains(index)
+                                    Text(
+                                        modifier = Modifier.padding(horizontal = 2.dp),
+                                        text = day,
+                                        color = if (enabled) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface.copy(
+                                                alpha = 0.5f
+                                            )
+                                        },
+                                        fontWeight = FontWeight.Normal,
+                                        letterSpacing = 1.sp
+                                    )
+                                }
+                            }
                         }
-                        daysOfWeek.forEach { (day, index) ->
-                            val enabled = alarm.days.contains(index)
-                            Text(
-                                modifier = Modifier.padding(horizontal = 2.dp),
-                                text = day,
-                                color = if (enabled) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                fontWeight = FontWeight.Normal,
-                                letterSpacing = 1.sp
-                            )
-                        }
                     }
+
+                    Switch(
+                        checked = isAlarmEnabled,
+                        onCheckedChange = onEnable,
+                        enabled = canEdit
+                    )
                 }
             }
-
-            Switch(
-                checked = isAlarmEnabled,
-                onCheckedChange = onEnable,
-                enabled = canEdit
-            )
         }
     }
 }
