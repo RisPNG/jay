@@ -106,7 +106,7 @@ fun MeridiemPicker(
     onValueChanged: (Meridiem) -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryMuted = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
     val hapticFeedback = LocalHapticFeedback.current
     val state = rememberPagerState(initialPage = 200 + value.ordinal) {
         400
@@ -114,10 +114,8 @@ fun MeridiemPicker(
     val currentPage = state.currentPage
 
     LaunchedEffect(currentPage) {
-        if (enabled) {
-            onValueChanged(Meridiem.entries[currentPage % 2])
-        }
-        if (enabled && state.isScrollInProgress) {
+        if (enabled) onValueChanged(Meridiem.entries[currentPage % 2])
+        if (state.isScrollInProgress) {
             hapticFeedback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
         }
     }
@@ -127,13 +125,13 @@ fun MeridiemPicker(
         state = state,
         pageSpacing = 16.dp,
         pageSize = PageSize.Fixed(64.dp),
-        userScrollEnabled = enabled,
-        snapPosition = SnapPosition.Center
+        snapPosition = SnapPosition.Center,
+        userScrollEnabled = enabled
     ) { index ->
         Text(
             text = Meridiem.entries[index % 2].name,
             style = MaterialTheme.typography.displayMedium,
-            color = if (enabled && index == currentPage) primary else secondary
+            color = if (enabled && index == currentPage) primary else primaryMuted
         )
     }
 }

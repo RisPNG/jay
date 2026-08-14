@@ -33,6 +33,7 @@ import com.bnyro.clock.presentation.screens.alarm.AlarmActivity
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.NotificationHelper
+import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.runBlocking
 import java.util.Timer
@@ -40,7 +41,6 @@ import java.util.TimerTask
 import com.bnyro.clock.social.data.SocialActivityWorker
 import com.bnyro.clock.social.data.SocialIgnoredAlarmWorker
 import com.bnyro.clock.social.domain.AlarmActivityKind
-import com.bnyro.clock.util.Preferences
 import androidx.work.WorkManager
 
 class AlarmService : Service() {
@@ -177,16 +177,6 @@ class AlarmService : Service() {
         timer.schedule(object : TimerTask() {
             @SuppressLint("MissingPermission")
             override fun run() {
-                currentAlarm?.takeUnless { outcomeRecorded }?.let {
-                    outcomeRecorded = true
-                    SocialActivityWorker.enqueue(
-                        this@AlarmService,
-                        it.id,
-                        AlarmActivityKind.IGNORED,
-                        occurrenceId,
-                        "timed_out"
-                    )
-                }
                 if (Permission.NotificationPermission.hasPermission(this@AlarmService)) {
                     val contentIntent = PendingIntent.getActivity(
                         this@AlarmService,
@@ -225,6 +215,16 @@ class AlarmService : Service() {
                             .setContentIntent(contentIntent)
                             .setAutoCancel(true)
                             .build()
+                    )
+                }
+                currentAlarm?.takeUnless { outcomeRecorded }?.let {
+                    outcomeRecorded = true
+                    SocialActivityWorker.enqueue(
+                        this@AlarmService,
+                        it.id,
+                        AlarmActivityKind.IGNORED,
+                        occurrenceId,
+                        "timed_out"
                     )
                 }
                 stopSelf()
@@ -338,20 +338,24 @@ class AlarmService : Service() {
             getString(R.string.dismiss),
             getPendingIntent(dismissIntent, 2)
         )
+        val targetAlarmTimeMs = AlarmHelper.getAlarmTime(alarm)
 
         return NotificationCompat.Builder(context, NotificationHelper.ALARM_CHANNEL).apply {
+            val formattedTime = TimeHelper.formatTime(
+                context,
+                java.time.Instant.ofEpochMilli(targetAlarmTimeMs)
+                    .atZone(java.time.ZoneId.systemDefault())
+            )
+
             setSmallIcon(R.drawable.ic_notification)
             setContentTitle(
-                alarm.label?.takeIf { it.isNotBlank() }?.let {
+                alarm.label?.takeIf { it.isNotBlank() }?.let { label ->
                     context.getString(
                         R.string.ringing_named_alarm,
-                        it,
-                        TimeHelper.millisToFormatted(context, alarm.time)
+                        label,
+                        formattedTime
                     )
-                } ?: context.getString(
-                    R.string.ringing_alarm,
-                    TimeHelper.millisToFormatted(context, alarm.time)
-                )
+                } ?: context.getString(R.string.ringing_alarm, formattedTime)
             )
             setAutoCancel(true)
             priority = NotificationCompat.PRIORITY_MAX
@@ -371,7 +375,7 @@ class AlarmService : Service() {
             }
             addAction(dismissAction.build())
             setDeleteIntent(onDeleteIntent)
-            setOngoing(false) //maybeeee? it fixes the one thing but i will have to do some tests it seems to work tho
+            setOngoing(false)
         }.build()
     }
 

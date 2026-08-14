@@ -51,8 +51,8 @@ fun AlarmItem(
     onLongClick: (Alarm) -> Unit,
     onUpdateAlarm: (Alarm) -> Unit,
     onDeleteAlarm: (Alarm) -> Unit,
-    onDismissAlarm: (Alarm) -> Unit,
-    onActivity: (() -> Unit)? = null
+    onActivity: (() -> Unit)? = null,
+    onDismissAlarm: (Alarm) -> Unit
 ) {
     var showDeletionDialog by remember { mutableStateOf(false) }
     var isAlarmEnabled by remember { mutableStateOf(alarm.enabled) }

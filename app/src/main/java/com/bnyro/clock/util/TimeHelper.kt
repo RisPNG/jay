@@ -229,6 +229,6 @@ object TimeHelper {
                     minutes == 0 -> "$formattedDays $formattedHours"
                     else -> "$formattedDays $formattedHours $formattedMinutes"
                 }
-        }
+            }
     }
 }
