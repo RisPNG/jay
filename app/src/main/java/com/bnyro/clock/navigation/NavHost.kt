@@ -86,7 +86,10 @@ fun AppNavHost(
                     targetOffset = { it / 4 }) + fadeOut()
             }) {
             AlarmPickerScreen {
-                navController.popBackStack()
+                navController.popBackStack(
+                    NavRoutes.AlarmPicker.routeWithArgs,
+                    inclusive = true
+                )
             }
         }
 

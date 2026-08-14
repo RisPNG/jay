@@ -68,7 +68,6 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                 } else {
                     socialRepository.createSharedAlarm(groupId, alarm)
                 }
-                onCreated()
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
@@ -78,7 +77,9 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                     exception.message ?: "Unable to create shared alarm",
                     Toast.LENGTH_LONG
                 ).show()
+                return@launch
             }
+            onCreated()
         }
     }
 
@@ -88,7 +89,6 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
         viewModelScope.launch {
             try {
                 socialRepository.updateAlarm(alarm)
-                onUpdated()
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
@@ -99,7 +99,9 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                     exception.message ?: "Unable to update shared alarm",
                     Toast.LENGTH_LONG
                 ).show()
+                return@launch
             }
+            onUpdated()
         }
     }
 
@@ -109,7 +111,6 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
         viewModelScope.launch {
             try {
                 socialRepository.deleteAlarm(alarm)
-                onDeleted()
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
@@ -120,7 +121,9 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                     exception.message ?: "Unable to delete alarm",
                     Toast.LENGTH_LONG
                 ).show()
+                return@launch
             }
+            onDeleted()
         }
     }
 }
