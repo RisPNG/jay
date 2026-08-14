@@ -1,6 +1,5 @@
 package com.bnyro.clock.presentation.screens.alarmpicker
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,7 +16,6 @@ fun AlarmPickerScreen(onNavigateBack: () -> Unit) {
     val context = LocalContext.current
     val groups by viewModel.groups.collectAsState()
     val currentGroup = groups.firstOrNull { it.id == viewModel.groupId }
-    BackHandler(enabled = viewModel.busy) { }
     AlarmPicker(
         onCancel = { onNavigateBack.invoke() },
         currentAlarm = viewModel.alarm,
