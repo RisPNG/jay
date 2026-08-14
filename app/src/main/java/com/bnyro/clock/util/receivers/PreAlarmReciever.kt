@@ -71,6 +71,7 @@ class PreAlarmReceiver : BroadcastReceiver() {
                     withContext(Dispatchers.Main) {
                         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                             .setSmallIcon(R.drawable.ic_alarm)
+                            .setContentTitle(context.getString(R.string.upcoming_alarm))
                             .setContentTitle(
                                 alarm.label?.takeIf { it.isNotBlank() }?.let {
                                     context.getString(
@@ -86,7 +87,8 @@ class PreAlarmReceiver : BroadcastReceiver() {
                             .setContentIntent(contentPendingIntent)
                             .setPriority(NotificationCompat.PRIORITY_LOW)
                             .addAction(R.drawable.ic_alarm, context.getString(R.string.dismiss), dismissPendingIntent)
-                            .setAutoCancel(true)
+
+                            .setOngoing(true)
                             .build()
 
                         notificationManager.notify(

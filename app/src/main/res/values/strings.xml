@@ -171,10 +171,6 @@
     <string name="exportdesc">Backup alarms to a JSON file</string>
     <string name="upcoming_alarm">Upcoming alarm</string>
     <string name="upcoming_alarm_content">Will go off at %1$s</string>
-    <string name="upcoming_named_alarm">%1$s alarm will ring at %2$s</string>
-    <string name="upcoming_unnamed_alarm">Alarm will ring at %1$s</string>
-    <string name="ringing_named_alarm">%1$s alarm at %2$s is ringing</string>
-    <string name="ringing_alarm">Alarm at %1$s is ringing</string>
     <string name="show_text_shadow">Show text shadow</string>
     <string name="migrate_title">Migration</string>
     <string name="Import_Alarms">Import alarms</string>
@@ -252,6 +248,10 @@
         <item quantity="one">%d minute</item>
         <item quantity="other">%d minutes</item>
     </plurals>
+    <plurals name="alarm_rang_for_minutes">
+        <item quantity="one">It rang for %d minute</item>
+        <item quantity="other">It rang for %d minutes</item>
+    </plurals>
     <plurals name="hours">
         <item quantity="one">%d hour</item>
         <item quantity="other">%d hours</item>
@@ -260,15 +260,11 @@
         <item quantity="one">%d day</item>
         <item quantity="other">%d days</item>
     </plurals>
-    <plurals name="alarm_rang_for_minutes">
-        <item quantity="one">It rang for %d minute</item>
-        <item quantity="other">It rang for %d minutes</item>
-    </plurals>
     <string name="all_done_permission">Double-check!</string>
     <string name="all_done_description">Some manufacturers use their own background access permission</string>
     <string name="battery_optimization_title">Disable Battery Optimization</string>
-    <string name="battery_optimization_description">Allow alarms and timers to work reliably while the screen is off.</string>
-    <string name="full_screen_alarm_permission_title">Full-screen Alarms</string>
+    <string name="battery_optimization_description">This permission is needed for timers to work when the Phone Screen is off.</string>
+    <string name="full_screen_alarm_permission_title">Full-screen alarms</string>
     <string name="full_screen_alarm_permission_description">Allow full-screen alarms so ringing alarms can appear over the lock screen.</string>
     <string name="available_days_0">S</string>
     <string name="available_days_1">M</string>
@@ -278,6 +274,11 @@
     <string name="available_days_5">F</string>
     <string name="available_days_6">S</string>
     <string name="lap">Lap</string>
+    <string name="upcoming_named_alarm">%1$s alarm will ring at %2$s</string>
+    <string name="upcoming_unnamed_alarm">Alarm will ring at %1$s</string>
+    <string name="ringing_named_alarm">%1$s alarm at %2$s is ringing</string>
+    <string name="ringing_alarm">Alarm at %1$s is ringing</string>
+    <string name="skip">Skip</string>
     <string name="lap_time">Lap time</string>
     <string name="overall_time">Overall time</string>
     <string name="show_date">Show date</string>
@@ -310,4 +311,5 @@
     <string name="date_text_color">Date text color</string>
     <string name="time_text_color">Time text color</string>
     <string name="credits">Created by You-Apps, maintained by Elektron</string>
+    <string name="advanced_settings">advanced settings</string>
 </resources>

@@ -17,7 +17,6 @@ import com.bnyro.clock.App
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.PickerStyle
-import com.bnyro.clock.domain.model.VolumeButtonAction
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.navigation.HomeRoutes
 import com.bnyro.clock.navigation.homeRoutes
@@ -32,6 +31,7 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import com.bnyro.clock.domain.model.VolumeButtonAction
 
 class SettingsModel : ViewModel() {
     enum class Theme(@StringRes val resId: Int) {

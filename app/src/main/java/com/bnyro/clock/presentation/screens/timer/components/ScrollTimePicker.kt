@@ -29,17 +29,15 @@ fun ScrollTimePicker(
     enabled: Boolean = true
 ) {
     val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryMuted = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
     val hapticFeedback = LocalHapticFeedback.current
     val state = rememberPagerState(initialPage = maxValue * 100 + value - offset) {
         maxValue * 200
     }
     val currentPage = state.currentPage
     LaunchedEffect(currentPage) {
-        if (enabled) {
-            onValueChanged((currentPage + offset) % maxValue)
-        }
-        if (enabled && state.isScrollInProgress) {
+        if (enabled) onValueChanged((currentPage + offset) % maxValue)
+        if (state.isScrollInProgress) {
             hapticFeedback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
         }
     }
@@ -50,8 +48,8 @@ fun ScrollTimePicker(
         state = state,
         pageSpacing = 16.dp,
         pageSize = PageSize.Fixed(64.dp),
-        userScrollEnabled = enabled,
         snapPosition = SnapPosition.Center,
+        userScrollEnabled = enabled,
         flingBehavior = PagerDefaults.flingBehavior(
             state = state,
             pagerSnapDistance = PagerSnapDistance.atMost(60)
@@ -62,7 +60,7 @@ fun ScrollTimePicker(
         Text(
             text = String.format("%02d", number),
             style = MaterialTheme.typography.displayMedium,
-            color = if (enabled && index == currentPage) primary else secondary
+            color = if (enabled && index == currentPage) primary else primaryMuted
         )
     }
 }

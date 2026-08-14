@@ -154,7 +154,6 @@ fun AlarmPicker(
                 PickerStyle.WHEEL -> ScrollAlarmTimePicker(
                     initialHours = hours,
                     initialMinutes = minutes,
-                    enabled = canSave,
                     onHoursChanged = { hours = it },
                     onMinutesChanged = { minutes = it }
                 )
@@ -390,7 +389,8 @@ fun AlarmPicker(
             Button(
                 enabled = canSave && !busy,
                 onClick = {
-                    val alarm = currentAlarm.copy(
+                val alarm =
+                    currentAlarm.copy(
                         time = (hours * 60 + minutes) * 60 * 1000L,
                         label = label.takeIf { l -> l.isNotBlank() },
                         days = chosenDays.sorted(),

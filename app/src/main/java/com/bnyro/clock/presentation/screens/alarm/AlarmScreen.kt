@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
@@ -195,11 +196,11 @@ fun AlarmScreen(
                     onDeleteAlarm = { alarmItem ->
                         alarmModel.deleteAlarm(alarmItem)
                     },
-                    onDismissAlarm = { alarmItem ->
-                        alarmModel.dismissUpcomingAlarm(alarmItem)
-                    },
                     onActivity = remoteAlarmIds[alarm.id]?.let { remoteAlarmId ->
                         { alarmModel.loadAlarmActivity(remoteAlarmId) }
+                    },
+                    onDismissAlarm = { alarmItem ->
+                        alarmModel.dismissUpcomingAlarm(alarmItem)
                     },
                     onUpdateAlarm = { updatedAlarm ->
                         if (!isSelectionMode) {
@@ -269,8 +270,8 @@ fun AlarmScreen(
                     }
                 },
                 confirmButton = {
-                    DialogButton(label = R.string.close, style = DialogButtonStyle.PRIMARY) {
-                        alarmModel.selectedActivityAlarmId = null
+                    Button(onClick = { alarmModel.selectedActivityAlarmId = null }) {
+                        Text(stringResource(R.string.close))
                     }
                 }
             )

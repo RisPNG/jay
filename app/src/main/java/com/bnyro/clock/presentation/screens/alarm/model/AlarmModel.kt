@@ -14,9 +14,10 @@ import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.social.data.SocialActivityWorker
 import com.bnyro.clock.social.domain.AlarmActivityKind
+import com.bnyro.clock.social.domain.canEditAlarms
 import com.bnyro.clock.social.domain.PERSONAL_ALARM_SOURCE_ID
 import com.bnyro.clock.social.domain.SocialChange
-import com.bnyro.clock.social.domain.canEditAlarms
+import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Collections
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.flow.map
 
 class AlarmModel(application: Application) : AndroidViewModel(application) {
@@ -131,11 +133,7 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissUpcomingAlarm(alarm: Alarm) {
-        SocialActivityWorker.enqueue(
-            getApplication(),
-            alarm.id,
-            AlarmActivityKind.DISMISSED
-        )
+        SocialActivityWorker.enqueue(getApplication(), alarm.id, AlarmActivityKind.DISMISSED)
         viewModelScope.launch {
             createUpdateDeleteAlarmUseCase.dismissUpcomingAlarm(alarm)
         }

@@ -44,9 +44,9 @@ fun AlarmCard(
     canEdit: Boolean = true,
     isAlarmEnabled: Boolean,
     onEnable: (Boolean) -> Unit,
+    onActivity: (() -> Unit)? = null,
     canDismiss: Boolean,
-    onDismiss: () -> Unit,
-    onActivity: (() -> Unit)? = null
+    onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -119,7 +119,7 @@ fun AlarmCard(
 
             Column(horizontalAlignment = Alignment.End) {
                 if (canDismiss) {
-                    DialogButton(R.string.dismiss, DialogButtonStyle.PRIMARY, onDismiss)
+                    DialogButton(R.string.dismiss, DialogButtonStyle.SECONDARY, onDismiss)
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -153,7 +153,9 @@ fun AlarmCard(
                                         color = if (enabled) {
                                             MaterialTheme.colorScheme.primary
                                         } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                            MaterialTheme.colorScheme.onSurface.copy(
+                                                alpha = 0.5f
+                                            )
                                         },
                                         fontWeight = FontWeight.Normal,
                                         letterSpacing = 1.sp
