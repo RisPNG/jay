@@ -30,6 +30,7 @@ fun AlarmReceiverDialog(context: Context, alarm: Alarm) {
                 currentAlarm = alarm,
                 groups = emptyList(),
                 currentGroupId = null,
+                busy = alarmModel.busy,
                 onSave = { savedAlarm, _ ->
                     alarmModel.createAlarm(savedAlarm, null) {
                         alarmModel.createToast(savedAlarm, context)
