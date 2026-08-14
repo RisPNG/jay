@@ -64,7 +64,10 @@ class SocialIgnoredAlarmWorker(context: Context, parameters: WorkerParameters) :
             occurrenceId: String
         ) {
             Preferences.edit { putString("jayAlarmOccurrence:$alarmId", occurrenceId) }
-            val deadlineAt = triggerAtMillis + AlarmService.AUTO_SNOOZE_MINUTES * 60_000L
+            val deadlineAt = triggerAtMillis + Preferences.instance.getInt(
+                Preferences.alarmTimeoutMinutesKey,
+                AlarmService.ALARM_TIMEOUT_MINUTES
+            ) * 60_000L
             WorkManager.getInstance(context).enqueueUniqueWork(
                 "jay_ignored_alarm_$alarmId",
                 ExistingWorkPolicy.REPLACE,

@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.presentation.screens.alarmpicker.components.AlarmPicker
 import com.bnyro.clock.presentation.screens.alarmpicker.model.AlarmPickerModel
+import com.bnyro.clock.util.AlarmHelper
 
 @Composable
 fun AlarmReceiverDialog(context: Context, alarm: Alarm) {
@@ -33,7 +34,7 @@ fun AlarmReceiverDialog(context: Context, alarm: Alarm) {
                 busy = alarmModel.busy,
                 onSave = { savedAlarm, _ ->
                     alarmModel.createAlarm(savedAlarm, null) {
-                        alarmModel.createToast(savedAlarm, context)
+                        AlarmHelper.showAlarmScheduledToast(context, savedAlarm)
                         showDialog = false
                     }
                 }
