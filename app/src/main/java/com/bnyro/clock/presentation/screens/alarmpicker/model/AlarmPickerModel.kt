@@ -113,14 +113,13 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                busy = false
                 socialRepository.synchronize()
                 Toast.makeText(
                     getApplication(),
                     exception.message ?: "Unable to delete alarm",
                     Toast.LENGTH_LONG
                 ).show()
-            } finally {
-                busy = false
             }
         }
     }
