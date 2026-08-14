@@ -75,6 +75,7 @@ fun AlarmPicker(
     groups: List<SocialGroup>,
     currentGroupId: String?,
     canSave: Boolean = true,
+    busy: Boolean = false,
     onSave: (Alarm, String?) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -345,11 +346,11 @@ fun AlarmPicker(
             Modifier.align(Alignment.End),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            OutlinedButton(onClick = { onCancel.invoke() }) {
+            OutlinedButton(onClick = { onCancel.invoke() }, enabled = !busy) {
                 Text(text = stringResource(id = android.R.string.cancel))
             }
             Button(
-                enabled = canSave,
+                enabled = canSave && !busy,
                 onClick = {
                 val alarm =
                     currentAlarm.copy(
