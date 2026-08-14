@@ -2,6 +2,9 @@ package com.bnyro.clock.presentation.screens.alarmpicker.model
 
 import android.app.Application
 import android.widget.Toast
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -32,6 +35,9 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
         emptyList()
     )
 
+    var busy by mutableStateOf(false)
+        private set
+
     var alarm: Alarm
     var groupId: String?
 
@@ -53,6 +59,8 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
     }
 
     fun createAlarm(alarm: Alarm, groupId: String?, onCreated: () -> Unit) {
+        if (busy) return
+        busy = true
         viewModelScope.launch {
             try {
                 if (groupId == null) {
@@ -69,11 +77,15 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                     exception.message ?: "Unable to create shared alarm",
                     Toast.LENGTH_LONG
                 ).show()
+            } finally {
+                busy = false
             }
         }
     }
 
     fun updateAlarm(alarm: Alarm, onUpdated: () -> Unit) {
+        if (busy) return
+        busy = true
         viewModelScope.launch {
             try {
                 socialRepository.updateAlarm(alarm)
@@ -87,11 +99,15 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                     exception.message ?: "Unable to update shared alarm",
                     Toast.LENGTH_LONG
                 ).show()
+            } finally {
+                busy = false
             }
         }
     }
 
     fun deleteAlarm(alarm: Alarm, onDeleted: () -> Unit) {
+        if (busy) return
+        busy = true
         viewModelScope.launch {
             try {
                 socialRepository.deleteAlarm(alarm)
@@ -105,6 +121,8 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                     exception.message ?: "Unable to delete alarm",
                     Toast.LENGTH_LONG
                 ).show()
+            } finally {
+                busy = false
             }
         }
     }

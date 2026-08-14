@@ -82,6 +82,7 @@ fun AlarmPicker(
     groups: List<SocialGroup>,
     currentGroupId: String?,
     canSave: Boolean = true,
+    busy: Boolean = false,
     onSave: (Alarm, String?) -> Unit,
     onDelete: ((Alarm) -> Unit)? = null,
     onCancel: () -> Unit
@@ -371,6 +372,7 @@ fun AlarmPicker(
             if (!isNewAlarm && onDelete != null) {
                 FilledTonalButton(
                     onClick = { onDelete(currentAlarm) },
+                    enabled = !busy,
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         contentColor = MaterialTheme.colorScheme.error
@@ -380,12 +382,12 @@ fun AlarmPicker(
                 }
             }
             Spacer(modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { onCancel.invoke() }) {
+            OutlinedButton(onClick = { onCancel.invoke() }, enabled = !busy) {
                 Text(text = stringResource(id = android.R.string.cancel))
             }
             Spacer(modifier = Modifier.width(16.dp))
             Button(
-                enabled = canSave,
+                enabled = canSave && !busy,
                 onClick = {
                     val alarm = currentAlarm.copy(
                         time = (hours * 60 + minutes) * 60 * 1000L,
