@@ -76,13 +76,12 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                busy = false
                 Toast.makeText(
                     getApplication(),
                     exception.message ?: "Unable to create shared alarm",
                     Toast.LENGTH_LONG
                 ).show()
-            } finally {
-                busy = false
             }
         }
     }
@@ -97,14 +96,13 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                busy = false
                 socialRepository.synchronize()
                 Toast.makeText(
                     getApplication(),
                     exception.message ?: "Unable to update shared alarm",
                     Toast.LENGTH_LONG
                 ).show()
-            } finally {
-                busy = false
             }
         }
     }
