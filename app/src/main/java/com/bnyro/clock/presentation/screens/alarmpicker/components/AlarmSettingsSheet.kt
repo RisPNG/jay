@@ -170,6 +170,7 @@ fun AlarmPicker(
                 PickerStyle.CLOCK -> ClockTimePicker(
                     initialHours = hours,
                     initialMinutes = minutes,
+                    enabled = canSave,
                     is24Hour = DateFormat.is24HourFormat(context),
                     onHoursChanged = { hours = it },
                     onMinutesChanged = { minutes = it }
