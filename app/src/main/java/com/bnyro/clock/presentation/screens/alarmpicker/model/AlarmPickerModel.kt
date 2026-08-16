@@ -38,6 +38,9 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
     var busy by mutableStateOf(false)
         private set
 
+    var createdAlarm by mutableStateOf<Alarm?>(null)
+        private set
+
     var alarm: Alarm
     var groupId: String?
 
@@ -60,6 +63,7 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
 
     fun createAlarm(alarm: Alarm, groupId: String?, onCreated: () -> Unit) {
         if (busy) return
+        createdAlarm = null
         busy = true
         viewModelScope.launch {
             try {
@@ -79,6 +83,7 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                 ).show()
                 return@launch
             }
+            createdAlarm = alarm
             onCreated()
         }
     }
