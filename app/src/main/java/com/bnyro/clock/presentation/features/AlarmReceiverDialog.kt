@@ -2,6 +2,7 @@ package com.bnyro.clock.presentation.features
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -19,9 +20,16 @@ fun AlarmReceiverDialog(context: Context, alarm: Alarm) {
     var showDialog by rememberSaveable {
         mutableStateOf(true)
     }
+    val alarmModel: AlarmPickerModel = viewModel()
+
+    LaunchedEffect(alarmModel.createdAlarm) {
+        alarmModel.createdAlarm?.let {
+            AlarmHelper.showAlarmScheduledToast(context, it)
+            showDialog = false
+        }
+    }
 
     if (showDialog) {
-        val alarmModel: AlarmPickerModel = viewModel()
         Dialog(
             onDismissRequest = { showDialog = false },
             properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -33,10 +41,7 @@ fun AlarmReceiverDialog(context: Context, alarm: Alarm) {
                 currentGroupId = null,
                 busy = alarmModel.busy,
                 onSave = { savedAlarm, _ ->
-                    alarmModel.createAlarm(savedAlarm, null) {
-                        AlarmHelper.showAlarmScheduledToast(context, savedAlarm)
-                        showDialog = false
-                    }
+                    alarmModel.createAlarm(savedAlarm, null) {}
                 }
             )
         }
