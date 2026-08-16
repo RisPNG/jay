@@ -1,6 +1,8 @@
 package com.bnyro.clock
 
 import android.app.Application
+import android.content.Context
+import android.os.Build
 import androidx.work.Configuration
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -22,15 +24,30 @@ import java.util.concurrent.TimeUnit
 
 class App : Application(), Configuration.Provider {
     lateinit var container: AppContainer
-    private val database by lazy { AppDatabase.getDatabase(this) }
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().build()
 
+    //should work for android 6 OR all higher
+    private val safeContext: Context by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            createDeviceProtectedStorageContext()
+        } else {
+            this
+        }
+    }
+    private val database by lazy {
+        AppDatabase.getDatabase(safeContext)
+    }
+
     override fun onCreate() {
         super.onCreate()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            migrateToDeviceProtectedStorage()
+        }
 
-        Preferences.init(this)
+        Preferences.init(safeContext)
+
         NotificationHelper.createStaticNotificationChannels(this)
 
         container = AppContainer(this, database)
@@ -78,6 +95,18 @@ class App : Application(), Configuration.Provider {
                     .setConstraints(constraints)
                     .build()
             )
+        }
+    }
+    private fun migrateToDeviceProtectedStorage() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val dbName = "app_database"
+            val prefName = "${packageName}_preferences"
+            if (!safeContext.getDatabasePath(dbName).exists()) {
+                safeContext.moveDatabaseFrom(this, dbName)
+            }
+            if (!safeContext.getSharedPreferences(prefName, MODE_PRIVATE).all.isNotEmpty()) {
+                safeContext.moveSharedPreferencesFrom(this, prefName)
+            }
         }
     }
 }
