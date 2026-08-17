@@ -23,10 +23,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -52,6 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.bnyro.clock.R
 import com.bnyro.clock.navigation.TopBarScaffold
+import com.bnyro.clock.presentation.components.DialogButton
+import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.presentation.screens.settings.components.SettingsCategory
 import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.social.domain.MemberRole
@@ -406,14 +406,11 @@ fun GroupsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (group.role == MemberRole.LEADER) {
-                        FilledTonalButton(
-                            onClick = { showDeleteConfirmation = true },
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                contentColor = MaterialTheme.colorScheme.error
-                            )
+                        DialogButton(
+                            label = R.string.delete,
+                            style = DialogButtonStyle.DESTRUCTIVE
                         ) {
-                            Text(stringResource(R.string.delete))
+                            showDeleteConfirmation = true
                         }
                     }
                     Spacer(Modifier.weight(1f))
@@ -451,23 +448,21 @@ fun GroupsScreen(
                 title = { Text(stringResource(R.string.delete_group)) },
                 text = { Text(stringResource(R.string.delete_group_confirmation)) },
                 confirmButton = {
-                    FilledTonalButton(
-                        onClick = {
-                            socialModel.deleteGroup(group.id)
-                            showDeleteConfirmation = false
-                            selectedGroup = null
-                        },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
+                    DialogButton(
+                        label = R.string.delete,
+                        style = DialogButtonStyle.DESTRUCTIVE
                     ) {
-                        Text(stringResource(R.string.delete))
+                        socialModel.deleteGroup(group.id)
+                        showDeleteConfirmation = false
+                        selectedGroup = null
                     }
                 },
                 dismissButton = {
-                    OutlinedButton(onClick = { showDeleteConfirmation = false }) {
-                        Text(stringResource(android.R.string.cancel))
+                    DialogButton(
+                        label = android.R.string.cancel,
+                        style = DialogButtonStyle.SECONDARY
+                    ) {
+                        showDeleteConfirmation = false
                     }
                 }
             )
