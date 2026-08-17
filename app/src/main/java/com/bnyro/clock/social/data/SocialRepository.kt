@@ -7,6 +7,8 @@ import androidx.room.withTransaction
 import androidx.work.WorkManager
 import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.domain.model.Alarm
+import com.bnyro.clock.domain.model.RepeatAnchor
+import com.bnyro.clock.domain.model.RepeatUnit
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.social.domain.AlarmActivityKind
@@ -115,7 +117,15 @@ class SocialRepository(
                             enabled = remote.enabled,
                             days = remote.days,
                             vibrate = remote.vibrate,
-                            endOccurrences = 1.takeUnless { remote.repeat },
+                            startDate = remote.startDate,
+                            repeatInterval = remote.repeatInterval,
+                            repeatUnit = RepeatUnit.valueOf(remote.repeatUnit),
+                            repeatAnchor = RepeatAnchor.valueOf(remote.repeatAnchor),
+                            repeatDuration = remote.repeatDuration,
+                            repeatDurationUnit = RepeatUnit.valueOf(remote.repeatDurationUnit),
+                            endDate = remote.endDate,
+                            endOccurrences = remote.endOccurrences,
+                            advanced = remote.advanced,
                             snoozeEnabled = remote.snoozeEnabled,
                             snoozeMinutes = remote.snoozeMinutes,
                             soundEnabled = remote.soundEnabled,
@@ -143,7 +153,15 @@ class SocialRepository(
                                 enabled = remote.enabled,
                                 days = remote.days,
                                 vibrate = remote.vibrate,
-                                endOccurrences = 1.takeUnless { remote.repeat },
+                                startDate = remote.startDate,
+                                repeatInterval = remote.repeatInterval,
+                                repeatUnit = RepeatUnit.valueOf(remote.repeatUnit),
+                                repeatAnchor = RepeatAnchor.valueOf(remote.repeatAnchor),
+                                repeatDuration = remote.repeatDuration,
+                                repeatDurationUnit = RepeatUnit.valueOf(remote.repeatDurationUnit),
+                                endDate = remote.endDate,
+                                endOccurrences = remote.endOccurrences,
+                                advanced = remote.advanced,
                                 snoozeEnabled = remote.snoozeEnabled,
                                 snoozeMinutes = remote.snoozeMinutes,
                                 soundEnabled = remote.soundEnabled,
@@ -460,7 +478,16 @@ class SocialRepository(
                         alarm.enabled,
                         alarm.days,
                         alarm.vibrate,
-                        !alarm.isOneTime,
+                        AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay()
+                            ?: alarm.startDate,
+                        alarm.repeatInterval,
+                        alarm.repeatUnit.name,
+                        alarm.repeatAnchor.name,
+                        alarm.repeatDuration,
+                        alarm.repeatDurationUnit.name,
+                        alarm.endDate,
+                        alarm.endOccurrences,
+                        alarm.advanced,
                         alarm.snoozeEnabled,
                         alarm.snoozeMinutes,
                         alarm.soundEnabled,
@@ -498,7 +525,16 @@ class SocialRepository(
                         enabled = alarm.enabled,
                         days = alarm.days,
                         vibrate = alarm.vibrate,
-                        repeat = !alarm.isOneTime,
+                        startDate = AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay()
+                            ?: alarm.startDate,
+                        repeatInterval = alarm.repeatInterval,
+                        repeatUnit = alarm.repeatUnit.name,
+                        repeatAnchor = alarm.repeatAnchor.name,
+                        repeatDuration = alarm.repeatDuration,
+                        repeatDurationUnit = alarm.repeatDurationUnit.name,
+                        endDate = alarm.endDate,
+                        endOccurrences = alarm.endOccurrences,
+                        advanced = alarm.advanced,
                         snoozeEnabled = alarm.snoozeEnabled,
                         snoozeMinutes = alarm.snoozeMinutes,
                         soundEnabled = alarm.soundEnabled,
