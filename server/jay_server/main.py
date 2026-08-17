@@ -614,11 +614,11 @@ def create_shared_alarm(
             """
             INSERT INTO shared_alarms (
                 id, group_id, time, label, enabled, days, vibrate,
-                start_date, repeat_interval, repeat_unit, repeat_anchor, repeat_duration, repeat_duration_unit, end_date, end_occurrences,
+                start_date, repeat_interval, repeat_unit, repeat_anchor, repeat_duration, repeat_duration_unit, end_date, end_occurrences, advanced,
                 snooze_enabled, snooze_minutes, sound_enabled, vibration_pattern,
                 vibration_pattern_name, created_by, updated_by
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                      %s, %s, %s, %s, %s, %s, %s)
+                      %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 alarm_id,
@@ -636,6 +636,7 @@ def create_shared_alarm(
                 alarm.repeat_duration_unit,
                 alarm.end_date,
                 alarm.end_occurrences,
+                alarm.advanced,
                 alarm.snooze_enabled,
                 alarm.snooze_minutes,
                 alarm.sound_enabled,
@@ -698,7 +699,7 @@ def update_shared_alarm(
                 days = %s, vibrate = %s, start_date = %s, repeat_interval = %s,
                 repeat_unit = %s, repeat_anchor = %s, repeat_duration = %s,
                 repeat_duration_unit = %s, end_date = %s, end_occurrences = %s,
-                snooze_enabled = %s,
+                advanced = %s, snooze_enabled = %s,
                 snooze_minutes = %s, sound_enabled = %s, vibration_pattern = %s,
                 vibration_pattern_name = %s, updated_by = %s, updated_at = now()
             WHERE id = %s AND revision = %s AND deleted = false
@@ -718,6 +719,7 @@ def update_shared_alarm(
                 update.repeat_duration_unit,
                 update.end_date,
                 update.end_occurrences,
+                update.advanced,
                 update.snooze_enabled,
                 update.snooze_minutes,
                 update.sound_enabled,

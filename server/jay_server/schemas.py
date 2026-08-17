@@ -101,6 +101,7 @@ class SharedAlarmPayload(BaseModel):
     repeat_duration_unit: RepeatUnit
     end_date: int | None = None
     end_occurrences: int | None = Field(default=None, gt=0, le=999)
+    advanced: bool = False
     snooze_enabled: bool
     snooze_minutes: int = Field(gt=0, le=1440)
     sound_enabled: bool

@@ -25,7 +25,8 @@ def upgrade() -> None:
                 CHECK (repeat_duration_unit IN ('DAY', 'WEEK', 'MONTH', 'YEAR')),
             ADD COLUMN end_date bigint,
             ADD COLUMN end_occurrences integer
-                CHECK (end_occurrences > 0)
+                CHECK (end_occurrences > 0),
+            ADD COLUMN advanced boolean NOT NULL DEFAULT false
         """
     )
     op.execute(
@@ -56,6 +57,7 @@ def downgrade() -> None:
             DROP COLUMN repeat_duration,
             DROP COLUMN repeat_duration_unit,
             DROP COLUMN end_date,
-            DROP COLUMN end_occurrences
+            DROP COLUMN end_occurrences,
+            DROP COLUMN advanced
         """
     )
