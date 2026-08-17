@@ -364,7 +364,8 @@ fun AlarmPicker(
                         repeatUnit = repeatUnit,
                         repeatAnchor = repeatAnchor,
                         endDate = endDate,
-                        endOccurrences = endOccurrences
+                        endOccurrences = endOccurrences,
+                        advanced = advanced
                     )
                     onSave(alarm, selectedGroupId)
                 }
