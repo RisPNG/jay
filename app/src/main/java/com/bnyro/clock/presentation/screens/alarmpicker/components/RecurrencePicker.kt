@@ -266,7 +266,7 @@ fun RecurrencePicker(
                         AlarmHelper.getRepetitionLastOccurrence(editedRepetition)?.let {
                             Text(
                                 modifier = Modifier.padding(top = 4.dp),
-                                text = stringResource(R.string.rings_until, endDateFormatter.format(it)),
+                                text = stringResource(R.string.repeats_until, endDateFormatter.format(it)),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
