@@ -15,6 +15,18 @@ class MemberRole(StrEnum):
     LEADER = "leader"
 
 
+class RepeatUnit(StrEnum):
+    DAY = "DAY"
+    WEEK = "WEEK"
+    MONTH = "MONTH"
+    YEAR = "YEAR"
+
+
+class RepeatAnchor(StrEnum):
+    DAY_OF_MONTH = "DAY_OF_MONTH"
+    DAY_OF_WEEK = "DAY_OF_WEEK"
+
+
 class ActivityKind(StrEnum):
     SNOOZED = "snoozed"
     DISMISSED = "dismissed"
@@ -81,7 +93,15 @@ class SharedAlarmPayload(BaseModel):
     enabled: bool
     days: list[int]
     vibrate: bool
-    repeat: bool
+    start_date: int
+    repeat_interval: int = Field(gt=0, le=999)
+    repeat_unit: RepeatUnit
+    repeat_anchor: RepeatAnchor
+    repeat_duration: int | None = Field(default=None, gt=0, le=999)
+    repeat_duration_unit: RepeatUnit
+    end_date: int | None = None
+    end_occurrences: int | None = Field(default=None, gt=0, le=999)
+    advanced: bool = False
     snooze_enabled: bool
     snooze_minutes: int = Field(gt=0, le=1440)
     sound_enabled: bool
