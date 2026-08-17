@@ -24,6 +24,7 @@ import com.bnyro.clock.social.domain.SocialChange
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
 import com.bnyro.clock.util.AlarmHelper
+import java.time.LocalDate
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.AlarmService
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,10 @@ data class SocialSyncResult(
     val groups: Map<String, SocialGroup>,
     val deviceId: String
 )
+
+private const val WEEKLY_REPEAT_UNIT = "WEEK"
+private const val DAILY_REPEAT_UNIT = "DAY"
+private const val DAY_OF_MONTH_ANCHOR = "DAY_OF_MONTH"
 
 class SocialRepository(
     private val context: Context,
@@ -115,7 +120,7 @@ class SocialRepository(
                             enabled = remote.enabled,
                             days = remote.days,
                             vibrate = remote.vibrate,
-                            repeat = remote.repeat,
+                            repeat = remote.endOccurrences != 1,
                             snoozeEnabled = remote.snoozeEnabled,
                             snoozeMinutes = remote.snoozeMinutes,
                             soundEnabled = remote.soundEnabled,
@@ -143,7 +148,7 @@ class SocialRepository(
                                 enabled = remote.enabled,
                                 days = remote.days,
                                 vibrate = remote.vibrate,
-                                repeat = remote.repeat,
+                                repeat = remote.endOccurrences != 1,
                                 snoozeEnabled = remote.snoozeEnabled,
                                 snoozeMinutes = remote.snoozeMinutes,
                                 soundEnabled = remote.soundEnabled,
@@ -460,7 +465,14 @@ class SocialRepository(
                         alarm.enabled,
                         alarm.days,
                         alarm.vibrate,
-                        alarm.repeat,
+                        LocalDate.now().toEpochDay(),
+                        1,
+                        WEEKLY_REPEAT_UNIT,
+                        DAY_OF_MONTH_ANCHOR,
+                        null,
+                        DAILY_REPEAT_UNIT,
+                        null,
+                        1.takeUnless { alarm.repeat },
                         alarm.snoozeEnabled,
                         alarm.snoozeMinutes,
                         alarm.soundEnabled,
@@ -498,7 +510,14 @@ class SocialRepository(
                         enabled = alarm.enabled,
                         days = alarm.days,
                         vibrate = alarm.vibrate,
-                        repeat = alarm.repeat,
+                        startDate = LocalDate.now().toEpochDay(),
+                        repeatInterval = 1,
+                        repeatUnit = WEEKLY_REPEAT_UNIT,
+                        repeatAnchor = DAY_OF_MONTH_ANCHOR,
+                        repeatDuration = null,
+                        repeatDurationUnit = DAILY_REPEAT_UNIT,
+                        endDate = null,
+                        endOccurrences = 1.takeUnless { alarm.repeat },
                         snoozeEnabled = alarm.snoozeEnabled,
                         snoozeMinutes = alarm.snoozeMinutes,
                         soundEnabled = alarm.soundEnabled,
