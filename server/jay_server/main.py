@@ -613,10 +613,12 @@ def create_shared_alarm(
         connection.execute(
             """
             INSERT INTO shared_alarms (
-                id, group_id, time, label, enabled, days, vibrate, repeat,
+                id, group_id, time, label, enabled, days, vibrate,
+                start_date, repeat_interval, repeat_unit, repeat_anchor, repeat_duration, repeat_duration_unit, end_date, end_occurrences,
                 snooze_enabled, snooze_minutes, sound_enabled, vibration_pattern,
                 vibration_pattern_name, created_by, updated_by
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                      %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 alarm_id,
@@ -626,7 +628,14 @@ def create_shared_alarm(
                 alarm.enabled,
                 alarm.days,
                 alarm.vibrate,
-                alarm.repeat,
+                alarm.start_date,
+                alarm.repeat_interval,
+                alarm.repeat_unit,
+                alarm.repeat_anchor,
+                alarm.repeat_duration,
+                alarm.repeat_duration_unit,
+                alarm.end_date,
+                alarm.end_occurrences,
                 alarm.snooze_enabled,
                 alarm.snooze_minutes,
                 alarm.sound_enabled,
@@ -649,7 +658,8 @@ def create_shared_alarm(
                 "enabled": alarm.enabled,
                 "days": alarm.days,
                 "vibrate": alarm.vibrate,
-                "repeat": alarm.repeat,
+                "repeat_unit": alarm.repeat_unit,
+                "repeat_interval": alarm.repeat_interval,
                 "snooze_enabled": alarm.snooze_enabled,
                 "snooze_minutes": alarm.snooze_minutes,
                 "sound_enabled": alarm.sound_enabled,
@@ -685,7 +695,10 @@ def update_shared_alarm(
             """
             UPDATE shared_alarms
             SET revision = revision + 1, time = %s, label = %s, enabled = %s,
-                days = %s, vibrate = %s, repeat = %s, snooze_enabled = %s,
+                days = %s, vibrate = %s, start_date = %s, repeat_interval = %s,
+                repeat_unit = %s, repeat_anchor = %s, repeat_duration = %s,
+                repeat_duration_unit = %s, end_date = %s, end_occurrences = %s,
+                snooze_enabled = %s,
                 snooze_minutes = %s, sound_enabled = %s, vibration_pattern = %s,
                 vibration_pattern_name = %s, updated_by = %s, updated_at = now()
             WHERE id = %s AND revision = %s AND deleted = false
@@ -697,7 +710,14 @@ def update_shared_alarm(
                 update.enabled,
                 update.days,
                 update.vibrate,
-                update.repeat,
+                update.start_date,
+                update.repeat_interval,
+                update.repeat_unit,
+                update.repeat_anchor,
+                update.repeat_duration,
+                update.repeat_duration_unit,
+                update.end_date,
+                update.end_occurrences,
                 update.snooze_enabled,
                 update.snooze_minutes,
                 update.sound_enabled,
@@ -733,8 +753,14 @@ def update_shared_alarm(
                 "days": update.days,
                 "previous_vibrate": alarm["vibrate"],
                 "vibrate": update.vibrate,
-                "previous_repeat": alarm["repeat"],
-                "repeat": update.repeat,
+                "previous_repeat_unit": alarm["repeat_unit"],
+                "repeat_unit": update.repeat_unit,
+                "previous_repeat_interval": alarm["repeat_interval"],
+                "repeat_interval": update.repeat_interval,
+                "previous_repeat_duration": alarm["repeat_duration"],
+                "repeat_duration": update.repeat_duration,
+                "previous_end_occurrences": alarm["end_occurrences"],
+                "end_occurrences": update.end_occurrences,
                 "previous_snooze_enabled": alarm["snooze_enabled"],
                 "snooze_enabled": update.snooze_enabled,
                 "previous_snooze_minutes": alarm["snooze_minutes"],
@@ -817,7 +843,7 @@ def register_alarm_occurrence(
     with transaction() as connection:
         alarm = connection.execute(
             """
-            SELECT group_id, revision, enabled, deleted, repeat
+            SELECT group_id, revision, enabled, deleted, end_occurrences
             FROM shared_alarms WHERE id = %s
             """,
             (alarm_id,),
@@ -827,7 +853,7 @@ def register_alarm_occurrence(
         require_group_member(connection, alarm["group_id"], device["id"])
         if alarm["revision"] != occurrence.alarm_revision or not alarm["enabled"]:
             raise HTTPException(status.HTTP_409_CONFLICT, "Alarm occurrence is no longer current")
-        if not alarm["repeat"] and connection.execute(
+        if alarm["end_occurrences"] == 1 and connection.execute(
             """
             SELECT 1 FROM alarm_occurrences
             WHERE alarm_id = %s AND device_id = %s AND alarm_revision = %s
@@ -901,7 +927,7 @@ def record_alarm_activity(
             return {"id": activity_id}
         alarm = connection.execute(
             """
-            SELECT group_id, revision, label, time, snooze_minutes, repeat
+            SELECT group_id, revision, label, time, snooze_minutes, end_occurrences
             FROM shared_alarms WHERE id = %s AND deleted = false
             """,
             (alarm_id,),
@@ -1058,7 +1084,7 @@ def record_alarm_activity(
                         activity.occurrence_id,
                     ),
                 )
-            if alarm["repeat"] and resolved_occurrence is not None:
+            if resolved_occurrence is not None:
                 schedule_alarm_occurrences(
                     connection,
                     alarm_id,
