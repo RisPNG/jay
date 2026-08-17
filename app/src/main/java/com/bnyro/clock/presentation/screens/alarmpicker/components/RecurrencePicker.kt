@@ -16,16 +16,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.EventRepeat
-import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -72,6 +72,7 @@ enum class RecurrenceEnd {
     AFTER_OCCURRENCES
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecurrencePicker(
     startDate: Long,
@@ -156,302 +157,282 @@ fun RecurrencePicker(
                     )
                 }
             }
+        }
 
-            Row(
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp, 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.EventRepeat,
+                contentDescription = null,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp, 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.EventRepeat,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(start = 8.dp, end = 16.dp)
-                        .size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Column {
-                    Text(
-                        text = stringResource(R.string.repeats_every),
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Row(
-                        modifier = Modifier.padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            modifier = Modifier.width(88.dp),
-                            value = intervalInput,
-                            enabled = enabled,
-                            onValueChange = { input ->
-                                intervalInput = input.filter(Char::isDigit).take(3)
-                                onRepeatIntervalChange(
-                                    intervalInput.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                                )
-                            },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Box {
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable(enabled = enabled) { showUnits = true }
-                                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = pluralStringResource(repeatUnit.value, repeatInterval),
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Icon(
-                                    imageVector = Icons.Rounded.ExpandMore,
-                                    contentDescription = null
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = showUnits,
-                                onDismissRequest = { showUnits = false }
-                            ) {
-                                RepeatUnit.entries.forEach { unit ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = pluralStringResource(
-                                                    unit.value,
-                                                    repeatInterval
-                                                )
-                                            )
-                                        },
-                                        onClick = {
-                                            onRepeatUnitChange(unit)
-                                            showUnits = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            AnimatedVisibility(
-                visible = repeatUnit == RepeatUnit.WEEK || repeatUnit == RepeatUnit.MONTH
-            ) {
-                Column(
-                    modifier = Modifier.padding(start = SECTION_INDENT, end = 8.dp, bottom = 8.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.repeats_on),
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    if (repeatUnit == RepeatUnit.WEEK) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            val daysOfWeek = remember {
-                                AlarmHelper.getDaysOfWeekByLocale(context)
-                            }
-
-                            daysOfWeek.forEach { (day, index) ->
-                                val selected = chosenDays.contains(index)
-                                Box(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .background(
-                                            when {
-                                                selected && enabled -> MaterialTheme.colorScheme.primary
-                                                selected -> MaterialTheme.colorScheme.surfaceVariant
-                                                else -> Color.Transparent
-                                            },
-                                            CircleShape
-                                        )
-                                        .clip(CircleShape)
-                                        .border(
-                                            if (selected) 0.dp else 1.dp,
-                                            if (enabled) {
-                                                MaterialTheme.colorScheme.primary
-                                            } else {
-                                                MaterialTheme.colorScheme.outlineVariant
-                                            },
-                                            CircleShape
-                                        )
-                                        .clickable(enabled = enabled) {
-                                            if (selected) {
-                                                if (chosenDays.size > 1) chosenDays.remove(index)
-                                            } else {
-                                                chosenDays.add(
-                                                    index
-                                                )
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = day,
-                                        color = when {
-                                            selected && enabled -> MaterialTheme.colorScheme.onPrimary
-                                            enabled -> MaterialTheme.colorScheme.onPrimaryContainer
-                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        Box(modifier = Modifier.padding(top = 8.dp)) {
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable(enabled = enabled) { showMonthlyRepeats = true }
-                                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = monthlyRepeatLabel(startLocalDate, monthlyRepeat),
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Icon(
-                                    imageVector = Icons.Rounded.ExpandMore,
-                                    contentDescription = null
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = showMonthlyRepeats,
-                                onDismissRequest = { showMonthlyRepeats = false }
-                            ) {
-                                MonthlyRepeat.entries.forEach { repeat ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(text = monthlyRepeatLabel(startLocalDate, repeat))
-                                        },
-                                        onClick = {
-                                            onMonthlyRepeatChange(repeat)
-                                            showMonthlyRepeats = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Column(
-                modifier = Modifier.padding(start = SECTION_INDENT, end = 8.dp, bottom = 8.dp)
-            ) {
+                    .padding(start = 8.dp, end = 16.dp)
+                    .size(24.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Column {
                 Text(
-                    text = stringResource(R.string.ends),
+                    text = stringResource(R.string.repeats_every),
                     style = MaterialTheme.typography.titleLarge
                 )
-
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .selectable(
-                            selected = endMode == RecurrenceEnd.NEVER,
-                            enabled = enabled,
-                            onClick = {
-                                endMode = RecurrenceEnd.NEVER
-                                onEndChange(null, null)
-                            }
-                        )
-                        .padding(vertical = 8.dp),
+                        .padding(top = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    RadioButton(
-                        selected = endMode == RecurrenceEnd.NEVER,
-                        enabled = enabled,
-                        onClick = null
-                    )
-                    Text(
-                        modifier = Modifier.padding(start = 12.dp),
-                        text = stringResource(R.string.ends_never)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = endMode == RecurrenceEnd.ON_DATE,
-                            enabled = enabled,
-                            onClick = {
-                                endMode = RecurrenceEnd.ON_DATE
-                                onEndChange(chosenEndDate, null)
-                            }
-                        )
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = endMode == RecurrenceEnd.ON_DATE,
-                        enabled = enabled,
-                        onClick = null
-                    )
-                    Text(
-                        modifier = Modifier.padding(start = 12.dp, end = 12.dp),
-                        text = stringResource(R.string.ends_on)
-                    )
-                    OutlinedButton(
-                        onClick = { showEndDatePicker = true },
-                        enabled = enabled
-                    ) {
-                        Text(text = endDateFormatter.format(LocalDate.ofEpochDay(chosenEndDate)))
-                    }
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = endMode == RecurrenceEnd.AFTER_OCCURRENCES,
-                            enabled = enabled,
-                            onClick = {
-                                endMode = RecurrenceEnd.AFTER_OCCURRENCES
-                                onEndChange(null, chosenEndOccurrences)
-                            }
-                        )
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = endMode == RecurrenceEnd.AFTER_OCCURRENCES,
-                        enabled = enabled,
-                        onClick = null
-                    )
-                    Text(
-                        modifier = Modifier.padding(start = 12.dp, end = 12.dp),
-                        text = stringResource(R.string.ends_after)
-                    )
                     OutlinedTextField(
                         modifier = Modifier.width(88.dp),
-                        value = occurrencesInput,
+                        value = intervalInput,
                         enabled = enabled,
                         onValueChange = { input ->
-                            occurrencesInput = input.filter(Char::isDigit).take(3)
-                            chosenEndOccurrences =
-                                occurrencesInput.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                            endMode = RecurrenceEnd.AFTER_OCCURRENCES
-                            onEndChange(null, chosenEndOccurrences)
+                            intervalInput = input.filter(Char::isDigit).take(3)
+                            onRepeatIntervalChange(intervalInput.toIntOrNull()?.coerceAtLeast(1) ?: 1)
                         },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
-                    Text(
-                        modifier = Modifier
-                            .padding(start = 12.dp)
-                            .weight(1f),
-                        text = pluralStringResource(R.plurals.occurrences, chosenEndOccurrences)
-                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    ExposedDropdownMenuBox(
+                        modifier = Modifier.weight(1f),
+                        expanded = showUnits,
+                        onExpandedChange = { if (enabled) showUnits = !showUnits }
+                    ) {
+                        OutlinedTextField(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                            value = pluralStringResource(repeatUnit.value, repeatInterval),
+                            onValueChange = {},
+                            readOnly = true,
+                            enabled = enabled,
+                            singleLine = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(showUnits) }
+                        )
+                        ExposedDropdownMenu(
+                            expanded = showUnits,
+                            onDismissRequest = { showUnits = false }
+                        ) {
+                            RepeatUnit.entries.forEach { unit ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(text = pluralStringResource(unit.value, repeatInterval))
+                                    },
+                                    onClick = {
+                                        onRepeatUnitChange(unit)
+                                        showUnits = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = repeatUnit == RepeatUnit.WEEK || repeatUnit == RepeatUnit.MONTH
+        ) {
+            Column(modifier = Modifier.padding(start = SECTION_INDENT, end = 8.dp, bottom = 8.dp)) {
+                Text(
+                    text = stringResource(R.string.repeats_on),
+                    style = MaterialTheme.typography.titleLarge
+                )
+                if (repeatUnit == RepeatUnit.WEEK) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val daysOfWeek = remember {
+                            AlarmHelper.getDaysOfWeekByLocale(context)
+                        }
+
+                        daysOfWeek.forEach { (day, index) ->
+                            val selected = chosenDays.contains(index)
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .background(
+                                        when {
+                                            selected && enabled -> MaterialTheme.colorScheme.primary
+                                            selected -> MaterialTheme.colorScheme.surfaceVariant
+                                            else -> Color.Transparent
+                                        },
+                                        CircleShape
+                                    )
+                                    .clip(CircleShape)
+                                    .border(
+                                        if (selected) 0.dp else 1.dp,
+                                        if (enabled) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.outlineVariant
+                                        },
+                                        CircleShape
+                                    )
+                                    .clickable(enabled = enabled) {
+                                        if (selected) {
+                                            if (chosenDays.size > 1) chosenDays.remove(index)
+                                        } else {
+                                            chosenDays.add(
+                                                index
+                                            )
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = day,
+                                    color = when {
+                                        selected && enabled -> MaterialTheme.colorScheme.onPrimary
+                                        enabled -> MaterialTheme.colorScheme.onPrimaryContainer
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    ExposedDropdownMenuBox(
+                        modifier = Modifier.padding(top = 8.dp),
+                        expanded = showMonthlyRepeats,
+                        onExpandedChange = { if (enabled) showMonthlyRepeats = !showMonthlyRepeats }
+                    ) {
+                        OutlinedTextField(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                            value = monthlyRepeatLabel(startLocalDate, monthlyRepeat),
+                            onValueChange = {},
+                            readOnly = true,
+                            enabled = enabled,
+                            singleLine = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(showMonthlyRepeats)
+                            }
+                        )
+                        ExposedDropdownMenu(
+                            expanded = showMonthlyRepeats,
+                            onDismissRequest = { showMonthlyRepeats = false }
+                        ) {
+                            MonthlyRepeat.entries.forEach { repeat ->
+                                DropdownMenuItem(
+                                    text = { Text(text = monthlyRepeatLabel(startLocalDate, repeat)) },
+                                    onClick = {
+                                        onMonthlyRepeatChange(repeat)
+                                        showMonthlyRepeats = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Column(modifier = Modifier.padding(start = SECTION_INDENT, end = 8.dp, bottom = 8.dp)) {
+            Text(text = stringResource(R.string.ends), style = MaterialTheme.typography.titleLarge)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = endMode == RecurrenceEnd.NEVER,
+                        enabled = enabled,
+                        onClick = {
+                            endMode = RecurrenceEnd.NEVER
+                            onEndChange(null, null)
+                        }
+                    )
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = endMode == RecurrenceEnd.NEVER,
+                    enabled = enabled,
+                    onClick = null
+                )
+                Text(
+                    modifier = Modifier.padding(start = 12.dp),
+                    text = stringResource(R.string.ends_never)
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = endMode == RecurrenceEnd.ON_DATE,
+                        enabled = enabled,
+                        onClick = {
+                            endMode = RecurrenceEnd.ON_DATE
+                            onEndChange(chosenEndDate, null)
+                        }
+                    )
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = endMode == RecurrenceEnd.ON_DATE,
+                    enabled = enabled,
+                    onClick = null
+                )
+                Text(
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp),
+                    text = stringResource(R.string.ends_on)
+                )
+                OutlinedButton(onClick = { showEndDatePicker = true }, enabled = enabled) {
+                    Text(text = endDateFormatter.format(LocalDate.ofEpochDay(chosenEndDate)))
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = endMode == RecurrenceEnd.AFTER_OCCURRENCES,
+                        enabled = enabled,
+                        onClick = {
+                            endMode = RecurrenceEnd.AFTER_OCCURRENCES
+                            onEndChange(null, chosenEndOccurrences)
+                        }
+                    )
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(
+                    selected = endMode == RecurrenceEnd.AFTER_OCCURRENCES,
+                    enabled = enabled,
+                    onClick = null
+                )
+                Text(
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp),
+                    text = stringResource(R.string.ends_after)
+                )
+                OutlinedTextField(
+                    modifier = Modifier.width(88.dp),
+                    value = occurrencesInput,
+                    enabled = enabled,
+                    onValueChange = { input ->
+                        occurrencesInput = input.filter(Char::isDigit).take(3)
+                        chosenEndOccurrences = occurrencesInput.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                        endMode = RecurrenceEnd.AFTER_OCCURRENCES
+                        onEndChange(null, chosenEndOccurrences)
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+                Text(
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .weight(1f),
+                    text = pluralStringResource(R.plurals.occurrences, chosenEndOccurrences)
+                )
             }
         }
     }
