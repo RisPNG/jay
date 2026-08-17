@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.stateIn
 class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHandle) :
     AndroidViewModel(application) {
     private val id: String? = savedStateHandle[NavRoutes.AlarmPicker.ALARM_ID]
+    val advanced: Boolean = savedStateHandle[NavRoutes.AlarmPicker.ADVANCED] ?: false
 
     private val alarmRepository = (application as App).container.alarmRepository
     private val createUpdateDeleteAlarmUseCase =

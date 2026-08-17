@@ -19,6 +19,7 @@ fun AlarmPickerScreen(onNavigateBack: () -> Unit) {
     AlarmPicker(
         onCancel = { onNavigateBack.invoke() },
         currentAlarm = viewModel.alarm,
+        advanced = viewModel.advanced,
         groups = groups.filter {
             it.id == viewModel.groupId || it.canEditAlarms
         },

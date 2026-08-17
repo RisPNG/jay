@@ -70,6 +70,7 @@ import com.bnyro.clock.social.domain.SocialGroup
 @Composable
 fun AlarmPicker(
     currentAlarm: Alarm,
+    advanced: Boolean,
     groups: List<SocialGroup>,
     currentGroupId: String?,
     canSave: Boolean = true,
@@ -219,6 +220,7 @@ fun AlarmPicker(
 
             Column {
                 RecurrencePicker(
+                    advanced = advanced,
                     startDate = startDate,
                     repeatDuration = repeatDuration,
                     repeatDurationUnit = repeatDurationUnit,
