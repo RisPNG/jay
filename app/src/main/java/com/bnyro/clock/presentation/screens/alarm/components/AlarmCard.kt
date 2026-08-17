@@ -66,7 +66,8 @@ fun AlarmCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                val millisRemaining = AlarmHelper.getAlarmTime(alarm) - System.currentTimeMillis()
+                val millisRemaining = AlarmHelper.getAlarmTime(alarm)
+                    ?.minus(System.currentTimeMillis())
                 if (groupName != null || alarm.label != null) {
                     Row(
                         modifier = Modifier
@@ -107,16 +108,18 @@ fun AlarmCard(
                     style = MaterialTheme.typography.headlineLarge,
                     fontSize = 36.sp
                 )
-                Text(
-                    text = if (millisRemaining <= 0) {
-                        stringResource(R.string.alarm_starting_now)
-                    } else {
-                        stringResource(
-                            R.string.alarm_starts_in,
-                            TimeHelper.durationToFormatted(context, millisRemaining.milliseconds)
-                        )
-                    }
-                )
+                millisRemaining?.let {
+                    Text(
+                        text = if (it <= 0) {
+                            stringResource(R.string.alarm_starting_now)
+                        } else {
+                            stringResource(
+                                R.string.alarm_starts_in,
+                                TimeHelper.durationToFormatted(context, it.milliseconds)
+                            )
+                        }
+                    )
+                }
             }
 
             Column(horizontalAlignment = Alignment.End) {

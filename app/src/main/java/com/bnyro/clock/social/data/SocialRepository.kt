@@ -664,7 +664,7 @@ class SocialRepository(
             WorkManager.getInstance(context).cancelUniqueWork("jay_ignored_alarm_${alarm.id}")
             return
         }
-        val triggerAt = AlarmHelper.getAlarmTime(alarm)
+        val triggerAt = AlarmHelper.getAlarmTime(alarm) ?: return
         val occurrenceId = triggerAt.toString()
         SocialIgnoredAlarmWorker.schedule(
             context,
