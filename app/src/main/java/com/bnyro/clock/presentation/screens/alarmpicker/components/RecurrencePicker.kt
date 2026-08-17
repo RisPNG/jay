@@ -2,6 +2,7 @@ package com.bnyro.clock.presentation.screens.alarmpicker.components
 
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -391,6 +392,12 @@ fun RecurrencePicker(
                         modifier = Modifier.height(OutlinedTextFieldDefaults.MinHeight),
                         shape = OutlinedTextFieldDefaults.shape,
                         enabled = enabled,
+                        border = BorderStroke(
+                            OutlinedTextFieldDefaults.UnfocusedBorderThickness,
+                            with(OutlinedTextFieldDefaults.colors()) {
+                                if (enabled) unfocusedIndicatorColor else disabledIndicatorColor
+                            }
+                        ),
                         onClick = { showEndDatePicker = true }
                     ) {
                         Text(text = endDateFormatter.format(LocalDate.ofEpochDay(chosenEndDate)))
