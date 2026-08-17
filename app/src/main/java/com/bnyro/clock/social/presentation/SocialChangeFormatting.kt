@@ -178,7 +178,7 @@ fun SocialChange.logDetails(context: Context): String? {
                     add(context.getString(R.string.days))
                 }
                 if (details?.get("previous_repeat") != details?.get("repeat")) {
-                    add(context.getString(R.string.repeat))
+                    add(context.getString(R.string.repeats_every))
                 }
                 if (details?.get("previous_snooze_enabled") != details?.get("snooze_enabled")) {
                     add(context.getString(R.string.snooze))
