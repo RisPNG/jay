@@ -104,7 +104,7 @@ fun AlarmPicker(
     var startDate by remember { mutableLongStateOf(currentAlarm.startDate) }
     var repeatInterval by remember { mutableIntStateOf(currentAlarm.repeatInterval) }
     var repeatUnit by remember { mutableStateOf(currentAlarm.repeatUnit) }
-    var monthlyRepeat by remember { mutableStateOf(currentAlarm.monthlyRepeat) }
+    var repeatAnchor by remember { mutableStateOf(currentAlarm.repeatAnchor) }
     var endDate by remember { mutableStateOf(currentAlarm.endDate) }
     var endOccurrences by remember { mutableStateOf(currentAlarm.endOccurrences) }
 
@@ -220,7 +220,7 @@ fun AlarmPicker(
                     startDate = startDate,
                     repeatInterval = repeatInterval,
                     repeatUnit = repeatUnit,
-                    monthlyRepeat = monthlyRepeat,
+                    repeatAnchor = repeatAnchor,
                     chosenDays = chosenDays,
                     endDate = endDate,
                     endOccurrences = endOccurrences,
@@ -228,7 +228,7 @@ fun AlarmPicker(
                     onStartDateChange = { startDate = it },
                     onRepeatIntervalChange = { repeatInterval = it },
                     onRepeatUnitChange = { repeatUnit = it },
-                    onMonthlyRepeatChange = { monthlyRepeat = it },
+                    onRepeatAnchorChange = { repeatAnchor = it },
                     onEndChange = { newEndDate, newEndOccurrences ->
                         endDate = newEndDate
                         endOccurrences = newEndOccurrences
@@ -350,7 +350,7 @@ fun AlarmPicker(
                         startDate = startDate,
                         repeatInterval = repeatInterval,
                         repeatUnit = repeatUnit,
-                        monthlyRepeat = monthlyRepeat,
+                        repeatAnchor = repeatAnchor,
                         endDate = endDate,
                         endOccurrences = endOccurrences
                     )
