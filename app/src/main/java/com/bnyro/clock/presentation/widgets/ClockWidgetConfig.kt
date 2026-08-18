@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.FormatColorText
 import androidx.compose.material.icons.rounded.FormatSize
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Layers
@@ -156,7 +157,8 @@ abstract class ClockWidgetConfig : ComponentActivity() {
                     }) { pV ->
                         DigitalClockWidgetSettings(
                             modifier = Modifier.padding(pV),
-                            options = options
+                            options = options,
+                            onCancel = { finish() }
                         ) { updatedOptions ->
                             complete(context, updatedOptions)
                         }
@@ -190,6 +192,7 @@ abstract class ClockWidgetConfig : ComponentActivity() {
 fun DigitalClockWidgetSettings(
     modifier: Modifier = Modifier,
     options: ClockWidgetOptions,
+    onCancel: () -> Unit,
     onComplete: (ClockWidgetOptions) -> Unit
 ) {
     val clockModel: ClockModel = viewModel()
@@ -323,9 +326,18 @@ fun DigitalClockWidgetSettings(
                 }
             )
         }
-        Button(
-            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
-            onClick = {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Spacer(modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { onCancel.invoke() }) {
+                Text(text = stringResource(id = android.R.string.cancel))
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Button(onClick = {
                 options.apply {
                     showDate = showDateOption
                     showTime = showTimeOption
@@ -345,9 +357,10 @@ fun DigitalClockWidgetSettings(
                     shadowAlpha = shadowAlphaOption
                     openAppOnClick = openAppOnClickOption
                 }
-                onComplete.invoke(options)
-            }) {
-            Text(stringResource(R.string.save))
+                    onComplete.invoke(options)
+                }) {
+                Text(text = stringResource(R.string.save))
+            }
         }
     }
 
@@ -419,23 +432,10 @@ fun TextSizeSelectSetting(
                     text = title,
                     style = MaterialTheme.typography.titleLarge
                 )
-            }
-            Row(
-                Modifier
-                    .clickable(
-                        onClick = { showSizePicker = true },
-                    )
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-
                 Text(
                     text = String.format("%.0f sp", currentSize),
-                    style = MaterialTheme.typography.titleLarge
+                    style = MaterialTheme.typography.bodyMedium
                 )
-                Icon(imageVector = Icons.Rounded.ExpandMore, contentDescription = null)
             }
         }
     }
@@ -482,9 +482,21 @@ fun ColorSelectSetting(
     val context = LocalContext.current
 
     Column(
-        Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        Modifier
+            .fillMaxWidth()
+            .padding(8.dp, 16.dp)
     ) {
-        Text(label)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Rounded.FormatColorText,
+                contentDescription = null,
+                modifier = Modifier
+                    .padding(start = 8.dp, end = 16.dp)
+                    .size(24.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(text = label, style = MaterialTheme.typography.titleLarge)
+        }
         Spacer(modifier = Modifier.height(6.dp))
         LazyRow(
             verticalAlignment = Alignment.CenterVertically
@@ -564,6 +576,7 @@ fun DefaultPreview() {
             dateTextSize = 16f,
             timeTextSize = 52f
         ),
+        onCancel = {},
         onComplete = {}
     )
 }
