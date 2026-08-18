@@ -30,7 +30,7 @@
 
         <activity
                 android:name=".presentation.widgets.DigitalClockWidgetConfig"
-                android:exported="false">
+                android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
@@ -38,7 +38,7 @@
 
         <activity
                 android:name=".presentation.widgets.VerticalClockWidgetConfig"
-                android:exported="false">
+                android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
@@ -46,7 +46,7 @@
 
         <activity
                 android:name=".presentation.widgets.AnalogClockWidgetConfig"
-                android:exported="false">
+                android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
