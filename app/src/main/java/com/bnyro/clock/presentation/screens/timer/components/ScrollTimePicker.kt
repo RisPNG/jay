@@ -26,7 +26,8 @@ fun ScrollTimePicker(
     onValueChanged: (Int) -> Unit,
     maxValue: Int,
     offset: Int = 0,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    label: (Int) -> String = { String.format("%02d", it) }
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val primaryMuted = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
@@ -36,7 +37,7 @@ fun ScrollTimePicker(
     }
     val currentPage = state.currentPage
     LaunchedEffect(currentPage) {
-        if (enabled) onValueChanged((currentPage + offset) % maxValue)
+        if (enabled) onValueChanged(currentPage % maxValue + offset)
         if (state.isScrollInProgress) {
             hapticFeedback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
         }
@@ -58,7 +59,7 @@ fun ScrollTimePicker(
     ) { index ->
         val number = index % maxValue + offset
         Text(
-            text = String.format("%02d", number),
+            text = label(number),
             style = MaterialTheme.typography.displayMedium,
             color = if (enabled && index == currentPage) primary else primaryMuted
         )
