@@ -53,9 +53,9 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                 alarmRepository.getAlarmById(id)!!
             }
         }
-        groupId = if (alarmId == 0L) null else runBlocking(Dispatchers.IO) {
+        groupId = if (id == 0L) null else runBlocking(Dispatchers.IO) {
             socialRepository.alarmGroupNames.first()
-                .firstOrNull { it.localAlarmId == alarmId }
+                .firstOrNull { it.localAlarmId == id }
                 ?.groupId
         }
     }
