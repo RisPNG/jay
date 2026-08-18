@@ -3,8 +3,7 @@ package com.bnyro.clock.util
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import com.bnyro.clock.domain.model.AlarmPickerStyle
-import com.bnyro.clock.domain.model.TimerPickerStyle
+import com.bnyro.clock.domain.model.PickerStyle
 import com.bnyro.clock.navigation.homeRoutes
 
 object Preferences {
@@ -39,15 +38,13 @@ object Preferences {
             if (timerPickerStyle is Boolean) {
                 putString(
                     timerPickerStyleKey,
-                    if (timerPickerStyle) TimerPickerStyle.NUMBER_PAD.name else TimerPickerStyle.WHEEL.name
+                    if (timerPickerStyle) PickerStyle.NUMBER_PAD.name else PickerStyle.WHEEL.name
                 )
-            } else if (timerPickerStyle is String && TimerPickerStyle.entries.none { it.name == timerPickerStyle }) {
-                putString(timerPickerStyleKey, TimerPickerStyle.WHEEL.name)
             }
             if (alarmPickerStyle is Boolean) {
                 putString(
                     alarmPickerStyleKey,
-                    if (alarmPickerStyle) AlarmPickerStyle.NUMBER_PAD.name else AlarmPickerStyle.WHEEL.name
+                    if (alarmPickerStyle) PickerStyle.NUMBER_PAD.name else PickerStyle.WHEEL.name
                 )
             }
         }

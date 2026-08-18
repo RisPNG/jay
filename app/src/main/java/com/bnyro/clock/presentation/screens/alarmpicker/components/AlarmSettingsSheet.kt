@@ -54,7 +54,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
-import com.bnyro.clock.domain.model.AlarmPickerStyle
+import com.bnyro.clock.domain.model.PickerStyle
 import com.bnyro.clock.presentation.components.ClockTimePicker
 import com.bnyro.clock.presentation.components.SwitchWithDivider
 import com.bnyro.clock.presentation.features.RingtonePickerDialog
@@ -124,11 +124,11 @@ fun AlarmPicker(
     val scrollState = rememberScrollState()
 
     val pickerStyle = remember {
-        AlarmPickerStyle.valueOf(
+        PickerStyle.valueOf(
             Preferences.instance.getString(
                 Preferences.alarmPickerStyleKey,
-                AlarmPickerStyle.WHEEL.name
-            ) ?: AlarmPickerStyle.WHEEL.name
+                PickerStyle.WHEEL.name
+            ) ?: PickerStyle.WHEEL.name
         )
     }
 
@@ -147,14 +147,14 @@ fun AlarmPicker(
             verticalArrangement = Arrangement.SpaceEvenly
         ) {
             when (pickerStyle) {
-                AlarmPickerStyle.WHEEL -> ScrollAlarmTimePicker(
+                PickerStyle.WHEEL -> ScrollAlarmTimePicker(
                     initialHours = hours,
                     initialMinutes = minutes,
                     onHoursChanged = { hours = it },
                     onMinutesChanged = { minutes = it }
                 )
 
-                AlarmPickerStyle.NUMBER_PAD -> AlarmTimePicker(
+                PickerStyle.NUMBER_PAD -> AlarmTimePicker(
                     initialHours = hours,
                     initialMinutes = minutes,
                     isEditing = currentAlarm.id != 0L,
@@ -163,7 +163,7 @@ fun AlarmPicker(
                     onMinutesChanged = { minutes = it }
                 )
 
-                AlarmPickerStyle.CLOCK -> ClockTimePicker(
+                PickerStyle.CLOCK -> ClockTimePicker(
                     initialHours = hours,
                     initialMinutes = minutes,
                     enabled = canSave,

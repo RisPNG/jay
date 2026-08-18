@@ -1,6 +1,6 @@
 package com.bnyro.clock.domain.model
 
-enum class AlarmPickerStyle {
+enum class PickerStyle {
     WHEEL,
     NUMBER_PAD,
     CLOCK

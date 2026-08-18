@@ -45,8 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.R
-import com.bnyro.clock.domain.model.AlarmPickerStyle
-import com.bnyro.clock.domain.model.TimerPickerStyle
+import com.bnyro.clock.domain.model.PickerStyle
 import com.bnyro.clock.domain.model.VolumeButtonAction
 import com.bnyro.clock.navigation.homeRoutes
 import com.bnyro.clock.presentation.components.ClickableIcon
@@ -217,16 +216,16 @@ fun SettingsScreen(
 
             ButtonGroupPref(
                 title = stringResource(R.string.alarm_picker_style),
-                options = AlarmPickerStyle.entries.map {
+                options = PickerStyle.entries.map {
                     stringResource(
                         when (it) {
-                            AlarmPickerStyle.WHEEL -> R.string.wheel
-                            AlarmPickerStyle.NUMBER_PAD -> R.string.number_pad
-                            AlarmPickerStyle.CLOCK -> R.string.clock
+                            PickerStyle.WHEEL -> R.string.wheel
+                            PickerStyle.NUMBER_PAD -> R.string.number_pad
+                            PickerStyle.CLOCK -> R.string.clock
                         }
                     )
                 },
-                values = AlarmPickerStyle.entries,
+                values = PickerStyle.entries,
                 currentValue = settingsModel.alarmPickerStyle
             ) {
                 settingsModel.alarmPickerStyle = it
@@ -284,15 +283,16 @@ fun SettingsScreen(
 
             ButtonGroupPref(
                 title = stringResource(R.string.timer_picker_style),
-                options = TimerPickerStyle.entries.map {
+                options = PickerStyle.entries.map {
                     stringResource(
                         when (it) {
-                            TimerPickerStyle.WHEEL -> R.string.wheel
-                            TimerPickerStyle.NUMBER_PAD -> R.string.number_pad
+                            PickerStyle.WHEEL -> R.string.wheel
+                            PickerStyle.NUMBER_PAD -> R.string.number_pad
+                            PickerStyle.CLOCK -> R.string.clock
                         }
                     )
                 },
-                values = TimerPickerStyle.entries,
+                values = PickerStyle.entries,
                 currentValue = settingsModel.timerPickerStyle
             ) {
                 settingsModel.timerPickerStyle = it
