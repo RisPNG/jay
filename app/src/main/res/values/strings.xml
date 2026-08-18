@@ -161,8 +161,6 @@
     <string name="jay_server">Jay server</string>
     <string name="clock_you_attribution">Jay is based on Clock You by You Apps and remains available under GPLv3.</string>
     <string name="jay_version">Jay version</string>
-    <string name="clock_you_version">Clock You version</string>
-    <string name="version_value">%1$s (%2$s)</string>
     <string name="recent_activity">Recent activity</string>
     <string name="alarm_source">Alarm source</string>
     <string name="select_all">Select all</string>
@@ -184,6 +182,8 @@
     <string name="dark">Dark</string>
     <string name="source_code">Source code</string>
     <string name="source_code_summary">View the app\'s source code</string>
+    <string name="clock_you_version">Clock You version</string>
+    <string name="version_value">%1$s (%2$s)</string>
     <!-- Widgets -->
     <string name="open_app_on_click">Open app on click</string>
     <string name="analog_clock">Analog clock</string>
