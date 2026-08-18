@@ -1,8 +1,7 @@
 package com.bnyro.clock.presentation.screens.alarm
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,7 +59,6 @@ import com.bnyro.clock.presentation.screens.alarm.model.AlarmModel
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.social.presentation.SocialLogEntry
 import com.bnyro.clock.social.presentation.alarmLogTitle
-import com.bnyro.clock.ui.theme.primaryContainerShade
 import com.bnyro.clock.util.AlarmHelper
 
 private val FAB_SIZE = 56.dp
@@ -109,9 +108,20 @@ fun AlarmScreen(
                     Row(modifier = Modifier.height(FAB_SIZE)) {
                         Box(
                             modifier = Modifier
+                                .size(FAB_SIZE)
+                                .clickable { onAlarm.invoke(0L, false) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Rounded.Add, null)
+                        }
+                        VerticalDivider(
+                            modifier = Modifier.fillMaxHeight(),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Box(
+                            modifier = Modifier
                                 .fillMaxHeight()
                                 .width(FAB_SIZE / 2)
-                                .background(MaterialTheme.colorScheme.primaryContainerShade)
                                 .clickable { showAlarmKinds = true },
                             contentAlignment = Alignment.Center
                         ) {
@@ -128,14 +138,6 @@ fun AlarmScreen(
                                     }
                                 )
                             }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(FAB_SIZE)
-                                .clickable { onAlarm.invoke(0L, false) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Rounded.Add, null)
                         }
                     }
                 }
