@@ -57,7 +57,8 @@ fun ScrollWheel(
         userScrollEnabled = enabled,
         flingBehavior = PagerDefaults.flingBehavior(
             state = state,
-            pagerSnapDistance = PagerSnapDistance.atMost(60)
+            pagerSnapDistance = PagerSnapDistance.atMost(60),
+            snapPositionalThreshold = 0.2f
         )
 
     ) { index ->
