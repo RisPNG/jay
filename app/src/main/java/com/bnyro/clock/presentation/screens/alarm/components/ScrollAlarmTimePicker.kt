@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
@@ -20,11 +22,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.bnyro.clock.presentation.screens.timer.components.ScrollTimePicker
 
@@ -42,8 +49,25 @@ fun ScrollAlarmTimePicker(
     // Track AM/PM state dynamically based on incoming hours
     val meridiem = if (initialHours >= 12) Meridiem.PM else Meridiem.AM
 
+    // the wheels sit on a page that scrolls the same way they do, so a drag that
+    // lands on them is theirs alone and never reaches the page behind
+    val keepDragsOnTheWheels = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ) = available.copy(x = 0f)
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity) =
+                available.copy(x = 0f)
+        }
+    }
+
     Box(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .nestedScroll(keepDragsOnTheWheels),
         contentAlignment = Alignment.Center
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -126,7 +150,11 @@ fun MeridiemPicker(
         pageSpacing = 16.dp,
         pageSize = PageSize.Fixed(64.dp),
         snapPosition = SnapPosition.Center,
-        userScrollEnabled = enabled
+        userScrollEnabled = enabled,
+        flingBehavior = PagerDefaults.flingBehavior(
+            state = state,
+            pagerSnapDistance = PagerSnapDistance.atMost(60)
+        )
     ) { index ->
         Text(
             text = Meridiem.entries[index % 2].name,
