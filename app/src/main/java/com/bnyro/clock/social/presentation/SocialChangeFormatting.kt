@@ -177,8 +177,21 @@ fun SocialChange.logDetails(context: Context): String? {
                 if (details?.get("previous_days") != details?.get("days")) {
                     add(context.getString(R.string.days))
                 }
-                if (details?.get("previous_repeat") != details?.get("repeat")) {
-                    add(context.getString(R.string.repeat))
+                if (
+                    details?.get("previous_repeat_interval") != details?.get("repeat_interval") ||
+                    details?.get("previous_repeat_unit") != details?.get("repeat_unit")
+                ) {
+                    add(context.getString(R.string.repeats_every))
+                }
+                if (
+                    details?.get("previous_repeat_duration") != details?.get("repeat_duration")
+                ) {
+                    add(context.getString(R.string.repeats_for))
+                }
+                if (
+                    details?.get("previous_end_occurrences") != details?.get("end_occurrences")
+                ) {
+                    add(context.getString(R.string.ends))
                 }
                 if (details?.get("previous_snooze_enabled") != details?.get("snooze_enabled")) {
                     add(context.getString(R.string.snooze))

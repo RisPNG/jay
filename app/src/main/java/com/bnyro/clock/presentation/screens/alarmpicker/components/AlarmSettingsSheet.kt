@@ -229,6 +229,7 @@ fun AlarmPicker(
                     chosenDays = chosenDays,
                     endDate = endDate,
                     endOccurrences = endOccurrences,
+                    enabled = canSave,
                     onStartDateChange = { startDate = it },
                     onRepeatDurationChange = { duration, unit ->
                         repeatDuration = duration

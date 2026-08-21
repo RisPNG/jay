@@ -91,6 +91,7 @@ fun RecurrencePicker(
     chosenDays: MutableList<Int>,
     endDate: Long?,
     endOccurrences: Int?,
+    enabled: Boolean = true,
     onStartDateChange: (Long) -> Unit,
     onRepeatDurationChange: (duration: Int?, unit: RepeatUnit) -> Unit,
     onRepeatIntervalChange: (Int) -> Unit,
@@ -136,10 +137,11 @@ fun RecurrencePicker(
             title = stringResource(R.string.repeat),
             isChecked = endOccurrences != 1,
             onClick = { repeats -> onEndChange(null, 1.takeUnless { repeats }) },
+            enabled = enabled,
             icon = Icons.Rounded.EventRepeat
         )
         AnimatedVisibility(visible = endOccurrences != 1) {
-            WeekdaySelector(chosenDays)
+            WeekdaySelector(chosenDays, enabled)
         }
         return
     }
@@ -155,353 +157,386 @@ fun RecurrencePicker(
         repeatDurationUnit = repeatDurationUnit
     )
 
-    Surface(modifier = Modifier.clickable { showStartDatePicker = true }) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp, 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Event,
-                contentDescription = null,
-                modifier = Modifier
-                    .padding(start = 8.dp, end = 16.dp)
-                    .size(24.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Column {
-                Text(
-                    text = stringResource(R.string.start_date),
-                    style = MaterialTheme.typography.titleLarge
-                )
-                Text(
-                    text = if (startLocalDate == LocalDate.now()) {
-                        stringResource(R.string.today)
-                    } else {
-                        startDateFormatter.format(startLocalDate)
-                    },
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+    Surface(
+        contentColor = if (enabled) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
         }
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp, 16.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Default.Refresh,
-            contentDescription = null,
-            modifier = Modifier
-                .padding(start = 8.dp, end = 16.dp)
-                .size(24.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
         Column {
-            Text(
-                text = stringResource(R.string.repeats_for),
-                style = MaterialTheme.typography.titleLarge
-            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .clickable(enabled = enabled) { showStartDatePicker = true }
+                    .padding(8.dp, 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (repeatDuration != null) {
+                Icon(
+                    imageVector = Icons.Rounded.Event,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(start = 8.dp, end = 16.dp)
+                        .size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Column {
+                    Text(
+                        text = stringResource(R.string.start_date),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Text(
+                        text = if (startLocalDate == LocalDate.now()) {
+                            stringResource(R.string.today)
+                        } else {
+                            startDateFormatter.format(startLocalDate)
+                        },
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp, 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(start = 8.dp, end = 16.dp)
+                        .size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Column {
+                    Text(
+                        text = stringResource(R.string.repeats_for),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (repeatDuration != null) {
+                            OutlinedTextField(
+                                modifier = Modifier.width(88.dp),
+                                value = durationInput,
+                                enabled = enabled,
+                                onValueChange = { input ->
+                                    durationInput = input.filter(Char::isDigit).take(3)
+                                    chosenDuration = durationInput.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                                    onRepeatDurationChange(chosenDuration, repeatDurationUnit)
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                        }
+                        ExposedDropdownMenuBox(
+                            modifier = Modifier.weight(1f),
+                            expanded = showDurations,
+                            onExpandedChange = { if (enabled) showDurations = !showDurations }
+                        ) {
+                            OutlinedTextField(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                value = repeatDuration
+                                    ?.let { pluralStringResource(repeatDurationUnit.value, it) }
+                                    ?: stringResource(R.string.always),
+                                onValueChange = {},
+                                readOnly = true,
+                                enabled = enabled,
+                                singleLine = true,
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(showDurations) }
+                            )
+                            ExposedDropdownMenu(
+                                expanded = showDurations,
+                                onDismissRequest = { showDurations = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(text = stringResource(R.string.always)) },
+                                    onClick = {
+                                        onRepeatDurationChange(null, repeatDurationUnit)
+                                        showDurations = false
+                                    }
+                                )
+                                RepeatUnit.entries.forEach { unit ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(text = pluralStringResource(unit.value, chosenDuration))
+                                        },
+                                        onClick = {
+                                            onRepeatDurationChange(chosenDuration, unit)
+                                            showDurations = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    AlarmHelper.getRepetitionLastOccurrence(editedRepetition)?.let {
+                        Text(
+                            modifier = Modifier.padding(top = 4.dp),
+                            text = stringResource(R.string.repeats_until, endDateFormatter.format(it)),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp, 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.EventRepeat,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(start = 8.dp, end = 16.dp)
+                        .size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Column {
+                    Text(
+                        text = stringResource(R.string.repeats_every),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            modifier = Modifier.width(88.dp),
+                            value = intervalInput,
+                            enabled = enabled,
+                            onValueChange = { input ->
+                                intervalInput = input.filter(Char::isDigit).take(3)
+                                onRepeatIntervalChange(intervalInput.toIntOrNull()?.coerceAtLeast(1) ?: 1)
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        ExposedDropdownMenuBox(
+                            modifier = Modifier.weight(1f),
+                            expanded = showUnits,
+                            onExpandedChange = { if (enabled) showUnits = !showUnits }
+                        ) {
+                            OutlinedTextField(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                value = pluralStringResource(repeatUnit.value, repeatInterval),
+                                onValueChange = {},
+                                readOnly = true,
+                                enabled = enabled,
+                                singleLine = true,
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(showUnits) }
+                            )
+                            ExposedDropdownMenu(
+                                expanded = showUnits,
+                                onDismissRequest = { showUnits = false }
+                            ) {
+                                RepeatUnit.entries.forEach { unit ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(text = pluralStringResource(unit.value, repeatInterval))
+                                        },
+                                        onClick = {
+                                            onRepeatUnitChange(unit)
+                                            showUnits = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    AlarmHelper.getFollowingRepetitionOccurrence(editedRepetition)?.let {
+                        Text(
+                            modifier = Modifier.padding(top = 4.dp),
+                            text = stringResource(R.string.repeats_again_on, endDateFormatter.format(it)),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(
+                visible = repeatUnit != RepeatUnit.DAY
+            ) {
+                Column(modifier = Modifier.padding(start = SECTION_INDENT, end = 8.dp, bottom = 8.dp)) {
+                    Text(
+                        text = stringResource(R.string.repeats_on),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    if (repeatUnit == RepeatUnit.WEEK) {
+                        WeekdaySelector(chosenDays, enabled)
+                    } else {
+                        ExposedDropdownMenuBox(
+                            modifier = Modifier.padding(top = 8.dp),
+                            expanded = showRepeatAnchors,
+                            onExpandedChange = { if (enabled) showRepeatAnchors = !showRepeatAnchors }
+                        ) {
+                            OutlinedTextField(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                value = repeatAnchorLabel(repeatUnit, startLocalDate, repeatAnchor),
+                                onValueChange = {},
+                                readOnly = true,
+                                enabled = enabled,
+                                singleLine = true,
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(showRepeatAnchors)
+                                }
+                            )
+                            ExposedDropdownMenu(
+                                expanded = showRepeatAnchors,
+                                onDismissRequest = { showRepeatAnchors = false }
+                            ) {
+                                RepeatAnchor.entries.forEach { anchor ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = repeatAnchorLabel(
+                                                    repeatUnit,
+                                                    startLocalDate,
+                                                    anchor
+                                                )
+                                            )
+                                        },
+                                        onClick = {
+                                            onRepeatAnchorChange(anchor)
+                                            showRepeatAnchors = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Column(modifier = Modifier.padding(start = SECTION_INDENT, end = 8.dp, bottom = 8.dp)) {
+                Text(text = stringResource(R.string.ends), style = MaterialTheme.typography.titleLarge)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = endMode == RecurrenceEnd.NEVER,
+                            enabled = enabled,
+                            onClick = {
+                                endMode = RecurrenceEnd.NEVER
+                                onEndChange(null, null)
+                            }
+                        )
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = endMode == RecurrenceEnd.NEVER,
+                        enabled = enabled,
+                        onClick = null
+                    )
+                    Text(
+                        modifier = Modifier.padding(start = 12.dp),
+                        text = stringResource(R.string.ends_never)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = endMode == RecurrenceEnd.ON_DATE,
+                            enabled = enabled,
+                            onClick = {
+                                endMode = RecurrenceEnd.ON_DATE
+                                onEndChange(chosenEndDate, null)
+                            }
+                        )
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = endMode == RecurrenceEnd.ON_DATE,
+                        enabled = enabled,
+                        onClick = null
+                    )
+                    Text(
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp),
+                        text = stringResource(R.string.ends_on)
+                    )
+                    OutlinedButton(
+                        modifier = Modifier.height(OutlinedTextFieldDefaults.MinHeight),
+                        shape = OutlinedTextFieldDefaults.shape,
+                        enabled = enabled,
+                        border = BorderStroke(
+                            OutlinedTextFieldDefaults.UnfocusedBorderThickness,
+                            with(OutlinedTextFieldDefaults.colors()) {
+                                if (enabled) unfocusedIndicatorColor else disabledIndicatorColor
+                            }
+                        ),
+                        onClick = { showEndDatePicker = true }
+                    ) {
+                        Text(text = endDateFormatter.format(LocalDate.ofEpochDay(chosenEndDate)))
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectable(
+                            selected = endMode == RecurrenceEnd.AFTER_OCCURRENCES,
+                            enabled = enabled,
+                            onClick = {
+                                endMode = RecurrenceEnd.AFTER_OCCURRENCES
+                                onEndChange(null, chosenEndOccurrences)
+                            }
+                        )
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = endMode == RecurrenceEnd.AFTER_OCCURRENCES,
+                        enabled = enabled,
+                        onClick = null
+                    )
+                    Text(
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp),
+                        text = stringResource(R.string.ends_after)
+                    )
                     OutlinedTextField(
                         modifier = Modifier.width(88.dp),
-                        value = durationInput,
+                        value = occurrencesInput,
+                        enabled = enabled,
                         onValueChange = { input ->
-                            durationInput = input.filter(Char::isDigit).take(3)
-                            chosenDuration = durationInput.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                            onRepeatDurationChange(chosenDuration, repeatDurationUnit)
+                            occurrencesInput = input.filter(Char::isDigit).take(3)
+                            chosenEndOccurrences = occurrencesInput.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                            endMode = RecurrenceEnd.AFTER_OCCURRENCES
+                            onEndChange(null, chosenEndOccurrences)
                         },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
-                }
-                ExposedDropdownMenuBox(
-                    modifier = Modifier.weight(1f),
-                    expanded = showDurations,
-                    onExpandedChange = { showDurations = !showDurations }
-                ) {
-                    OutlinedTextField(
+                    Text(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        value = repeatDuration
-                            ?.let { pluralStringResource(repeatDurationUnit.value, it) }
-                            ?: stringResource(R.string.always),
-                        onValueChange = {},
-                        readOnly = true,
-                        singleLine = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(showDurations) }
+                            .padding(start = 12.dp)
+                            .weight(1f),
+                        text = pluralStringResource(R.plurals.occurrences, chosenEndOccurrences)
                     )
-                    ExposedDropdownMenu(
-                        expanded = showDurations,
-                        onDismissRequest = { showDurations = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(text = stringResource(R.string.always)) },
-                            onClick = {
-                                onRepeatDurationChange(null, repeatDurationUnit)
-                                showDurations = false
-                            }
-                        )
-                        RepeatUnit.entries.forEach { unit ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(text = pluralStringResource(unit.value, chosenDuration))
-                                },
-                                onClick = {
-                                    onRepeatDurationChange(chosenDuration, unit)
-                                    showDurations = false
-                                }
-                            )
-                        }
-                    }
                 }
             }
-            AlarmHelper.getRepetitionLastOccurrence(editedRepetition)?.let {
-                Text(
-                    modifier = Modifier.padding(top = 4.dp),
-                    text = stringResource(R.string.repeats_until, endDateFormatter.format(it)),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp, 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.EventRepeat,
-            contentDescription = null,
-            modifier = Modifier
-                .padding(start = 8.dp, end = 16.dp)
-                .size(24.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Column {
-            Text(
-                text = stringResource(R.string.repeats_every),
-                style = MaterialTheme.typography.titleLarge
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    modifier = Modifier.width(88.dp),
-                    value = intervalInput,
-                    onValueChange = { input ->
-                        intervalInput = input.filter(Char::isDigit).take(3)
-                        onRepeatIntervalChange(intervalInput.toIntOrNull()?.coerceAtLeast(1) ?: 1)
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                ExposedDropdownMenuBox(
-                    modifier = Modifier.weight(1f),
-                    expanded = showUnits,
-                    onExpandedChange = { showUnits = !showUnits }
-                ) {
-                    OutlinedTextField(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        value = pluralStringResource(repeatUnit.value, repeatInterval),
-                        onValueChange = {},
-                        readOnly = true,
-                        singleLine = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(showUnits) }
-                    )
-                    ExposedDropdownMenu(
-                        expanded = showUnits,
-                        onDismissRequest = { showUnits = false }
-                    ) {
-                        RepeatUnit.entries.forEach { unit ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(text = pluralStringResource(unit.value, repeatInterval))
-                                },
-                                onClick = {
-                                    onRepeatUnitChange(unit)
-                                    showUnits = false
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-            AlarmHelper.getFollowingRepetitionOccurrence(editedRepetition)?.let {
-                Text(
-                    modifier = Modifier.padding(top = 4.dp),
-                    text = stringResource(R.string.repeats_again_on, endDateFormatter.format(it)),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-    }
-
-    AnimatedVisibility(
-        visible = repeatUnit != RepeatUnit.DAY
-    ) {
-        Column(modifier = Modifier.padding(start = SECTION_INDENT, end = 8.dp, bottom = 8.dp)) {
-            Text(
-                text = stringResource(R.string.repeats_on),
-                style = MaterialTheme.typography.titleLarge
-            )
-            if (repeatUnit == RepeatUnit.WEEK) {
-                WeekdaySelector(chosenDays)
-            } else {
-                ExposedDropdownMenuBox(
-                    modifier = Modifier.padding(top = 8.dp),
-                    expanded = showRepeatAnchors,
-                    onExpandedChange = { showRepeatAnchors = !showRepeatAnchors }
-                ) {
-                    OutlinedTextField(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        value = repeatAnchorLabel(repeatUnit, startLocalDate, repeatAnchor),
-                        onValueChange = {},
-                        readOnly = true,
-                        singleLine = true,
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(showRepeatAnchors)
-                        }
-                    )
-                    ExposedDropdownMenu(
-                        expanded = showRepeatAnchors,
-                        onDismissRequest = { showRepeatAnchors = false }
-                    ) {
-                        RepeatAnchor.entries.forEach { anchor ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = repeatAnchorLabel(
-                                            repeatUnit,
-                                            startLocalDate,
-                                            anchor
-                                        )
-                                    )
-                                },
-                                onClick = {
-                                    onRepeatAnchorChange(anchor)
-                                    showRepeatAnchors = false
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Column(modifier = Modifier.padding(start = SECTION_INDENT, end = 8.dp, bottom = 8.dp)) {
-        Text(text = stringResource(R.string.ends), style = MaterialTheme.typography.titleLarge)
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .selectable(
-                    selected = endMode == RecurrenceEnd.NEVER,
-                    onClick = {
-                        endMode = RecurrenceEnd.NEVER
-                        onEndChange(null, null)
-                    }
-                )
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RadioButton(selected = endMode == RecurrenceEnd.NEVER, onClick = null)
-            Text(
-                modifier = Modifier.padding(start = 12.dp),
-                text = stringResource(R.string.ends_never)
-            )
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .selectable(
-                    selected = endMode == RecurrenceEnd.ON_DATE,
-                    onClick = {
-                        endMode = RecurrenceEnd.ON_DATE
-                        onEndChange(chosenEndDate, null)
-                    }
-                )
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RadioButton(selected = endMode == RecurrenceEnd.ON_DATE, onClick = null)
-            Text(
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp),
-                text = stringResource(R.string.ends_on)
-            )
-            OutlinedButton(
-                modifier = Modifier.height(OutlinedTextFieldDefaults.MinHeight),
-                shape = OutlinedTextFieldDefaults.shape,
-                border = BorderStroke(
-                    OutlinedTextFieldDefaults.UnfocusedBorderThickness,
-                    OutlinedTextFieldDefaults.colors().unfocusedIndicatorColor
-                ),
-                onClick = { showEndDatePicker = true }
-            ) {
-                Text(text = endDateFormatter.format(LocalDate.ofEpochDay(chosenEndDate)))
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .selectable(
-                    selected = endMode == RecurrenceEnd.AFTER_OCCURRENCES,
-                    onClick = {
-                        endMode = RecurrenceEnd.AFTER_OCCURRENCES
-                        onEndChange(null, chosenEndOccurrences)
-                    }
-                )
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RadioButton(selected = endMode == RecurrenceEnd.AFTER_OCCURRENCES, onClick = null)
-            Text(
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp),
-                text = stringResource(R.string.ends_after)
-            )
-            OutlinedTextField(
-                modifier = Modifier.width(88.dp),
-                value = occurrencesInput,
-                onValueChange = { input ->
-                    occurrencesInput = input.filter(Char::isDigit).take(3)
-                    chosenEndOccurrences = occurrencesInput.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                    endMode = RecurrenceEnd.AFTER_OCCURRENCES
-                    onEndChange(null, chosenEndOccurrences)
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
-            Text(
-                modifier = Modifier
-                    .padding(start = 12.dp)
-                    .weight(1f),
-                text = pluralStringResource(R.plurals.occurrences, chosenEndOccurrences)
-            )
         }
     }
 
@@ -530,7 +565,7 @@ fun RecurrencePicker(
 }
 
 @Composable
-private fun WeekdaySelector(chosenDays: MutableList<Int>) {
+private fun WeekdaySelector(chosenDays: MutableList<Int>, enabled: Boolean) {
     val context = LocalContext.current
     Row(
         modifier = Modifier
@@ -543,22 +578,30 @@ private fun WeekdaySelector(chosenDays: MutableList<Int>) {
         }
 
         daysOfWeek.forEach { (day, index) ->
-            val enabled = chosenDays.contains(index)
+            val selected = chosenDays.contains(index)
             Box(
                 modifier = Modifier
                     .size(30.dp)
                     .background(
-                        if (enabled) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        when {
+                            selected && enabled -> MaterialTheme.colorScheme.primary
+                            selected -> MaterialTheme.colorScheme.surfaceVariant
+                            else -> Color.Transparent
+                        },
                         CircleShape
                     )
                     .clip(CircleShape)
                     .border(
-                        if (enabled) 0.dp else 1.dp,
-                        MaterialTheme.colorScheme.primary,
+                        if (selected) 0.dp else 1.dp,
+                        if (enabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
+                        },
                         CircleShape
                     )
-                    .clickable {
-                        if (enabled) {
+                    .clickable(enabled = enabled) {
+                        if (selected) {
                             if (chosenDays.size > 1) chosenDays.remove(index)
                         } else {
                             chosenDays.add(
@@ -570,7 +613,11 @@ private fun WeekdaySelector(chosenDays: MutableList<Int>) {
             ) {
                 Text(
                     text = day,
-                    color = if (enabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
+                    color = when {
+                        selected && enabled -> MaterialTheme.colorScheme.onPrimary
+                        enabled -> MaterialTheme.colorScheme.onPrimaryContainer
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
             }
         }
