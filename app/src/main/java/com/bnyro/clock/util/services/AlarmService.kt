@@ -92,9 +92,7 @@ class AlarmService : Service() {
                     }
                     //maybe fixes a super shitty bug that was shitty kinda D:
                     currentAlarm?.let { alarm ->
-                        if (alarm.repeat) {
-                            AlarmHelper.enqueue(this@AlarmService, alarm, skipToday = true)
-                        }
+                        AlarmHelper.enqueue(this@AlarmService, alarm, skipToday = true)
                     }
                     stopSelf()
                 }
@@ -338,7 +336,7 @@ class AlarmService : Service() {
             getString(R.string.dismiss),
             getPendingIntent(dismissIntent, 2)
         )
-        val targetAlarmTimeMs = AlarmHelper.getAlarmTime(alarm)
+        val targetAlarmTimeMs = AlarmHelper.getAlarmTime(alarm) ?: System.currentTimeMillis()
 
         return NotificationCompat.Builder(context, NotificationHelper.ALARM_CHANNEL).apply {
             val formattedTime = TimeHelper.formatTime(
