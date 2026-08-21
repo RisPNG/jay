@@ -35,14 +35,15 @@ class SocialIgnoredAlarmWorker(context: Context, parameters: WorkerParameters) :
             "no_response"
         )
         val alarm = (applicationContext as App).container.alarmRepository.getAlarmById(alarmId)
-        if (alarm?.enabled == true && alarm.repeat) {
-            val triggerAt = AlarmHelper.getAlarmTime(alarm)
-            schedule(
-                applicationContext,
-                alarmId,
-                triggerAt,
-                triggerAt.toString()
-            )
+        if (alarm?.enabled == true && !alarm.isOneTime) {
+            AlarmHelper.getAlarmTime(alarm)?.let { triggerAt ->
+                schedule(
+                    applicationContext,
+                    alarmId,
+                    triggerAt,
+                    triggerAt.toString()
+                )
+            }
         }
         Result.success()
     } catch (error: SocialApiException) {

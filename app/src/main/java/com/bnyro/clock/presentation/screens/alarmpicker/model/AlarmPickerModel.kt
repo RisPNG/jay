@@ -23,7 +23,8 @@ import kotlinx.coroutines.flow.stateIn
 
 class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHandle) :
     AndroidViewModel(application) {
-    private val id: String? = savedStateHandle[NavRoutes.AlarmPicker.ALARM_ID]
+    private val id: Long = savedStateHandle[NavRoutes.AlarmPicker.ALARM_ID] ?: 0L
+    val advanced: Boolean = savedStateHandle[NavRoutes.AlarmPicker.ADVANCED] ?: false
 
     private val alarmRepository = (application as App).container.alarmRepository
     private val createUpdateDeleteAlarmUseCase =
@@ -45,18 +46,16 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
     var groupId: String?
 
     init {
-        val alarmId = id?.toLong() ?: 0L
-
-        alarm = if (alarmId == 0L) {
+        alarm = if (id == 0L) {
             Alarm(time = TimeHelper.currentDayMillis)
         } else {
             runBlocking(Dispatchers.IO) {
-                alarmRepository.getAlarmById(alarmId)!!
+                alarmRepository.getAlarmById(id)!!
             }
         }
-        groupId = if (alarmId == 0L) null else runBlocking(Dispatchers.IO) {
+        groupId = if (id == 0L) null else runBlocking(Dispatchers.IO) {
             socialRepository.alarmGroupNames.first()
-                .firstOrNull { it.localAlarmId == alarmId }
+                .firstOrNull { it.localAlarmId == id }
                 ?.groupId
         }
     }

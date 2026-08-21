@@ -7,6 +7,8 @@ import androidx.room.withTransaction
 import androidx.work.WorkManager
 import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.domain.model.Alarm
+import com.bnyro.clock.domain.model.RepeatAnchor
+import com.bnyro.clock.domain.model.RepeatUnit
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.social.domain.AlarmActivityKind
@@ -24,7 +26,6 @@ import com.bnyro.clock.social.domain.SocialChange
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
 import com.bnyro.clock.util.AlarmHelper
-import java.time.LocalDate
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.AlarmService
 import kotlinx.coroutines.Dispatchers
@@ -45,10 +46,6 @@ data class SocialSyncResult(
     val groups: Map<String, SocialGroup>,
     val deviceId: String
 )
-
-private const val WEEKLY_REPEAT_UNIT = "WEEK"
-private const val DAILY_REPEAT_UNIT = "DAY"
-private const val DAY_OF_MONTH_ANCHOR = "DAY_OF_MONTH"
 
 class SocialRepository(
     private val context: Context,
@@ -120,7 +117,15 @@ class SocialRepository(
                             enabled = remote.enabled,
                             days = remote.days,
                             vibrate = remote.vibrate,
-                            repeat = remote.endOccurrences != 1,
+                            startDate = remote.startDate,
+                            repeatInterval = remote.repeatInterval,
+                            repeatUnit = RepeatUnit.valueOf(remote.repeatUnit),
+                            repeatAnchor = RepeatAnchor.valueOf(remote.repeatAnchor),
+                            repeatDuration = remote.repeatDuration,
+                            repeatDurationUnit = RepeatUnit.valueOf(remote.repeatDurationUnit),
+                            endDate = remote.endDate,
+                            endOccurrences = remote.endOccurrences,
+                            advanced = remote.advanced,
                             snoozeEnabled = remote.snoozeEnabled,
                             snoozeMinutes = remote.snoozeMinutes,
                             soundEnabled = remote.soundEnabled,
@@ -148,7 +153,15 @@ class SocialRepository(
                                 enabled = remote.enabled,
                                 days = remote.days,
                                 vibrate = remote.vibrate,
-                                repeat = remote.endOccurrences != 1,
+                                startDate = remote.startDate,
+                                repeatInterval = remote.repeatInterval,
+                                repeatUnit = RepeatUnit.valueOf(remote.repeatUnit),
+                                repeatAnchor = RepeatAnchor.valueOf(remote.repeatAnchor),
+                                repeatDuration = remote.repeatDuration,
+                                repeatDurationUnit = RepeatUnit.valueOf(remote.repeatDurationUnit),
+                                endDate = remote.endDate,
+                                endOccurrences = remote.endOccurrences,
+                                advanced = remote.advanced,
                                 snoozeEnabled = remote.snoozeEnabled,
                                 snoozeMinutes = remote.snoozeMinutes,
                                 soundEnabled = remote.soundEnabled,
@@ -459,26 +472,26 @@ class SocialRepository(
                 val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
                 val response = SocialApi(serverUrl, identity).createAlarm(
                     SharedAlarmRequest(
-                        groupId,
-                        alarm.time,
-                        alarm.label,
-                        alarm.enabled,
-                        alarm.days,
-                        alarm.vibrate,
-                        LocalDate.now().toEpochDay(),
-                        1,
-                        WEEKLY_REPEAT_UNIT,
-                        DAY_OF_MONTH_ANCHOR,
-                        null,
-                        DAILY_REPEAT_UNIT,
-                        null,
-                        1.takeUnless { alarm.repeat },
-                        false,
-                        alarm.snoozeEnabled,
-                        alarm.snoozeMinutes,
-                        alarm.soundEnabled,
-                        alarm.vibrationPattern,
-                        alarm.vibrationPatternName
+                        groupId = groupId,
+                        time = alarm.time,
+                        label = alarm.label,
+                        enabled = alarm.enabled,
+                        days = alarm.days,
+                        vibrate = alarm.vibrate,
+                        startDate = alarm.startDate,
+                        repeatInterval = alarm.repeatInterval,
+                        repeatUnit = alarm.repeatUnit.name,
+                        repeatAnchor = alarm.repeatAnchor.name,
+                        repeatDuration = alarm.repeatDuration,
+                        repeatDurationUnit = alarm.repeatDurationUnit.name,
+                        endDate = alarm.endDate,
+                        endOccurrences = alarm.endOccurrences,
+                        advanced = alarm.advanced,
+                        snoozeEnabled = alarm.snoozeEnabled,
+                        snoozeMinutes = alarm.snoozeMinutes,
+                        soundEnabled = alarm.soundEnabled,
+                        vibrationPattern = alarm.vibrationPattern,
+                        vibrationPatternName = alarm.vibrationPatternName
                     )
                 )
                 val localId = alarmUseCase.createAlarm(alarm)
@@ -511,15 +524,15 @@ class SocialRepository(
                         enabled = alarm.enabled,
                         days = alarm.days,
                         vibrate = alarm.vibrate,
-                        startDate = LocalDate.now().toEpochDay(),
-                        repeatInterval = 1,
-                        repeatUnit = WEEKLY_REPEAT_UNIT,
-                        repeatAnchor = DAY_OF_MONTH_ANCHOR,
-                        repeatDuration = null,
-                        repeatDurationUnit = DAILY_REPEAT_UNIT,
-                        endDate = null,
-                        endOccurrences = 1.takeUnless { alarm.repeat },
-                        advanced = false,
+                        startDate = alarm.startDate,
+                        repeatInterval = alarm.repeatInterval,
+                        repeatUnit = alarm.repeatUnit.name,
+                        repeatAnchor = alarm.repeatAnchor.name,
+                        repeatDuration = alarm.repeatDuration,
+                        repeatDurationUnit = alarm.repeatDurationUnit.name,
+                        endDate = alarm.endDate,
+                        endOccurrences = alarm.endOccurrences,
+                        advanced = alarm.advanced,
                         snoozeEnabled = alarm.snoozeEnabled,
                         snoozeMinutes = alarm.snoozeMinutes,
                         soundEnabled = alarm.soundEnabled,
@@ -681,11 +694,11 @@ class SocialRepository(
         remoteAlarmId: String,
         revision: Int
     ) {
-        if (!alarm.enabled) {
+        val triggerAt = AlarmHelper.getAlarmTime(alarm)
+        if (!alarm.enabled || triggerAt == null) {
             WorkManager.getInstance(context).cancelUniqueWork("jay_ignored_alarm_${alarm.id}")
             return
         }
-        val triggerAt = AlarmHelper.getAlarmTime(alarm)
         val occurrenceId = triggerAt.toString()
         SocialIgnoredAlarmWorker.schedule(
             context,
