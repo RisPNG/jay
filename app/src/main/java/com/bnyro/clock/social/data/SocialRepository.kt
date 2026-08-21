@@ -63,13 +63,13 @@ class SocialRepository(
     suspend fun synchronize(): SocialSyncResult = synchronizationMutex.withLock {
         withContext(Dispatchers.IO) {
             val serverUrl = Preferences.instance.getString(
-                Preferences.jayServerUrlKey,
+                SocialPreferences.serverUrlKey,
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
             val api = SocialApi(serverUrl, identity)
             api.register()
-            val previousCursor = Preferences.instance.getLong(Preferences.jaySyncCursorKey, 0)
+            val previousCursor = Preferences.instance.getLong(SocialPreferences.syncCursorKey, 0)
             val knownGroupIds = groups.first().map { it.id }.toSet()
             val response = api.synchronize(previousCursor)
             val remoteGroupIds = response.groups.map { it.id }.toSet()
@@ -205,7 +205,7 @@ class SocialRepository(
                 })
             }
 
-            Preferences.edit { putLong(Preferences.jaySyncCursorKey, response.cursor) }
+            Preferences.edit { putLong(SocialPreferences.syncCursorKey, response.cursor) }
             SocialSyncResult(
                 if (previousCursor == 0L) emptyList() else response.changes.map {
                     SocialChange(
@@ -234,7 +234,7 @@ class SocialRepository(
 
     suspend fun followLiveChanges(onSynchronized: (SocialSyncResult) -> Unit) {
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -243,7 +243,7 @@ class SocialRepository(
             listenForChanges(
                 shouldContinue = {
                     val configuredServer = Preferences.instance.getString(
-                        Preferences.jayServerUrlKey,
+                        SocialPreferences.serverUrlKey,
                         DEFAULT_SERVER_URL
                     ) ?: DEFAULT_SERVER_URL
                     configuredServer.trimEnd('/') == serverUrl.trimEnd('/')
@@ -262,7 +262,7 @@ class SocialRepository(
         notifyIgnored: Boolean
     ) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -284,7 +284,7 @@ class SocialRepository(
 
     suspend fun saveGroupSettings(group: SocialGroup) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -315,7 +315,7 @@ class SocialRepository(
 
     suspend fun createInvite(groupId: String): String = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -334,12 +334,12 @@ class SocialRepository(
             ) else null
         }.toMap()
         val serverUrl = parameters["server"] ?: Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val token = parameters["token"] ?: invitation
         val configuredServer = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         require(serverUrl.trimEnd('/') == configuredServer.trimEnd('/')) {
@@ -355,7 +355,7 @@ class SocialRepository(
 
     suspend fun leaveGroup(groupId: String) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -365,7 +365,7 @@ class SocialRepository(
 
     suspend fun deleteGroup(groupId: String) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -376,7 +376,7 @@ class SocialRepository(
     suspend fun updateMember(groupId: String, deviceId: String, role: MemberRole) =
         withContext(Dispatchers.IO) {
             val serverUrl = Preferences.instance.getString(
-                Preferences.jayServerUrlKey,
+                SocialPreferences.serverUrlKey,
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -391,7 +391,7 @@ class SocialRepository(
     suspend fun getGroupActivity(groupId: String, before: Long? = null): SocialActivityPage =
         withContext(Dispatchers.IO) {
             val serverUrl = Preferences.instance.getString(
-                Preferences.jayServerUrlKey,
+                SocialPreferences.serverUrlKey,
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -423,7 +423,7 @@ class SocialRepository(
     suspend fun getAlarmActivity(alarmId: String, before: Long? = null): SocialActivityPage =
         withContext(Dispatchers.IO) {
             val serverUrl = Preferences.instance.getString(
-                Preferences.jayServerUrlKey,
+                SocialPreferences.serverUrlKey,
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -454,7 +454,7 @@ class SocialRepository(
 
     suspend fun removeMember(groupId: String, deviceId: String) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -466,7 +466,7 @@ class SocialRepository(
         synchronizationMutex.withLock {
             withContext(Dispatchers.IO) {
                 val serverUrl = Preferences.instance.getString(
-                    Preferences.jayServerUrlKey,
+                    SocialPreferences.serverUrlKey,
                     DEFAULT_SERVER_URL
                 ) ?: DEFAULT_SERVER_URL
                 val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -512,7 +512,7 @@ class SocialRepository(
                 alarmUseCase.updateAlarm(alarm)
             } else {
                 val serverUrl = Preferences.instance.getString(
-                    Preferences.jayServerUrlKey,
+                    SocialPreferences.serverUrlKey,
                     DEFAULT_SERVER_URL
                 ) ?: DEFAULT_SERVER_URL
                 val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -559,7 +559,7 @@ class SocialRepository(
             val link = socialDao.getAlarmLinkByLocalId(alarm.id)
             if (link != null) {
                 val serverUrl = Preferences.instance.getString(
-                    Preferences.jayServerUrlKey,
+                    SocialPreferences.serverUrlKey,
                     DEFAULT_SERVER_URL
                 ) ?: DEFAULT_SERVER_URL
                 val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -587,7 +587,7 @@ class SocialRepository(
         withContext(Dispatchers.IO) {
             val link = socialDao.getAlarmLinkByLocalId(localAlarmId) ?: return@withContext
             val serverUrl = Preferences.instance.getString(
-                Preferences.jayServerUrlKey,
+                SocialPreferences.serverUrlKey,
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -606,10 +606,10 @@ class SocialRepository(
 
     suspend fun renameDevice(name: String) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
-        Preferences.edit { putString(Preferences.jayDeviceNameKey, name) }
+        Preferences.edit { putString(SocialPreferences.deviceNameKey, name) }
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
         SocialApi(serverUrl, identity).apply {
             register()
@@ -620,7 +620,7 @@ class SocialRepository(
 
     suspend fun registerPushToken(token: String) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -632,7 +632,7 @@ class SocialRepository(
 
     suspend fun refreshPlayEntitlement() = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
@@ -684,8 +684,8 @@ class SocialRepository(
             socialDao.clearGroups()
         }
         Preferences.edit {
-            putString(Preferences.jayServerUrlKey, serverUrl.trimEnd('/'))
-            putLong(Preferences.jaySyncCursorKey, 0)
+            putString(SocialPreferences.serverUrlKey, serverUrl.trimEnd('/'))
+            putLong(SocialPreferences.syncCursorKey, 0)
         }
     }
 
@@ -707,7 +707,7 @@ class SocialRepository(
             occurrenceId
         )
         val serverUrl = Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)

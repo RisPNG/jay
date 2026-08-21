@@ -21,22 +21,22 @@ data class DeviceIdentity(
 object DeviceIdentityStore {
     fun loadOrCreate(context: Context, serverUrl: String): DeviceIdentity {
         val identityPreferences = context.getSharedPreferences("jay_identity", Context.MODE_PRIVATE)
-        val encodedSecret = identityPreferences.getString(Preferences.jayDeviceSecretKey, null)
+        val encodedSecret = identityPreferences.getString(SocialPreferences.deviceSecretKey, null)
             ?: ByteArray(32).also(SecureRandom()::nextBytes).let {
                 Base64.encodeToString(it, Base64.NO_WRAP or Base64.URL_SAFE)
             }.also { generated ->
                 identityPreferences.edit {
-                    putString(Preferences.jayDeviceSecretKey, generated)
+                    putString(SocialPreferences.deviceSecretKey, generated)
                 }
             }
         val secret = Base64.decode(encodedSecret, Base64.NO_WRAP or Base64.URL_SAFE)
-        val name = Preferences.instance.getString(Preferences.jayDeviceNameKey, null)
+        val name = Preferences.instance.getString(SocialPreferences.deviceNameKey, null)
             ?: context.assets.open("device_alias_words.json").bufferedReader().use {
                 Json.decodeFromString<DeviceNameWords>(it.readText())
             }.let { words ->
                 "${words.adjectives.random()} ${words.nouns.random()}"
             }.also { generated ->
-                Preferences.edit { putString(Preferences.jayDeviceNameKey, generated) }
+                Preferences.edit { putString(SocialPreferences.deviceNameKey, generated) }
             }
         val id = MessageDigest.getInstance("SHA-256").digest(secret).joinToString("") {
             "%02x".format(it)

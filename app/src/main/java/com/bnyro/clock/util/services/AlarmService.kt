@@ -38,10 +38,8 @@ import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.runBlocking
 import java.util.Timer
 import java.util.TimerTask
-import com.bnyro.clock.social.data.SocialActivityWorker
-import com.bnyro.clock.social.data.SocialIgnoredAlarmWorker
-import com.bnyro.clock.social.domain.AlarmActivityKind
-import androidx.work.WorkManager
+import com.bnyro.clock.social.data.SocialAlarmEvents
+import com.bnyro.clock.social.data.SocialPreferences
 
 class AlarmService : Service() {
     private val notificationId = 5
@@ -80,15 +78,7 @@ class AlarmService : Service() {
                 DISMISS_ACTION -> {
                     currentAlarm?.let {
                         outcomeRecorded = true
-                        SocialActivityWorker.enqueue(
-                            this@AlarmService,
-                            it.id,
-                            AlarmActivityKind.DISMISSED,
-                            occurrenceId
-                        )
-                        WorkManager.getInstance(this@AlarmService).cancelUniqueWork(
-                            "jay_ignored_alarm_${it.id}"
-                        )
+                        SocialAlarmEvents.dismiss(this@AlarmService, it.id, occurrenceId)
                     }
                     //maybe fixes a super shitty bug that was shitty kinda D:
                     currentAlarm?.let { alarm ->
@@ -99,16 +89,10 @@ class AlarmService : Service() {
                 SNOOZE_ACTION -> {
                     currentAlarm?.let {
                         outcomeRecorded = true
-                        SocialActivityWorker.enqueue(
+                        SocialAlarmEvents.snooze(
                             this@AlarmService,
                             it.id,
-                            AlarmActivityKind.SNOOZED,
-                            occurrenceId
-                        )
-                        SocialIgnoredAlarmWorker.schedule(
-                            this@AlarmService,
-                            it.id,
-                            System.currentTimeMillis() + it.snoozeMinutes * 60_000L,
+                            it.snoozeMinutes,
                             occurrenceId!!
                         )
                     }
@@ -158,7 +142,7 @@ class AlarmService : Service() {
         play(alarm)
         currentAlarm = alarm
         occurrenceId = Preferences.instance.getString(
-            "jayAlarmOccurrence:${alarm.id}",
+            "${SocialPreferences.alarmOccurrencePrefix}${alarm.id}",
             null
         ) ?: "${alarm.id}:${System.currentTimeMillis()}"
         outcomeRecorded = false
@@ -217,10 +201,9 @@ class AlarmService : Service() {
                 }
                 currentAlarm?.takeUnless { outcomeRecorded }?.let {
                     outcomeRecorded = true
-                    SocialActivityWorker.enqueue(
+                    SocialAlarmEvents.ignore(
                         this@AlarmService,
                         it.id,
-                        AlarmActivityKind.IGNORED,
                         occurrenceId,
                         "timed_out"
                     )
