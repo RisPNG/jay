@@ -6,21 +6,32 @@ import android.app.PendingIntent
 import android.app.NotificationManager
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationManagerCompat
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Permission
 import com.bnyro.clock.social.data.SocialSyncResult
-import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.ui.MainActivity
 import java.time.Instant
 
 object SocialNotificationHelper {
+    fun createNotificationChannel(context: Context) {
+        NotificationManagerCompat.from(context).createNotificationChannel(
+            NotificationChannelCompat.Builder(
+                SOCIAL_CHANNEL,
+                NotificationManagerCompat.IMPORTANCE_DEFAULT
+            )
+                .setName(context.getString(R.string.shared_alarm_activity))
+                .build()
+        )
+    }
+
     @SuppressLint("MissingPermission")
     fun notifyDeviceIssue(context: Context, id: Int, title: String, message: String) {
         if (!Permission.NotificationPermission.hasPermission(context)) return
         NotificationManagerCompat.from(context).notify(
             id,
-            NotificationCompat.Builder(context, NotificationHelper.SOCIAL_CHANNEL)
+            NotificationCompat.Builder(context, SOCIAL_CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(message)
@@ -65,7 +76,7 @@ object SocialNotificationHelper {
             val eventTime = Instant.parse(change.occurredAt).toEpochMilli()
             notificationManager.notify(
                 change.sequence.hashCode(),
-                NotificationCompat.Builder(context, NotificationHelper.SOCIAL_CHANNEL)
+                NotificationCompat.Builder(context, SOCIAL_CHANNEL)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setContentTitle(change.presentationTitle(context, result.deviceId))
                     .setContentText(change.presentationTime(context))
@@ -119,7 +130,7 @@ object SocialNotificationHelper {
             }
             notificationManager.notify(
                 notificationId,
-                NotificationCompat.Builder(context, NotificationHelper.SOCIAL_CHANNEL)
+                NotificationCompat.Builder(context, SOCIAL_CHANNEL)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setContentTitle(title)
                     .setContentText(message)
@@ -152,4 +163,5 @@ object SocialNotificationHelper {
     const val EXTRA_SOCIAL_ENTITY_TYPE = "com.rispng.jay.SOCIAL_ENTITY_TYPE"
     const val SYNC_FAILURE_NOTIFICATION_ID = 190_001
     const val ENTITLEMENT_NOTIFICATION_ID = 190_002
+    private const val SOCIAL_CHANNEL = "social"
 }

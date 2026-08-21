@@ -2,7 +2,6 @@ package com.bnyro.clock.presentation.screens.alarm
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
@@ -11,8 +10,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -23,14 +20,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ExpandLess
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
@@ -57,8 +52,7 @@ import com.bnyro.clock.presentation.screens.alarm.components.AlarmFilterSection
 import com.bnyro.clock.presentation.screens.alarm.components.AlarmItem
 import com.bnyro.clock.presentation.screens.alarm.model.AlarmModel
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
-import com.bnyro.clock.social.presentation.SocialLogEntry
-import com.bnyro.clock.social.presentation.alarmLogTitle
+import com.bnyro.clock.social.presentation.SocialAlarmActivityDialog
 import com.bnyro.clock.util.AlarmHelper
 
 private val FAB_SIZE = 56.dp
@@ -284,35 +278,7 @@ fun AlarmScreen(
         }
 
         if (alarmModel.selectedActivityAlarmId != null) {
-            AlertDialog(
-                onDismissRequest = { alarmModel.selectedActivityAlarmId = null },
-                title = { Text(stringResource(R.string.alarm_logs)) },
-                text = {
-                    Column(
-                        Modifier.verticalScroll(rememberScrollState())
-                    ) {
-                        if (alarmModel.alarmActivity.isEmpty()) {
-                            Text(stringResource(R.string.no_activity))
-                        }
-                        alarmModel.alarmActivity.forEach { change ->
-                            SocialLogEntry(change, change.alarmLogTitle(context))
-                        }
-                        if (alarmModel.alarmActivityNextBefore != null) {
-                            OutlinedButton(onClick = {
-                                alarmModel.loadAlarmActivity(
-                                    alarmModel.selectedActivityAlarmId!!,
-                                    more = true
-                                )
-                            }) { Text(stringResource(R.string.load_more)) }
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(onClick = { alarmModel.selectedActivityAlarmId = null }) {
-                        Text(stringResource(R.string.close))
-                    }
-                }
-            )
+            SocialAlarmActivityDialog(alarmModel)
         }
     }
 }

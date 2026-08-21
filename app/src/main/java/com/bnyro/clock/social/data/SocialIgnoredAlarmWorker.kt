@@ -64,7 +64,9 @@ class SocialIgnoredAlarmWorker(context: Context, parameters: WorkerParameters) :
             triggerAtMillis: Long,
             occurrenceId: String
         ) {
-            Preferences.edit { putString("jayAlarmOccurrence:$alarmId", occurrenceId) }
+            Preferences.edit {
+                putString("${SocialPreferences.alarmOccurrencePrefix}$alarmId", occurrenceId)
+            }
             val deadlineAt = triggerAtMillis + Preferences.instance.getInt(
                 Preferences.alarmTimeoutMinutesKey,
                 AlarmService.ALARM_TIMEOUT_MINUTES
