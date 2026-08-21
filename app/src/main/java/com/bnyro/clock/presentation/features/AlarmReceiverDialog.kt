@@ -37,10 +37,10 @@ fun AlarmReceiverDialog(context: Context, alarm: Alarm) {
             AlarmPicker(
                 onCancel = { showDialog = false },
                 currentAlarm = alarm,
+                advanced = false,
                 groups = emptyList(),
                 currentGroupId = null,
                 busy = alarmModel.busy,
-                advanced = false,
                 onSave = { savedAlarm, _ ->
                     alarmModel.createAlarm(savedAlarm, null) {}
                 }

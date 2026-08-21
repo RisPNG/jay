@@ -472,27 +472,26 @@ class SocialRepository(
                 val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
                 val response = SocialApi(serverUrl, identity).createAlarm(
                     SharedAlarmRequest(
-                        groupId,
-                        alarm.time,
-                        alarm.label,
-                        alarm.enabled,
-                        alarm.days,
-                        alarm.vibrate,
-                        AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay()
-                            ?: alarm.startDate,
-                        alarm.repeatInterval,
-                        alarm.repeatUnit.name,
-                        alarm.repeatAnchor.name,
-                        alarm.repeatDuration,
-                        alarm.repeatDurationUnit.name,
-                        alarm.endDate,
-                        alarm.endOccurrences,
-                        alarm.advanced,
-                        alarm.snoozeEnabled,
-                        alarm.snoozeMinutes,
-                        alarm.soundEnabled,
-                        alarm.vibrationPattern,
-                        alarm.vibrationPatternName
+                        groupId = groupId,
+                        time = alarm.time,
+                        label = alarm.label,
+                        enabled = alarm.enabled,
+                        days = alarm.days,
+                        vibrate = alarm.vibrate,
+                        startDate = alarm.startDate,
+                        repeatInterval = alarm.repeatInterval,
+                        repeatUnit = alarm.repeatUnit.name,
+                        repeatAnchor = alarm.repeatAnchor.name,
+                        repeatDuration = alarm.repeatDuration,
+                        repeatDurationUnit = alarm.repeatDurationUnit.name,
+                        endDate = alarm.endDate,
+                        endOccurrences = alarm.endOccurrences,
+                        advanced = alarm.advanced,
+                        snoozeEnabled = alarm.snoozeEnabled,
+                        snoozeMinutes = alarm.snoozeMinutes,
+                        soundEnabled = alarm.soundEnabled,
+                        vibrationPattern = alarm.vibrationPattern,
+                        vibrationPatternName = alarm.vibrationPatternName
                     )
                 )
                 val localId = alarmUseCase.createAlarm(alarm)
@@ -525,8 +524,7 @@ class SocialRepository(
                         enabled = alarm.enabled,
                         days = alarm.days,
                         vibrate = alarm.vibrate,
-                        startDate = AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay()
-                            ?: alarm.startDate,
+                        startDate = alarm.startDate,
                         repeatInterval = alarm.repeatInterval,
                         repeatUnit = alarm.repeatUnit.name,
                         repeatAnchor = alarm.repeatAnchor.name,
@@ -696,11 +694,11 @@ class SocialRepository(
         remoteAlarmId: String,
         revision: Int
     ) {
-        if (!alarm.enabled) {
+        val triggerAt = AlarmHelper.getAlarmTime(alarm)
+        if (!alarm.enabled || triggerAt == null) {
             WorkManager.getInstance(context).cancelUniqueWork("jay_ignored_alarm_${alarm.id}")
             return
         }
-        val triggerAt = AlarmHelper.getAlarmTime(alarm) ?: return
         val occurrenceId = triggerAt.toString()
         SocialIgnoredAlarmWorker.schedule(
             context,
