@@ -35,7 +35,7 @@ class SocialIgnoredAlarmWorker(context: Context, parameters: WorkerParameters) :
             "no_response"
         )
         val alarm = (applicationContext as App).container.alarmRepository.getAlarmById(alarmId)
-        if (alarm?.enabled == true && !AlarmHelper.hasRecurrenceEnded(alarm)) {
+        if (alarm?.enabled == true && !alarm.isOneTime) {
             AlarmHelper.getAlarmTime(alarm)?.let { triggerAt ->
                 schedule(
                     applicationContext,
