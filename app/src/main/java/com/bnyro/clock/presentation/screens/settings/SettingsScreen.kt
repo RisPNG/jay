@@ -15,14 +15,8 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Badge
-import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Widgets
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LargeTopAppBar
@@ -60,8 +54,7 @@ import com.bnyro.clock.presentation.screens.settings.components.SwitchPref
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import com.bnyro.clock.util.Preferences
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.bnyro.clock.social.presentation.SocialModel
+import com.bnyro.clock.social.presentation.SocialSettingsSection
 import com.bnyro.clock.util.services.AlarmService
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -73,9 +66,6 @@ fun SettingsScreen(
     timerModel: TimerModel
 ) {
     val context = LocalContext.current
-    val socialModel: SocialModel = viewModel()
-    var showDeviceNameDialog by remember { mutableStateOf(false) }
-    var showServerDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState()
@@ -338,25 +328,7 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.surfaceVariant
             )
 
-            SettingsCategory(stringResource(R.string.jay_social))
-            IconPreference(
-                title = stringResource(R.string.device_name),
-                summary = socialModel.deviceName,
-                imageVector = Icons.Default.Badge
-            ) {
-                showDeviceNameDialog = true
-            }
-            IconPreference(
-                title = stringResource(R.string.jay_server),
-                summary = socialModel.serverUrl,
-                imageVector = Icons.Default.Cloud
-            ) {
-                showServerDialog = true
-            }
-            HorizontalDivider(
-                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            )
+            SocialSettingsSection()
 
             SettingsCategory(stringResource(R.string.migrate_title))
             IconPreference(
@@ -413,62 +385,6 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.surfaceVariant
             )
         }
-    }
-    if (showDeviceNameDialog) {
-        var name by remember(socialModel.deviceName) { mutableStateOf(socialModel.deviceName) }
-        AlertDialog(
-            onDismissRequest = { showDeviceNameDialog = false },
-            title = { Text(stringResource(R.string.device_name)) },
-            text = {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        socialModel.renameDevice(name.trim())
-                        showDeviceNameDialog = false
-                    },
-                    enabled = name.isNotBlank()
-                ) { Text(stringResource(R.string.save)) }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showDeviceNameDialog = false }) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            }
-        )
-    }
-    if (showServerDialog) {
-        var server by remember(socialModel.serverUrl) { mutableStateOf(socialModel.serverUrl) }
-        AlertDialog(
-            onDismissRequest = { showServerDialog = false },
-            title = { Text(stringResource(R.string.jay_server)) },
-            text = {
-                OutlinedTextField(
-                    value = server,
-                    onValueChange = { server = it },
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        socialModel.changeServer(server.trim())
-                        showServerDialog = false
-                    },
-                    enabled = server.startsWith("https://") || BuildConfig.DEBUG && server.startsWith("http://")
-                ) { Text(stringResource(R.string.save)) }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showServerDialog = false }) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            }
-        )
     }
     if (showAlarmTimeoutDialog) {
         ScrollPickerDialog(

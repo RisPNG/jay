@@ -9,14 +9,13 @@ import com.bnyro.clock.App
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.util.AlarmHelper
 import kotlinx.coroutines.runBlocking
-import com.bnyro.clock.social.data.SocialActivityWorker
-import com.bnyro.clock.social.domain.AlarmActivityKind
+import com.bnyro.clock.social.data.SocialAlarmEvents
 //i really am going overboard with recievers but whatever they cool af
 class DismissUpcomingReceiver : BroadcastReceiver() {
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onReceive(context: Context, intent: Intent?) {
         val id = intent?.getLongExtra(AlarmHelper.EXTRA_ID, -1)?.takeIf { it != -1L } ?: return
-        SocialActivityWorker.enqueue(context, id, AlarmActivityKind.DISMISSED)
+        SocialAlarmEvents.dismiss(context, id)
         val alarmRepository = (context.applicationContext as App).container.alarmRepository
 
         runBlocking {

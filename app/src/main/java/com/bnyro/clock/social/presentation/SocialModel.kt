@@ -12,6 +12,7 @@ import com.bnyro.clock.social.domain.MemberRole
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
 import com.bnyro.clock.social.domain.SocialChange
+import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.Preferences
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -49,12 +50,12 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
     var deviceId by mutableStateOf<String?>(null)
         private set
     var deviceName by mutableStateOf(
-        Preferences.instance.getString(Preferences.jayDeviceNameKey, null).orEmpty()
+        Preferences.instance.getString(SocialPreferences.deviceNameKey, null).orEmpty()
     )
         private set
     var serverUrl by mutableStateOf(
         Preferences.instance.getString(
-            Preferences.jayServerUrlKey,
+            SocialPreferences.serverUrlKey,
             com.bnyro.clock.social.data.SocialRepository.DEFAULT_SERVER_URL
         ) ?: com.bnyro.clock.social.data.SocialRepository.DEFAULT_SERVER_URL
     )
@@ -71,7 +72,7 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
                 .onSuccess { result ->
                     deviceId = result.deviceId
                     deviceName = Preferences.instance.getString(
-                        Preferences.jayDeviceNameKey,
+                        SocialPreferences.deviceNameKey,
                         deviceName
                     ) ?: deviceName
                 }

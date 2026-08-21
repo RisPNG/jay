@@ -149,6 +149,7 @@ fun AlarmPicker(
                 PickerStyle.WHEEL -> ScrollAlarmTimePicker(
                     initialHours = hours,
                     initialMinutes = minutes,
+                    enabled = canSave,
                     onHoursChanged = { hours = it },
                     onMinutesChanged = { minutes = it }
                 )
@@ -326,7 +327,7 @@ fun AlarmPicker(
             if (!isNewAlarm && onDelete != null) {
                 FilledTonalButton(
                     onClick = { onDelete(currentAlarm) },
-                    enabled = !busy,
+                    enabled = canSave && !busy,
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         contentColor = MaterialTheme.colorScheme.error

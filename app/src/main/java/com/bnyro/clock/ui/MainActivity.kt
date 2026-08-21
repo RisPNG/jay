@@ -16,9 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.bnyro.clock.App
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.navigation.HomeRoutes
 import com.bnyro.clock.navigation.MainNavContainer
@@ -30,23 +28,19 @@ import com.bnyro.clock.presentation.screens.permission.PermissionModel
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.presentation.screens.stopwatch.model.StopwatchModel
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
-import com.bnyro.clock.social.presentation.SocialNotificationHelper
+import com.bnyro.clock.social.presentation.SocialActivityCoordinator
 import com.bnyro.clock.ui.theme.ClockYouTheme
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.ThemeUtil
 import com.bnyro.clock.util.services.StopwatchService
 import com.bnyro.clock.util.services.TimerService
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     val stopwatchModel by viewModels<StopwatchModel>()
     val timerModel by viewModels<TimerModel>()
     private var initialTab: HomeRoutes = HomeRoutes.Alarm
-    private var socialLiveSyncJob: Job? = null
+    private val socialActivityCoordinator by lazy { SocialActivityCoordinator(this) }
 
     lateinit var stopwatchService: StopwatchService
 
@@ -100,7 +94,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        receiveGroupInvitation(intent)
+        socialActivityCoordinator.receiveInvitation(intent)
 
         val allPermissions = PermissionModel.allPermissions
         val requiredPermissions = allPermissions.any {
@@ -116,14 +110,7 @@ class MainActivity : ComponentActivity() {
             SHOW_STOPWATCH_ACTION -> HomeRoutes.Stopwatch
             AlarmClock.ACTION_SET_ALARM, AlarmClock.ACTION_SHOW_ALARMS -> HomeRoutes.Alarm
             AlarmClock.ACTION_SET_TIMER, AlarmClock.ACTION_SHOW_TIMERS -> HomeRoutes.Timer
-            Intent.ACTION_VIEW -> HomeRoutes.Groups
-            SocialNotificationHelper.SHOW_SOCIAL_ACTIVITY_ACTION -> {
-                if (
-                    intent.getStringExtra(SocialNotificationHelper.EXTRA_SOCIAL_ENTITY_TYPE) in
-                    setOf("alarm", "outcome")
-                ) HomeRoutes.Alarm else HomeRoutes.Groups
-            }
-            else -> homeRoutes.first {
+            else -> socialActivityCoordinator.homeRoute(intent) ?: homeRoutes.first {
                 Preferences.instance.getString(
                     Preferences.startTabKey,
                     HomeRoutes.Alarm.route
@@ -165,16 +152,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        socialLiveSyncJob = lifecycleScope.launch {
-            while (isActive) {
-                runCatching {
-                    (application as App).container.socialRepository.followLiveChanges {
-                        SocialNotificationHelper.notifySocialChanges(this@MainActivity, it)
-                    }
-                }
-                if (isActive) delay(2_000)
-            }
-        }
+        socialActivityCoordinator.startLiveSync()
         Intent(this, StopwatchService::class.java).also { intent ->
             bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         }
@@ -186,13 +164,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (receiveGroupInvitation(intent)) recreate()
+        if (socialActivityCoordinator.receiveInvitation(intent)) recreate()
     }
 
     override fun onStop() {
         super.onStop()
-        socialLiveSyncJob?.cancel()
-        socialLiveSyncJob = null
+        socialActivityCoordinator.stopLiveSync()
         unbindService(serviceConnection)
         unbindService(timerServiceConnection)
     }
@@ -225,14 +202,6 @@ class MainActivity : ComponentActivity() {
         if (intent?.action != AlarmClock.ACTION_SET_TIMER) return null
 
         return intent.getIntExtra(AlarmClock.EXTRA_LENGTH, 0).takeIf { it > 0 }
-    }
-
-    private fun receiveGroupInvitation(intent: Intent?): Boolean {
-        val invitation = intent?.dataString?.takeIf {
-            intent.action == Intent.ACTION_VIEW && it.startsWith("jay://join?")
-        } ?: return false
-        Preferences.edit { putString(Preferences.jayPendingInvitationKey, invitation) }
-        return true
     }
 
     companion object {
