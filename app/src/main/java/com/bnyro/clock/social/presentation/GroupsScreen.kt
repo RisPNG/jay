@@ -56,6 +56,7 @@ import com.bnyro.clock.presentation.screens.settings.components.SettingsCategory
 import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.social.domain.MemberRole
 import com.bnyro.clock.social.domain.SocialGroup
+import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.Preferences
 
 @Composable
@@ -73,8 +74,8 @@ fun GroupsScreen(
     var activityGroup by remember { mutableStateOf<SocialGroup?>(null) }
 
     LaunchedEffect(Unit) {
-        Preferences.instance.getString(Preferences.jayPendingInvitationKey, null)?.let {
-            Preferences.edit { remove(Preferences.jayPendingInvitationKey) }
+        Preferences.instance.getString(SocialPreferences.pendingInvitationKey, null)?.let {
+            Preferences.edit { remove(SocialPreferences.pendingInvitationKey) }
             socialModel.joinGroup(it)
         }
     }

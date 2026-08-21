@@ -15,15 +15,12 @@ import com.bnyro.clock.presentation.screens.stopwatch.StopwatchScreen
 import com.bnyro.clock.presentation.screens.stopwatch.model.StopwatchModel
 import com.bnyro.clock.presentation.screens.timer.TimerScreen
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
-import com.bnyro.clock.social.presentation.GroupsScreen
-import com.bnyro.clock.social.presentation.SocialModel
 
 val mainTabs = listOf(
     HomeRoutes.Alarm,
     HomeRoutes.Clock,
     HomeRoutes.Timer,
-    HomeRoutes.Stopwatch,
-    HomeRoutes.Groups
+    HomeRoutes.Stopwatch
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -35,8 +32,7 @@ fun HomePager(
     alarmModel: AlarmModel,
     timerModel: TimerModel,
     stopwatchModel: StopwatchModel,
-    settingsModel: SettingsModel,
-    socialModel: SocialModel
+    settingsModel: SettingsModel
 ) {
     HorizontalPager(
         state = pagerState,
@@ -73,12 +69,7 @@ fun HomePager(
                     stopwatchModel = stopwatchModel
                 )
             }
-            HomeRoutes.Groups -> {
-                GroupsScreen(
-                    onClickSettings = { onNavigate(NavRoutes.Settings.route) },
-                    socialModel = socialModel
-                )
-            }
+            else -> Unit
         }
     }
 }
