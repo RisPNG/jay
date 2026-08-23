@@ -107,7 +107,7 @@ fun AlarmScreen(
                             modifier = Modifier
                                 .padding(vertical = 12.dp)
                                 .width(1.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                            color = MaterialTheme.colorScheme.outlineVariant
                         )
                         Box(
                             modifier = Modifier
