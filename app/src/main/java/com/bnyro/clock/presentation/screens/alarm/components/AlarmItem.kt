@@ -98,7 +98,7 @@ fun AlarmItem(
                         if (isSelected) {
                             Modifier.border(
                                 width = 2.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                color = MaterialTheme.colorScheme.primary,
                                 shape = cardShape
                             )
                         } else {
