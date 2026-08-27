@@ -13,6 +13,7 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.bnyro.clock.ui.theme.primaryFade
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,7 +38,7 @@ fun ScrollWheel(
     label: (Int) -> String = { String.format("%02d", it) }
 ) {
     val primary = MaterialTheme.colorScheme.primary
-    val primaryMuted = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+    val primaryMuted = MaterialTheme.colorScheme.primaryFade
     val hapticFeedback = LocalHapticFeedback.current
     val state = rememberPagerState(initialPage = maxValue * 100 + value - offset) {
         maxValue * 200
