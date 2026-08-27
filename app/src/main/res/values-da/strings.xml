@@ -26,7 +26,6 @@
     <string name="snooze">Slumre</string>
     <string name="dismiss">Afvis</string>
     <string name="same_time">Samme tid</string>
-    <string name="show_timer_quick_selection">Vis hurtigvalg af timer</string>
     <string name="repeat">Gentag</string>
     <string name="select_snooze_time">Vælg Slumretid</string>
     <string name="alarm_name">Alarmnavn</string>
@@ -105,7 +104,6 @@
     <string name="snooze_minutes">Slumre %d minutter</string>
     <string name="show_widget_background">Vis Widget-baggrund</string>
     <string name="use_a_different_time_zone_for_the_widget">Brug en anden tidszone til widget\'en</string>
-    <string name="add_preset_timer">Tilføj forudindstillet timer</string>
     <string name="start">Start</string>
     <string name="add_minutes">Tilføj %d minutter</string>
     <string name="delete_world_clock">Slet Verdensur</string>

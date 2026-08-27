@@ -45,7 +45,6 @@
     <string name="digital_clock">Jam digital</string>
     <string name="delete">Hapus</string>
     <string name="offset">Offset</string>
-    <string name="show_timer_quick_selection">Tampilkan pilihan cepat pewaktu</string>
     <string name="seconds">Detik</string>
     <string name="hours">Jam</string>
     <string name="minutes">Menit</string>
@@ -91,7 +90,6 @@
     <string name="start">Mulai</string>
     <string name="show_date">Tampilkan Tanggal</string>
     <string name="save">Simpan</string>
-    <string name="add_preset_timer">Tambahkan pewaktu prasetel</string>
     <string name="digital_clock_widget">Widget Jam Digital</string>
     <string name="delete_world_clock">Hapus Jam Dunia</string>
     <string name="search_country_timezone">Cari Negara/Zona Waktu</string>

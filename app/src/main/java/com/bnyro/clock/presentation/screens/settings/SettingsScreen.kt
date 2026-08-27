@@ -52,7 +52,6 @@ import com.bnyro.clock.presentation.screens.settings.components.IconPreference
 import com.bnyro.clock.presentation.screens.settings.components.SettingsCategory
 import com.bnyro.clock.presentation.screens.settings.components.SwitchPref
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
-import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.AlarmService
 
@@ -61,8 +60,7 @@ import com.bnyro.clock.util.services.AlarmService
 fun SettingsScreen(
     onClickBack: () -> Unit,
     onNavigate: (String) -> Unit,
-    settingsModel: SettingsModel,
-    timerModel: TimerModel
+    settingsModel: SettingsModel
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
@@ -289,21 +287,7 @@ fun SettingsScreen(
             ) {
                 settingsModel.timerPickerStyle = it
                 Preferences.edit { putString(Preferences.timerPickerStyleKey, it.name) }
-                timerModel.timePickerFakeUnits = 0
-                timerModel.timePickerSeconds = 0
             }
-
-            SwitchPref(
-                prefKey = Preferences.timerShowExamplesKey,
-                title = stringResource(R.string.show_timer_quick_selection),
-                defaultValue = true
-            )
-
-            SwitchPref(
-                prefKey = "timer_BIG_start_button",
-                title = stringResource(R.string.timer_use_big_start),
-                defaultValue = false
-            )
 
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),

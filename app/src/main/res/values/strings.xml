@@ -10,9 +10,7 @@
     <string name="about">About</string>
     <string name="timer_service">Timer service</string>
     <string name="running_named_timer">%1$s timer is running</string>
-    <string name="running_timer">Timer is running</string>
     <string name="paused_named_timer">%1$s timer is paused</string>
-    <string name="paused_timer">Timer is paused</string>
     <string name="finished_named_timer">%1$s timer finished</string>
     <string name="running_stopwatch">Stopwatch is running</string>
     <string name="paused_stopwatch">Stopwatch is paused</string>
@@ -64,7 +62,6 @@
 
     <string name="show_clock_bottom_tab">Toggle items</string>
     <string name="altname">Clock</string>
-    <string name="timer_use_big_start">Use big start button</string>
     <string name="export">Export alarms</string>
     <string name="exportdesc">Backup alarms to a JSON file</string>
     <string name="upcoming_alarm">Upcoming alarm</string>
@@ -101,7 +98,6 @@
     <string name="missed_alarms">Missed alarms</string>
     <string name="named_alarm_missed">%1$s alarm at %2$s was missed</string>
     <string name="alarm_missed">Alarm at %1$s was missed</string>
-    <string name="show_timer_quick_selection">Show quick selection</string>
     <string name="hours">Hours</string>
     <string name="minutes">Minutes</string>
     <string name="seconds">Seconds</string>
@@ -198,6 +194,14 @@
         <item quantity="one">year</item>
         <item quantity="other">years</item>
     </plurals>
+    <plurals name="active_timers">
+        <item quantity="one">Active timer</item>
+        <item quantity="other">Active timers</item>
+    </plurals>
+    <plurals name="saved_timers">
+        <item quantity="one">Saved timer</item>
+        <item quantity="other">Saved timers</item>
+    </plurals>
     <plurals name="every_days">
         <item quantity="one">Every day</item>
         <item quantity="other">Every %d days</item>
@@ -238,7 +242,7 @@
     <string name="show_date">Show date</string>
     <string name="save">Save</string>
     <string name="date_text_size">Date text size</string>
-    <string name="add_preset_timer">Add preset timer</string>
+    <string name="add_saved_timer">Add saved timer</string>
     <string name="start">Start</string>
     <string name="delete_world_clock">Delete world clock</string>
     <string name="search_country_timezone">Search country or time zone</string>

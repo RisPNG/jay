@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="dismiss">關閉</string>
-    <string name="show_timer_quick_selection">顯示計時器快速選擇</string>
     <string name="hours">小時</string>
     <string name="edit_alarm">編輯鬧鐘</string>
     <string name="snooze">貪睡</string>
@@ -65,7 +64,6 @@
     <string name="lap">圈</string>
     <string name="lap_time">單圈時間</string>
     <string name="overall_time">總時間</string>
-    <string name="add_preset_timer">新增現在的計時器</string>
     <string name="show_date">顯示日期</string>
     <string name="save">儲存</string>
     <string name="date_text_size">日期文字大小</string>

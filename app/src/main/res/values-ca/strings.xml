@@ -45,7 +45,6 @@
     <string name="digital_clock">Rellotge digital</string>
     <string name="vertical_clock">Rellotge vertical</string>
     <string name="delete">Suprimeix</string>
-    <string name="show_timer_quick_selection">Mostra la selecció ràpida del temporitzador</string>
     <string name="hours">Hores</string>
     <plurals name="minutes">
         <item quantity="one">%d minut</item>
