@@ -71,7 +71,7 @@ fun AlarmCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 5.dp, end = 10.dp),
+                        .padding(end = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     groupName?.let {
