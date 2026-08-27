@@ -65,7 +65,7 @@ fun AlarmCard(
                     ?.minus(System.currentTimeMillis())
                 Row(
                     modifier = Modifier
-                        .padding(start = 5.dp, end = 10.dp)
+                        .padding(end = 10.dp)
                         .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
