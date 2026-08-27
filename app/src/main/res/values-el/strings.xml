@@ -58,7 +58,6 @@
     <string name="same_time">Ίδια ώρα</string>
     <string name="repeat">Επανάληψη</string>
     <string name="alarm_name">Όνομα ξυπνητηριού</string>
-    <string name="repeating">Επαναλαμβανόμενη</string>
     <string name="weekends">Σαββατοκύριακα</string>
     <string name="alarm_will_play">Το ξυπνητήρι θα ξεκινήσει σε %1$s.</string>
     <string name="color_scheme">Χρωματικό σχέδιο</string>

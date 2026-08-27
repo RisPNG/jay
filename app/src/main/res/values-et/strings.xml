@@ -54,7 +54,6 @@
     <string name="dismiss">Katkesta</string>
     <string name="alarm_name">Äratuse nimi</string>
     <string name="one_time">Üks kord</string>
-    <string name="repeating">Korduv</string>
     <string name="weekends">Nädalavahetused</string>
     <string name="weekdays">Tööpäevad</string>
     <string name="alarm_will_play">Äratuse aeg on %1$s.</string>

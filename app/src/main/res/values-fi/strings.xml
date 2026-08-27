@@ -61,7 +61,6 @@
     </plurals>
     <string name="one_time">Kerran</string>
     <string name="select_snooze_time">Valitse torkutusaika</string>
-    <string name="repeating">Toistuva</string>
     <string name="alarm_name">Herätyksen nimi</string>
     <string name="weekends">Viikonloput</string>
     <string name="weekdays">Arkipäivät</string>

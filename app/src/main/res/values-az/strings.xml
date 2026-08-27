@@ -60,7 +60,6 @@
     <string name="select_snooze_time">Ertələmə vaxtını seç</string>
     <string name="alarm_name">Siqnal Adı</string>
     <string name="one_time">Bir Dəfə</string>
-    <string name="repeating">Təkrarlanan</string>
     <string name="weekends">Həftə sonları</string>
     <string name="weekdays">Həftə içi</string>
     <string name="duration_seconds">Müddət: %1$s</string>

@@ -56,7 +56,6 @@
     <string name="start_tab">प्रारंभ टैब</string>
     <string name="from">से</string>
     <string name="to">तक</string>
-    <string name="repeating">दोहराना</string>
     <plurals name="hour_minute_offset_positive">
         <item quantity="one">%d घंटा और %d मिनट आगे</item>
         <item quantity="other">%d घंटे और %d मिनट आगे</item>

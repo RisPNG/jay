@@ -79,7 +79,6 @@
     <string name="select_snooze_time">Snooze-Zeit auswählen</string>
     <string name="alarm_name">Name des Alarms</string>
     <string name="one_time">Einmal</string>
-    <string name="repeating">Wiederholend</string>
     <string name="weekends">Wochenende</string>
     <string name="weekdays">Wochentage</string>
     <string name="available_days_0">S</string>

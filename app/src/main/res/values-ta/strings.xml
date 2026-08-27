@@ -87,7 +87,6 @@
     <string name="select_snooze_time">உறக்கநிலை நேரத்தைத் தேர்ந்தெடுக்கவும்</string>
     <string name="alarm_name">அலாரம் பெயர்</string>
     <string name="one_time">ஒரு முறை</string>
-    <string name="repeating">மீண்டும்</string>
     <string name="weekends">வார இறுதி நாட்கள்</string>
     <string name="weekdays">வார நாட்கள்</string>
     <string name="alarm_will_play">அலாரம் %1$s இல் தொடங்கும்.</string>

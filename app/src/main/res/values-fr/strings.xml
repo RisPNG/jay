@@ -77,7 +77,6 @@
     <string name="one_time">Une seule fois</string>
     <string name="weekdays">Jours de la semaine</string>
     <string name="select_snooze_time">Sélectionner l\'heure de répétition</string>
-    <string name="repeating">Répétition</string>
     <string name="alarm_name">Libellé de l\'alarme</string>
     <string name="available_days_0">Dim</string>
     <string name="available_days_1">Lun</string>

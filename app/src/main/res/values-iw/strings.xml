@@ -79,7 +79,6 @@
     <string name="add_preset_timer">הוספת שעון עצר מוגדר</string>
     <string name="from">‌מ־</string>
     <string name="to">עד</string>
-    <string name="repeating">חוזר</string>
     <string name="time_text_size">גודל כתב שעה</string>
     <string name="save">שמירה</string>
     <string name="show_time">הצגת השעה</string>

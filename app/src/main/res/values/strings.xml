@@ -129,7 +129,7 @@
     <string name="select_snooze_time">Select snooze length</string>
     <string name="alarm_name">Alarm name</string>
     <string name="one_time">One time</string>
-    <string name="repeating">Repeating</string>
+    <string name="every_day">Every day</string>
     <string name="weekends">Weekends</string>
     <string name="weekdays">Weekdays</string>
     <string name="alarm_will_play">The alarm will start in %1$s.</string>

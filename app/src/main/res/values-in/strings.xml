@@ -58,7 +58,6 @@
     <string name="select_snooze_time">Pilih waktu Jeda Sebentar</string>
     <string name="alarm_name">Nama Alarm</string>
     <string name="one_time">Satu Waktu</string>
-    <string name="repeating">Mengulangi</string>
     <string name="weekdays">Hari kerja</string>
     <string name="weekends">Akhir pekan</string>
     <string name="dismiss">Keluar</string>

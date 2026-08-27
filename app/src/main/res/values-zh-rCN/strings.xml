@@ -72,7 +72,6 @@
     <string name="weekdays">工作日</string>
     <string name="catppuccin">Catppuccin</string>
     <string name="amoled">纯黑</string>
-    <string name="repeating">重复</string>
     <string name="color_scheme">配色方案</string>
     <string name="alarm_will_play">闹钟将在 %1$s 后启动。</string>
     <string name="start_tab">开始标签页</string>

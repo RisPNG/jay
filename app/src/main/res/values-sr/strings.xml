@@ -80,7 +80,6 @@
     <string name="one_time">Једном</string>
     <string name="weekdays">Радним данима</string>
     <string name="select_snooze_time">Изаберите време одлагања</string>
-    <string name="repeating">Понављање</string>
     <string name="alarm_name">Назив аларма</string>
     <string name="catppuccin">Catppuccin</string>
     <string name="amoled">Amoled</string>

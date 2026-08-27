@@ -58,7 +58,6 @@
     <string name="select_snooze_time">Selecionar tempo da soneca</string>
     <string name="alarm_name">Nome do alarme</string>
     <string name="one_time">Uma vez</string>
-    <string name="repeating">Repetindo</string>
     <string name="weekdays">Dias da semana</string>
     <plurals name="hour_offset_positive">
         <item quantity="one">%d hora a partir de agora</item>

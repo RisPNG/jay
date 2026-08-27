@@ -32,7 +32,6 @@
     <string name="alarm_name">Alarmnavn</string>
     <string name="weekends">Weekender</string>
     <string name="weekdays">Hverdage</string>
-    <string name="repeating">Gentagende</string>
     <string name="start_tab">Start-fane</string>
     <string name="alarm_will_play">Alarmen starter om %1$s.</string>
     <string name="amoled">Amoled</string>
