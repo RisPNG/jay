@@ -29,9 +29,11 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.TimerDescriptor
 import com.bnyro.clock.domain.model.TimerObject
+import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.domain.model.WatchState
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.NotificationHelper
@@ -127,12 +129,15 @@ class TimerService : Service() {
 
                     oldnow = System.currentTimeMillis()
 
-                    obj.currentPosition.value = obj.initialPosition
-                    obj.state.value = WatchState.RUNNING
+                    // a finished timer has no run left to return to, so it starts a new one
+                    if (obj.currentPosition.value == 0) obj.state.value = WatchState.RUNNING
+                    obj.currentPosition.value = obj.initialPosition.value
 
                     cancelAlarm(obj)
-                    scheduleAlarm(obj)
-                    acquireWakeLock()
+                    if (obj.state.value == WatchState.RUNNING) {
+                        scheduleAlarm(obj)
+                        acquireWakeLock()
+                    }
 
                     val finishedNotificationId = (Integer.MAX_VALUE / 3) + obj.id * 10
                     val notificationManager = NotificationManagerCompat.from(context)
@@ -148,21 +153,22 @@ class TimerService : Service() {
 
     private fun play(timerObject: TimerObject) {
         stopAudio()
-        val alert: Uri = timerObject.ringtone ?: RingtoneManager.getDefaultUri(
-            RingtoneManager.TYPE_ALARM
-        )
+        if (timerObject.soundEnabled) {
+            val alert: Uri = timerObject.soundUri?.toUri() ?: RingtoneManager.getDefaultUri(
+                RingtoneManager.TYPE_ALARM
+            )
 
-        mediaPlayer = MediaPlayer()
+            mediaPlayer = MediaPlayer()
 
-        try {
-            mediaPlayer!!.setDataSource(this, alert)
-            startAlarm(mediaPlayer!!)
-        } catch (e: Exception) {
-            Log.e("failed to play ringtone", e.message, e)
+            try {
+                mediaPlayer!!.setDataSource(this, alert)
+                startAlarm(mediaPlayer!!)
+            } catch (e: Exception) {
+                Log.e("failed to play ringtone", e.message, e)
+            }
         }
         if (timerObject.vibrate) {
-            val pattern = longArrayOf(0, 500, 500)
-            vibrator.vibrate(pattern, 0)
+            vibrator.vibrate(timerObject.vibrationPattern.map(Int::toLong).toLongArray(), 0)
         } else {
             vibrator.cancel()
         }
@@ -289,21 +295,13 @@ class TimerService : Service() {
     private fun getNotification(timerObject: TimerObject) = NotificationCompat.Builder(
         this, NotificationHelper.TIMER_CHANNEL
     ).setContentTitle(
-        timerObject.label.value?.takeIf { it.isNotBlank() }?.let {
-            getString(
-                if (timerObject.state.value == WatchState.RUNNING) {
-                    R.string.running_named_timer
-                } else {
-                    R.string.paused_named_timer
-                },
-                it
-            )
-        } ?: getString(
+        getString(
             if (timerObject.state.value == WatchState.RUNNING) {
-                R.string.running_timer
+                R.string.running_named_timer
             } else {
-                R.string.paused_timer
-            }
+                R.string.paused_named_timer
+            },
+            timerObject.label.value
         )
     )
         .setContentIntent(contentIntent)
@@ -464,11 +462,7 @@ class TimerService : Service() {
         val notification = NotificationCompat.Builder(this, notificationChannelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setSilent(true)
-            .setContentTitle(
-                timerObject.label.value?.takeIf { it.isNotBlank() }?.let {
-                    getString(R.string.finished_named_timer, it)
-                } ?: getString(R.string.timer_finished)
-            )
+            .setContentTitle(getString(R.string.finished_named_timer, timerObject.label.value))
             .setContentIntent(contentIntent)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -515,22 +509,17 @@ class TimerService : Service() {
         R.string.add_5_minutes, ACTION_ADD_5_MIN, 6, timerObject.id
     )
 
-    fun updateLabel(id: Int, newLabel: String) {
+    fun updateTimer(id: Int, settings: TimerSettings) {
         timerObjects.firstOrNull { it.id == id }?.let {
-            it.label.value = newLabel
+            it.label.value = settings.label
+            it.initialPosition.value = settings.seconds * 1000
+            it.soundName = settings.soundName
+            it.soundUri = settings.soundUri
+            it.soundEnabled = settings.soundEnabled
+            it.vibrate = settings.vibrate
+            it.vibrationPattern = settings.vibrationPattern
+            it.vibrationPatternName = settings.vibrationPatternName
             updateNotification(it)
-        }
-    }
-
-    fun updateRingtone(id: Int, newRingtoneUri: Uri?) {
-        timerObjects.firstOrNull { it.id == id }?.let {
-            it.ringtone = newRingtoneUri
-        }
-    }
-
-    fun updateVibrate(id: Int, vibrate: Boolean) {
-        timerObjects.firstOrNull { it.id == id }?.let {
-            it.vibrate = vibrate
         }
     }
 

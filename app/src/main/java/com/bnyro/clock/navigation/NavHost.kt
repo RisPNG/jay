@@ -74,7 +74,7 @@ fun AppNavHost(
                 navController.popBackStack()
             }, onNavigate = {
                 navController.navigate(it)
-            }, settingsModel, timerModel)
+            }, settingsModel)
         }
 
         composable(NavRoutes.Widgets.route,

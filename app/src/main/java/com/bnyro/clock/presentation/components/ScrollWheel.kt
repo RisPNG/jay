@@ -20,10 +20,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
@@ -46,6 +51,20 @@ fun ScrollWheel(
     val currentPage = state.currentPage
     val widestLabel = remember(maxValue, offset) {
         (0 until maxValue).maxOf { label(it + offset).length }
+    }
+    // the wheel usually sits on a page that scrolls the same way it does, so a drag that
+    // lands on it is its alone and never reaches the page behind
+    val keepDragsOnTheWheel = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ) = available.copy(x = 0f)
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity) =
+                available.copy(x = 0f)
+        }
     }
     // a slow drag is answered by the row under the highlight, whatever the wheel was
     // doing on the way there; only a real flick is allowed to carry on and coast
@@ -83,6 +102,7 @@ fun ScrollWheel(
     }
     VerticalPager(
         modifier = Modifier
+            .nestedScroll(keepDragsOnTheWheel)
             .height(224.dp)
             .widthIn(min = if (widestLabel >= 3) 96.dp else 0.dp),
         state = state,

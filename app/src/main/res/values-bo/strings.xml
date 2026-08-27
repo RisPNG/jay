@@ -58,7 +58,6 @@
     <string name="select_snooze_time">གཉིད་དུས་འདེམས་རོགས།</string>
     <string name="alarm_name">དྲིལ་བརྡའི་མིང་།</string>
     <string name="one_time">ཐེངས་གཅིག།</string>
-    <string name="repeating">བསྐྱར་ཟློས།</string>
     <string name="weekends">གཟའ་མཇུག།</string>
     <string name="weekdays">བདུན་ཞག།</string>
     <string name="alarm_will_play">དུས་ཚོད་ %1$s འདིའི་ནང་དྲིལ་བརྡ་འགོ་འཛུགས།</string>

@@ -195,6 +195,18 @@ object TimeHelper {
     }
 
     /**
+     * Names a timer after the duration it was set to, as in "1h 30m 5s".
+     */
+    fun durationToName(seconds: Int): String {
+        return listOf(
+            seconds / 3600 to "h",
+            seconds % 3600 / 60 to "m",
+            seconds % 60 to "s"
+        ).filter { (value, _) -> value > 0 }
+            .joinToString(" ") { (value, unit) -> "$value$unit" }
+    }
+
+    /**
      * Method that formats a Duration object into a verbose string to be displayed in the UI
      */
     fun durationToFormatted(context: Context, duration: Duration): String {
