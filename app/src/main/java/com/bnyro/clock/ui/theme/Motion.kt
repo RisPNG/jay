@@ -9,8 +9,9 @@ import androidx.compose.ui.unit.IntSize
 /**
  * The weight a card takes on as it arrives in a list, and gives up as it leaves.
  */
+const val ItemFadeDurationMillis = 120
 val ItemFade: FiniteAnimationSpec<Float> =
-    tween(durationMillis = 120, easing = FastOutSlowInEasing)
+    tween(durationMillis = ItemFadeDurationMillis, easing = FastOutSlowInEasing)
 
 /**
  * The travel of a card the list moves aside to make room for another, or to close the gap one left.
