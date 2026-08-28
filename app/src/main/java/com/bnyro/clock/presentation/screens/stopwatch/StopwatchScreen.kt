@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,10 +57,13 @@ import com.bnyro.clock.navigation.TopBarScaffold
 import com.bnyro.clock.presentation.screens.stopwatch.model.StopwatchModel
 import com.bnyro.clock.ui.theme.ItemFade
 import com.bnyro.clock.ui.theme.ItemSlide
+import com.bnyro.clock.ui.theme.ListResize
 import com.bnyro.clock.util.extensions.KeepScreenOn
 import com.bnyro.clock.util.extensions.addZero
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+
+private val SIDE_CONTROL_SLOT = 76.dp
 
 @Composable
 fun StopwatchScreen(onClickSettings: () -> Unit, stopwatchModel: StopwatchModel) {
@@ -149,26 +153,26 @@ private fun StopwatchController(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AnimatedVisibility(stopwatchModel.state == WatchState.RUNNING) {
-            Row {
-                FloatingActionButton(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    onClick = {
-                        val tableOverflows = timeStampsState.canScrollForward ||
-                            timeStampsState.canScrollBackward
-                        stopwatchModel.onLapClicked()
-                        if (tableOverflows) {
-                            scope.launch {
-                                timeStampsState.scrollToItem(
-                                    stopwatchModel.rememberedTimeStamps.size - 1
-                                )
-                            }
+        SideControl(
+            visible = stopwatchModel.state == WatchState.RUNNING,
+            alignment = Alignment.CenterStart
+        ) {
+            FloatingActionButton(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                onClick = {
+                    val tableOverflows = timeStampsState.canScrollForward ||
+                        timeStampsState.canScrollBackward
+                    stopwatchModel.onLapClicked()
+                    if (tableOverflows) {
+                        scope.launch {
+                            timeStampsState.scrollToItem(
+                                stopwatchModel.rememberedTimeStamps.size - 1
+                            )
                         }
                     }
-                ) {
-                    Icon(Icons.Default.Timer, null)
                 }
-                Spacer(modifier = Modifier.width(20.dp))
+            ) {
+                Icon(Icons.Default.Timer, null)
             }
         }
         LargeFloatingActionButton(
@@ -186,30 +190,44 @@ private fun StopwatchController(
                 contentDescription = null
             )
         }
-        AnimatedVisibility(stopwatchModel.currentPosition != 0L) {
-            Row {
-                Spacer(modifier = Modifier.width(20.dp))
-                if (stopwatchModel.state != WatchState.PAUSED) {
-                    FloatingActionButton(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        onClick = { stopwatchModel.stopStopwatch(context) }
-                    ) {
-                        Icon(Icons.Default.Stop, null)
+        SideControl(
+            visible = stopwatchModel.currentPosition != 0L,
+            alignment = Alignment.CenterEnd
+        ) {
+            if (stopwatchModel.state != WatchState.PAUSED) {
+                FloatingActionButton(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    onClick = { stopwatchModel.stopStopwatch(context) }
+                ) {
+                    Icon(Icons.Default.Stop, null)
+                }
+            } else {
+                FloatingActionButton(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    onClick = {
+                        stopwatchModel.stopStopwatch(context)
+                        stopwatchModel.rememberedTimeStamps.clear()
                     }
-                } else {
-                    FloatingActionButton(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        onClick = {
-                            stopwatchModel.stopStopwatch(context)
-                            stopwatchModel.rememberedTimeStamps.clear()
-                        }
-                    ) {
-                        Icon(Icons.Default.Delete, null)
-                    }
+                ) {
+                    Icon(Icons.Default.Delete, null)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SideControl(
+    visible: Boolean,
+    alignment: Alignment,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier.width(SIDE_CONTROL_SLOT),
+        contentAlignment = alignment
+    ) {
+        AnimatedVisibility(visible) { content() }
     }
 }
 
@@ -225,6 +243,7 @@ private fun LapTable(
                 RoundedCornerShape(16.dp)
             )
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp))
+            .animateContentSize(ListResize)
             .padding(16.dp),
         state = timeStampsState
     ) {
