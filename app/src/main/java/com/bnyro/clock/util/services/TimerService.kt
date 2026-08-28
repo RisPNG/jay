@@ -451,7 +451,6 @@ class TimerService : Service() {
 
         val notification = NotificationCompat.Builder(this, notificationChannelId)
             .setSmallIcon(R.drawable.ic_timer)
-            .setSilent(true)
             .setContentTitle(getString(R.string.finished_named_timer, timerObject.label.value))
             .setContentIntent(contentIntent)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
@@ -460,9 +459,7 @@ class TimerService : Service() {
             .setOngoing(false)
             .addAction(stopAction)
             .addAction(restartAction)
-            .build().apply {
-                flags = flags or NotificationCompat.FLAG_INSISTENT
-            }
+            .build()
 
         NotificationManagerCompat.from(this).notify(finishedNotificationId, notification)
     }
