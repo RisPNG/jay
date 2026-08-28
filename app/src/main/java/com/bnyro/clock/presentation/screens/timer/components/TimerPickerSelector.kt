@@ -21,6 +21,18 @@ import com.bnyro.clock.presentation.components.ScrollTimerPicker
 fun TimerPickerSelector(
     pickerStyle: PickerStyle,
     seconds: Int,
+    onSecondsChanged: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier) {
+        TimerPicker(pickerStyle, seconds, onSecondsChanged)
+    }
+}
+
+@Composable
+private fun TimerPicker(
+    pickerStyle: PickerStyle,
+    seconds: Int,
     onSecondsChanged: (Int) -> Unit
 ) {
     when (pickerStyle) {

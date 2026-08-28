@@ -91,6 +91,14 @@
     <string name="digital_clock">Digital clock</string>
     <string name="vertical_clock">Vertical clock</string>
     <string name="timer_picker_style">Picker style</string>
+    <string name="timer_picker_behaviour">Picker with a timer running</string>
+    <string name="picker_keep_open">Keep open</string>
+    <string name="picker_hide">Hide</string>
+    <string name="timer_use_big_start">Use big start button</string>
+    <string name="timer_increment">Increment amount</string>
+    <string name="select_timer_increment">Select increment amount</string>
+    <string name="show_timer_picker">Show picker</string>
+    <string name="hide_timer_picker">Hide picker</string>
     <string name="alarm_picker_style">Picker style</string>
     <string name="scroll">Scroll</string>
     <string name="number_pad">Numpad</string>
@@ -159,6 +167,14 @@
     <plurals name="hour_minute_offset_negative">
         <item quantity="one">%d hour and %d minutes behind</item>
         <item quantity="other">%d hours and %d minutes behind</item>
+    </plurals>
+    <plurals name="seconds_count">
+        <item quantity="one">%d second</item>
+        <item quantity="other">%d seconds</item>
+    </plurals>
+    <plurals name="add_seconds">
+        <item quantity="one">Add %d sec</item>
+        <item quantity="other">Add %d secs</item>
     </plurals>
     <plurals name="minutes">
         <item quantity="one">%d minute</item>

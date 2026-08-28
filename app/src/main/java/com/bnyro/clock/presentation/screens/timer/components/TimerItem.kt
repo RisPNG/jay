@@ -158,7 +158,7 @@ fun TimerItem(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         ClickableIcon(imageVector = Icons.Default.MoreTime) {
-                            timerModel.addMinuteToTimer(context, obj.id)
+                            timerModel.addTimeToTimer(context, obj.id)
                         }
 
                         ClickableIcon(imageVector = Icons.Default.Refresh) {
