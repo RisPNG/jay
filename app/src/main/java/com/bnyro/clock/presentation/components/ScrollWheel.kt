@@ -32,6 +32,11 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
+/**
+ * The room one character of a wheel's label takes at the size the wheel draws it.
+ */
+private val LABEL_WIDTH = 32.dp
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ScrollWheel(
@@ -104,7 +109,7 @@ fun ScrollWheel(
         modifier = Modifier
             .nestedScroll(keepDragsOnTheWheel)
             .height(224.dp)
-            .widthIn(min = if (widestLabel >= 3) 96.dp else 0.dp),
+            .widthIn(min = (LABEL_WIDTH * widestLabel)),
         state = state,
         pageSpacing = 16.dp,
         pageSize = PageSize.Fixed(64.dp),
