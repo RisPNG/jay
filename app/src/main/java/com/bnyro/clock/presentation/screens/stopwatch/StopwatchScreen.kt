@@ -7,6 +7,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,9 +50,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.WatchState
 import com.bnyro.clock.navigation.TopBarScaffold
@@ -176,6 +180,7 @@ private fun StopwatchController(
             }
         }
         LargeFloatingActionButton(
+            modifier = Modifier.zIndex(1f),
             shape = CircleShape,
             onClick = {
                 stopwatchModel.pauseResumeStopwatch(context)
@@ -223,11 +228,24 @@ private fun SideControl(
     alignment: Alignment,
     content: @Composable () -> Unit
 ) {
+    val slotWidth = with(LocalDensity.current) { SIDE_CONTROL_SLOT.roundToPx() }
+    val behindMainControl = if (alignment == Alignment.CenterStart) {
+        slotWidth
+    } else {
+        -slotWidth
+    }
+
     Box(
         modifier = Modifier.width(SIDE_CONTROL_SLOT),
         contentAlignment = alignment
     ) {
-        AnimatedVisibility(visible) { content() }
+        AnimatedVisibility(
+            visible = visible,
+            enter = slideInHorizontally(ItemSlide) { behindMainControl },
+            exit = slideOutHorizontally(ItemSlide) { behindMainControl }
+        ) {
+            content()
+        }
     }
 }
 
