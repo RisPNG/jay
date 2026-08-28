@@ -1,10 +1,5 @@
 package com.bnyro.clock.presentation.screens.timer
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -63,7 +58,6 @@ import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import com.bnyro.clock.ui.theme.ItemFade
 import com.bnyro.clock.ui.theme.ItemFadeDurationMillis
 import com.bnyro.clock.ui.theme.ItemSlide
-import com.bnyro.clock.ui.theme.ListResize
 import com.bnyro.clock.util.extensions.KeepScreenOn
 import kotlinx.coroutines.delay
 
@@ -80,21 +74,23 @@ fun TimerScreen(
     // the picker has nowhere to go until something is running, and how it starts out
     // once something is is what the setting decides rather than where it was left
     var showPicker by remember(settingsModel.timerPickerBehaviour) {
-        mutableStateOf(settingsModel.timerPickerBehaviour == TimerPickerBehaviour.KEEP_OPEN)
+        mutableStateOf(
+            activeTimers.isEmpty() ||
+                settingsModel.timerPickerBehaviour == TimerPickerBehaviour.KEEP_OPEN
+        )
     }
     LaunchedEffect(activeTimers.isEmpty(), settingsModel.timerPickerBehaviour) {
-        if (activeTimers.isNotEmpty() &&
-            settingsModel.timerPickerBehaviour == TimerPickerBehaviour.HIDE
-        ) {
+        if (activeTimers.isEmpty()) {
+            showPicker = true
+        } else if (settingsModel.timerPickerBehaviour == TimerPickerBehaviour.HIDE) {
             delay(ItemFadeDurationMillis.toLong())
             showPicker = false
         }
     }
 
-    val pickerVisible = activeTimers.isEmpty() || showPicker
     val timerPageState = rememberLazyListState()
-    LaunchedEffect(pickerVisible) {
-        if (pickerVisible) timerPageState.requestScrollToItem(0)
+    LaunchedEffect(showPicker) {
+        if (showPicker) timerPageState.animateScrollToItem(0)
     }
 
     val selectedSavedTimerIds = remember { mutableStateListOf<Int>() }
@@ -136,13 +132,9 @@ fun TimerScreen(
                 .padding(paddingValues),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            item(key = "picker") {
-                AnimatedVisibility(
-                    visible = pickerVisible,
-                    enter = fadeIn(ItemFade) + expandVertically(ListResize),
-                    exit = shrinkVertically(ListResize) + fadeOut(ItemFade)
-                ) {
-                    Column {
+            if (showPicker) {
+                item(key = "picker") {
+                    Column(modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)) {
                         TimerPickerSelector(
                             pickerStyle = settingsModel.timerPickerStyle,
                             seconds = timerModel.timePickerSeconds,
