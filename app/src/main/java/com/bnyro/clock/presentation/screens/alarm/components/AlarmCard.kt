@@ -81,9 +81,28 @@ fun AlarmCard(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
+                    val repeatDuration = alarm.repeatDuration
                     when {
                         alarm.isOneTime -> {
                             Text(text = stringResource(R.string.one_time))
+                        }
+
+                        repeatDuration != null -> {
+                            Text(
+                                text = stringResource(
+                                    R.string.repeats_for_every,
+                                    repeatDuration,
+                                    pluralStringResource(
+                                        id = alarm.repeatDurationUnit.value,
+                                        count = repeatDuration
+                                    ),
+                                    alarm.repeatInterval,
+                                    pluralStringResource(
+                                        id = alarm.repeatUnit.value,
+                                        count = alarm.repeatInterval
+                                    )
+                                )
+                            )
                         }
 
                         alarm.repeatUnit != RepeatUnit.WEEK || alarm.repeatInterval > 1 -> {

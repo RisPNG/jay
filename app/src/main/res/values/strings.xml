@@ -144,6 +144,7 @@
     <string name="alarm_never_rings">Never rings</string>
     <string name="repeats_until">Repeats until %1$s</string>
     <string name="repeats_again_on">Repeats again on %1$s</string>
+    <string name="repeats_for_every">For %1$d %2$s every %3$d %4$s</string>
     <string name="less_than_one_minute">less than 1 minute</string>
     <string name="amoled">AMOLED</string>
     <string name="catppuccin">Catppuccin</string>

@@ -1,5 +1,10 @@
 package com.bnyro.clock.presentation.screens.timer
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -57,6 +61,7 @@ import com.bnyro.clock.presentation.screens.timer.components.TimerPickerSelector
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import com.bnyro.clock.ui.theme.ItemFade
 import com.bnyro.clock.ui.theme.ItemSlide
+import com.bnyro.clock.ui.theme.ListResize
 import com.bnyro.clock.util.extensions.KeepScreenOn
 
 @Composable
@@ -81,10 +86,6 @@ fun TimerScreen(
             showPicker = false
         }
     }
-
-    // taking the picker away shortens what is above the list, so the list follows it up
-    val listState = rememberLazyListState()
-    LaunchedEffect(showPicker) { listState.scrollToItem(0) }
 
     val selectedSavedTimerIds = remember { mutableStateListOf<Int>() }
     val isSelectionMode = selectedSavedTimerIds.isNotEmpty()
@@ -122,43 +123,47 @@ fun TimerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            state = listState,
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            if (activeTimers.isEmpty() || showPicker) {
-                item(key = "picker") {
-                    TimerPickerSelector(
-                        modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade),
-                        pickerStyle = settingsModel.timerPickerStyle,
-                        seconds = timerModel.timePickerSeconds,
-                        onSecondsChanged = { timerModel.timePickerSeconds = it }
-                    )
-                }
-            }
-            item(key = "startButton") {
-                Row(
-                    modifier = Modifier
-                        .animateItem(ItemFade, ItemSlide, ItemFade)
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    horizontalArrangement = Arrangement.Center
+            item(key = "picker") {
+                AnimatedVisibility(
+                    visible = activeTimers.isEmpty() || showPicker,
+                    enter = fadeIn(ItemFade) + expandVertically(ListResize),
+                    exit = shrinkVertically(ListResize) + fadeOut(ItemFade)
                 ) {
-                    val startTimer = {
-                        timerModel.startTimer(
-                            context,
-                            TimerSettings(seconds = timerModel.timePickerSeconds)
+                    Column {
+                        TimerPickerSelector(
+                            pickerStyle = settingsModel.timerPickerStyle,
+                            seconds = timerModel.timePickerSeconds,
+                            onSecondsChanged = { timerModel.timePickerSeconds = it }
                         )
-                    }
-                    if (settingsModel.timerBigStartButton) {
-                        LargeFloatingActionButton(shape = CircleShape, onClick = startTimer) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        }
-                    } else {
-                        FilledIconButton(
-                            modifier = Modifier.size(48.dp),
-                            onClick = startTimer
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp),
+                            horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            val startTimer = {
+                                timerModel.startTimer(
+                                    context,
+                                    TimerSettings(seconds = timerModel.timePickerSeconds)
+                                )
+                            }
+                            if (settingsModel.timerBigStartButton) {
+                                LargeFloatingActionButton(
+                                    shape = CircleShape,
+                                    onClick = startTimer
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                }
+                            } else {
+                                FilledIconButton(
+                                    modifier = Modifier.size(48.dp),
+                                    onClick = startTimer
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                }
+                            }
                         }
                     }
                 }
