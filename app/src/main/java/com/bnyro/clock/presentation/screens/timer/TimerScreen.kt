@@ -119,58 +119,100 @@ fun TimerScreen(
             }
         }
     ) { paddingValues ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 16.dp)
+                .padding(paddingValues)
         ) {
-            item(key = "picker") {
-                AnimatedVisibility(
-                    visible = activeTimers.isEmpty() || showPicker,
-                    enter = fadeIn(ItemFade) + expandVertically(ListResize),
-                    exit = shrinkVertically(ListResize) + fadeOut(ItemFade)
-                ) {
-                    Column {
-                        TimerPickerSelector(
-                            pickerStyle = settingsModel.timerPickerStyle,
-                            seconds = timerModel.timePickerSeconds,
-                            onSecondsChanged = { timerModel.timePickerSeconds = it }
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 16.dp),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            val startTimer = {
-                                timerModel.startTimer(
-                                    context,
-                                    TimerSettings(seconds = timerModel.timePickerSeconds)
-                                )
+            AnimatedVisibility(
+                visible = activeTimers.isEmpty() || showPicker,
+                enter = fadeIn(ItemFade) + expandVertically(ListResize),
+                exit = shrinkVertically(ListResize) + fadeOut(ItemFade)
+            ) {
+                Column {
+                    TimerPickerSelector(
+                        pickerStyle = settingsModel.timerPickerStyle,
+                        seconds = timerModel.timePickerSeconds,
+                        onSecondsChanged = { timerModel.timePickerSeconds = it }
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        val startTimer = {
+                            timerModel.startTimer(
+                                context,
+                                TimerSettings(seconds = timerModel.timePickerSeconds)
+                            )
+                        }
+                        if (settingsModel.timerBigStartButton) {
+                            LargeFloatingActionButton(
+                                shape = CircleShape,
+                                onClick = startTimer
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null)
                             }
-                            if (settingsModel.timerBigStartButton) {
-                                LargeFloatingActionButton(
-                                    shape = CircleShape,
-                                    onClick = startTimer
-                                ) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                }
-                            } else {
-                                FilledIconButton(
-                                    modifier = Modifier.size(48.dp),
-                                    onClick = startTimer
-                                ) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                }
+                        } else {
+                            FilledIconButton(
+                                modifier = Modifier.size(48.dp),
+                                onClick = startTimer
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null)
                             }
                         }
                     }
                 }
             }
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = 16.dp)
+            ) {
+                if (activeTimers.isNotEmpty()) {
+                    item(key = "activeTimers") {
+                        Column(
+                            modifier = Modifier
+                                .animateItem(ItemFade, ItemSlide, ItemFade)
+                                .padding(horizontal = 16.dp)
+                        ) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            SettingsCategory(
+                                pluralStringResource(R.plurals.active_timers, activeTimers.size)
+                            ) {
+                                ClickableIcon(
+                                    imageVector = if (showPicker) {
+                                        Icons.Rounded.ExpandLess
+                                    } else {
+                                        Icons.Rounded.ExpandMore
+                                    },
+                                    contentDescription = stringResource(
+                                        if (showPicker) {
+                                            R.string.hide_timer_picker
+                                        } else {
+                                            R.string.show_timer_picker
+                                        }
+                                    )
+                                ) {
+                                    showPicker = !showPicker
+                                }
+                            }
+                        }
+                    }
+                    items(activeTimers, key = { it.id }) { timer ->
+                        TimerItem(
+                            obj = timer,
+                            timerModel = timerModel,
+                            onEdit = { editedTimer = timer },
+                            modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)
+                        )
+                    }
+                }
 
-            if (activeTimers.isNotEmpty()) {
-                item(key = "activeTimers") {
+                item(key = "savedTimers") {
                     Column(
                         modifier = Modifier
                             .animateItem(ItemFade, ItemSlide, ItemFade)
@@ -181,86 +223,45 @@ fun TimerScreen(
                             color = MaterialTheme.colorScheme.surfaceVariant
                         )
                         SettingsCategory(
-                            pluralStringResource(R.plurals.active_timers, activeTimers.size)
+                            pluralStringResource(R.plurals.saved_timers, timerModel.savedTimers.size)
                         ) {
-                            ClickableIcon(
-                                imageVector = if (showPicker) {
-                                    Icons.Rounded.ExpandLess
-                                } else {
-                                    Icons.Rounded.ExpandMore
-                                },
-                                contentDescription = stringResource(
-                                    if (showPicker) {
-                                        R.string.hide_timer_picker
-                                    } else {
-                                        R.string.show_timer_picker
-                                    }
-                                )
-                            ) {
-                                showPicker = !showPicker
+                            if (!isSelectionMode) {
+                                ClickableIcon(
+                                    imageVector = Icons.Rounded.AddAlarm,
+                                    contentDescription = stringResource(R.string.add_saved_timer)
+                                ) {
+                                    timerModel.addSavedTimer(timerModel.timePickerSeconds)
+                                }
                             }
                         }
                     }
                 }
-                items(activeTimers, key = { it.id }) { timer ->
-                    TimerItem(
-                        obj = timer,
-                        timerModel = timerModel,
-                        onEdit = { editedTimer = timer },
+                items(timerModel.savedTimers, key = { it.id }) { timer ->
+                    val isSelected = selectedSavedTimerIds.contains(timer.id)
+
+                    SavedTimerItem(
+                        timer = timer,
+                        isSelected = isSelected,
+                        onStart = {
+                            if (!isSelectionMode) timerModel.startTimer(context, timer)
+                        },
+                        onClick = {
+                            if (isSelectionMode) {
+                                if (isSelected) {
+                                    selectedSavedTimerIds.remove(timer.id)
+                                } else {
+                                    selectedSavedTimerIds.add(timer.id)
+                                }
+                            } else {
+                                editedSavedTimerId = timer.id
+                            }
+                        },
+                        onLongClick = {
+                            if (!isSelectionMode) selectedSavedTimerIds.add(timer.id)
+                        },
                         modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)
                     )
                 }
-            }
-
-            item(key = "savedTimers") {
-                Column(
-                    modifier = Modifier
-                        .animateItem(ItemFade, ItemSlide, ItemFade)
-                        .padding(horizontal = 16.dp)
-                ) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                    SettingsCategory(
-                        pluralStringResource(R.plurals.saved_timers, timerModel.savedTimers.size)
-                    ) {
-                        if (!isSelectionMode) {
-                            ClickableIcon(
-                                imageVector = Icons.Rounded.AddAlarm,
-                                contentDescription = stringResource(R.string.add_saved_timer)
-                            ) {
-                                timerModel.addSavedTimer(timerModel.timePickerSeconds)
-                            }
-                        }
-                    }
-                }
-            }
-            items(timerModel.savedTimers, key = { it.id }) { timer ->
-                val isSelected = selectedSavedTimerIds.contains(timer.id)
-
-                SavedTimerItem(
-                    timer = timer,
-                    isSelected = isSelected,
-                    onStart = {
-                        if (!isSelectionMode) timerModel.startTimer(context, timer)
-                    },
-                    onClick = {
-                        if (isSelectionMode) {
-                            if (isSelected) {
-                                selectedSavedTimerIds.remove(timer.id)
-                            } else {
-                                selectedSavedTimerIds.add(timer.id)
-                            }
-                        } else {
-                            editedSavedTimerId = timer.id
-                        }
-                    },
-                    onLongClick = {
-                        if (!isSelectionMode) selectedSavedTimerIds.add(timer.id)
-                    },
-                    modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)
-                )
             }
         }
     }
