@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.rounded.MoreTime
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.PickerStyle
+import com.bnyro.clock.domain.model.TimerPickerBehaviour
 import com.bnyro.clock.domain.model.VolumeButtonAction
 import com.bnyro.clock.navigation.NavRoutes
 import com.bnyro.clock.navigation.homeRoutes
@@ -68,6 +70,12 @@ fun SettingsScreen(
         rememberTopAppBarState()
     )
     var showAlarmTimeoutDialog by remember { mutableStateOf(false) }
+    var showTimerIncrementDialog by remember { mutableStateOf(false) }
+    var timerIncrementSeconds by remember {
+        mutableIntStateOf(
+            Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60)
+        )
+    }
     var alarmTimeoutMinutes by remember {
         mutableIntStateOf(
             Preferences.instance.getInt(
@@ -289,6 +297,43 @@ fun SettingsScreen(
                 Preferences.edit { putString(Preferences.timerPickerStyleKey, it.name) }
             }
 
+            ButtonGroupPref(
+                title = stringResource(R.string.timer_picker_behaviour),
+                options = TimerPickerBehaviour.entries.map {
+                    stringResource(
+                        when (it) {
+                            TimerPickerBehaviour.KEEP_OPEN -> R.string.picker_keep_open
+                            TimerPickerBehaviour.HIDE -> R.string.picker_hide
+                        }
+                    )
+                },
+                values = TimerPickerBehaviour.entries,
+                currentValue = settingsModel.timerPickerBehaviour
+            ) {
+                settingsModel.timerPickerBehaviour = it
+                Preferences.edit { putString(Preferences.timerPickerBehaviourKey, it.name) }
+            }
+
+            SwitchPref(
+                prefKey = Preferences.timerBigStartButtonKey,
+                title = stringResource(R.string.timer_use_big_start),
+                defaultValue = true
+            ) {
+                settingsModel.timerBigStartButton = it
+            }
+
+            IconPreference(
+                title = stringResource(R.string.timer_increment),
+                summary = pluralStringResource(
+                    R.plurals.seconds_count,
+                    timerIncrementSeconds,
+                    timerIncrementSeconds
+                ),
+                imageVector = Icons.Rounded.MoreTime
+            ) {
+                showTimerIncrementDialog = true
+            }
+
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
@@ -354,6 +399,22 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.surfaceVariant
             )
         }
+    }
+    if (showTimerIncrementDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showTimerIncrementDialog = false },
+            title = stringResource(R.string.select_timer_increment),
+            unit = stringResource(R.string.seconds),
+            value = timerIncrementSeconds,
+            maxValue = 60,
+            offset = 1,
+            label = { it.toString() },
+            onValueSet = {
+                timerIncrementSeconds = it
+                Preferences.edit { putInt(Preferences.timerIncrementSecondsKey, it) }
+                showTimerIncrementDialog = false
+            }
+        )
     }
     if (showAlarmTimeoutDialog) {
         ScrollPickerDialog(

@@ -32,7 +32,7 @@ class TimerModel : ViewModel() {
         }
     )
 
-    var timePickerSeconds by mutableStateOf(0)
+    var timePickerSeconds by mutableStateOf(60)
 
     fun onChangeTimers(objects: Array<TimerObject>) {
         _timerObjects.value = listOf(*objects)
@@ -83,55 +83,19 @@ class TimerModel : ViewModel() {
         context.startService(intent)
     }
 
-    fun pauseResumeTimer(context: Context, index: Int) {
-        val pauseResumeIntent = Intent(TimerService.UPDATE_STATE_ACTION)
-            .putExtra(
-                TimerService.ID_EXTRA_KEY,
-                index
-            )
-            .putExtra(
-                TimerService.ACTION_EXTRA_KEY,
-                TimerService.ACTION_PAUSE_RESUME
-            )
-        context.sendBroadcast(pauseResumeIntent)
+    fun pauseResumeTimer(context: Context, id: Int) {
+        context.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_PAUSE_RESUME, id))
     }
 
-    fun stopTimer(context: Context, index: Int) {
-        val stopIntent = Intent(TimerService.UPDATE_STATE_ACTION)
-            .putExtra(
-                TimerService.ID_EXTRA_KEY,
-                index
-            )
-            .putExtra(
-                TimerService.ACTION_EXTRA_KEY,
-                TimerService.ACTION_STOP
-            )
-        context.sendBroadcast(stopIntent)
+    fun stopTimer(context: Context, id: Int) {
+        context.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_STOP, id))
     }
 
-    fun addMinuteToTimer(context: Context, index: Int) {
-        val addMinuteIntent = Intent(TimerService.UPDATE_STATE_ACTION)
-            .putExtra(
-                TimerService.ID_EXTRA_KEY,
-                index
-            )
-            .putExtra(
-                TimerService.ACTION_EXTRA_KEY,
-                TimerService.ACTION_ADD_MINUTE
-            )
-        context.sendBroadcast(addMinuteIntent)
+    fun addTimeToTimer(context: Context, id: Int) {
+        context.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_ADD_TIME, id))
     }
 
-    fun restartTimer(context: Context, index: Int) {
-        val restartIntent = Intent(TimerService.UPDATE_STATE_ACTION)
-            .putExtra(
-                TimerService.ID_EXTRA_KEY,
-                index
-            )
-            .putExtra(
-                TimerService.ACTION_EXTRA_KEY,
-                TimerService.TIMER_RESTART
-            )
-        context.sendBroadcast(restartIntent)
+    fun restartTimer(context: Context, id: Int) {
+        context.sendBroadcast(TimerService.updateStateIntent(TimerService.TIMER_RESTART, id))
     }
 }

@@ -21,10 +21,10 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.os.Vibrator
+import android.provider.AlarmClock
 import android.text.format.DateUtils
 import android.util.Log
 import androidx.annotation.RequiresApi
-import androidx.annotation.StringRes
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -37,6 +37,7 @@ import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.domain.model.WatchState
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.NotificationHelper
+import com.bnyro.clock.util.Preferences
 
 import java.util.Timer
 import java.util.TimerTask
@@ -104,6 +105,9 @@ class TimerService : Service() {
         }
     }
 
+    private val incrementSeconds
+        get() = Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60)
+
     private val receiver = object : BroadcastReceiver() {
         @RequiresApi(Build.VERSION_CODES.N)
         override fun onReceive(context: Context, intent: Intent) {
@@ -119,8 +123,8 @@ class TimerService : Service() {
                     if (obj.state.value == WatchState.PAUSED) resume(obj) else pause(obj)
                 }
 
-                ACTION_ADD_MINUTE -> {
-                    obj.currentPosition.value += 60000
+                ACTION_ADD_TIME -> {
+                    obj.currentPosition.value += incrementSeconds * 1000
                     if (obj.state.value == WatchState.RUNNING) {
                         cancelAlarm(obj)
                         scheduleAlarm(obj)
@@ -221,7 +225,9 @@ class TimerService : Service() {
         contentIntent = PendingIntent.getActivity(
             this,
             0,
-            Intent(this, MainActivity::class.java),
+            Intent(this, MainActivity::class.java)
+                .setAction(AlarmClock.ACTION_SHOW_TIMERS)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -239,7 +245,10 @@ class TimerService : Service() {
             }, 0, UPDATE_DELAY.toLong()
         )
         ContextCompat.registerReceiver(
-            this, receiver, IntentFilter(UPDATE_STATE_ACTION), ContextCompat.RECEIVER_EXPORTED
+            this,
+            receiver,
+            IntentFilter(UPDATE_STATE_ACTION).apply { addDataScheme(UPDATE_STATE_SCHEME) },
+            ContextCompat.RECEIVER_EXPORTED
         )
     }
 
@@ -299,39 +308,21 @@ class TimerService : Service() {
     private fun getNotification(timerObject: TimerObject) = NotificationCompat.Builder(
         this, NotificationHelper.TIMER_CHANNEL
     ).setContentTitle(
-        if (timerObject.state.value == WatchState.RUNNING) {
-            timerObject.label.value
-        } else {
-            getString(R.string.paused_timer_title, timerObject.label.value)
-        }
+        DateUtils.formatElapsedTime((timerObject.currentPosition.value / 1000).toLong())
     )
-        .setContentIntent(contentIntent)
-        .apply {
+        .setContentText(
             if (timerObject.state.value == WatchState.RUNNING) {
-                setUsesChronometer(true)
-                setWhen(System.currentTimeMillis() + timerObject.currentPosition.value)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    setChronometerCountDown(true)
-                } else {
-                    setContentText(
-                        DateUtils.formatElapsedTime(
-                            (timerObject.currentPosition.value / 1000).toLong()
-                        )
-                    )
-                }
+                timerObject.label.value
             } else {
-                setContentText(
-                    DateUtils.formatElapsedTime(
-                        (timerObject.currentPosition.value / 1000).toLong()
-                    )
-                )
-                setShowWhen(false)
+                getString(R.string.paused_timer_title, timerObject.label.value)
             }
-        }
+        )
+        .setContentIntent(contentIntent)
+        .setShowWhen(false)
         .addAction(pauseResumeAction(timerObject))
         .addAction(
             if (timerObject.state.value == WatchState.RUNNING) {
-                addMinuteAction(timerObject)
+                addTimeAction(timerObject)
             } else {
                 resetAction(timerObject)
             }
@@ -350,10 +341,10 @@ class TimerService : Service() {
 
         timerObjects.forEach {
             if (it.state.value == WatchState.RUNNING) {
-                it.currentPosition.value =
-                    (it.currentPosition.value - delta.toInt()).coerceAtLeast(0)
+                val before = it.currentPosition.value
+                it.currentPosition.value = (before - delta.toInt()).coerceAtLeast(0)
 
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+                if (before / 1000 != it.currentPosition.value / 1000) {
                     updateNotification(it)
                 }
             }
@@ -429,10 +420,7 @@ class TimerService : Service() {
         val notificationChannelId = NotificationHelper.TIMER_FINISHED_CHANNEL
         val finishedNotificationId = (Integer.MAX_VALUE / 3) + timerObject.id * 10
 
-        val stopIntent = Intent(UPDATE_STATE_ACTION).apply {
-            putExtra(ACTION_EXTRA_KEY, ACTION_STOP)
-            putExtra(ID_EXTRA_KEY, timerObject.id)
-        }
+        val stopIntent = updateStateIntent(ACTION_STOP, timerObject.id)
         val stopPendingIntent = PendingIntent.getBroadcast(
             this,
             finishedNotificationId,
@@ -443,10 +431,7 @@ class TimerService : Service() {
             null, getString(R.string.stop), stopPendingIntent
         ).build()
 
-        val restartIntent = Intent(UPDATE_STATE_ACTION).apply {
-            putExtra(ACTION_EXTRA_KEY, TIMER_RESTART)
-            putExtra(ID_EXTRA_KEY, timerObject.id)
-        }
+        val restartIntent = updateStateIntent(TIMER_RESTART, timerObject.id)
         val restartPendingIntent = PendingIntent.getBroadcast(
             this,
             finishedNotificationId + 2,
@@ -459,10 +444,7 @@ class TimerService : Service() {
 
         cancelAlarm(timerObject)
 
-        val deleteIntent = Intent(UPDATE_STATE_ACTION).apply {
-            putExtra(ACTION_EXTRA_KEY, ACTION_STOP)
-            putExtra(ID_EXTRA_KEY, timerObject.id)
-        }
+        val deleteIntent = updateStateIntent(ACTION_STOP, timerObject.id)
         val deletePendingIntent = PendingIntent.getBroadcast(
             this, finishedNotificationId + 1, deleteIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -488,33 +470,40 @@ class TimerService : Service() {
     private fun pauseResumeAction(timerObject: TimerObject): NotificationCompat.Action {
         val text =
             if (timerObject.state.value == WatchState.PAUSED) R.string.resume else R.string.pause
-        return getAction(text, ACTION_PAUSE_RESUME, 5, timerObject.id)
+        return getAction(getString(text), ACTION_PAUSE_RESUME, 5, timerObject.id)
     }
 
     private fun getAction(
-        @StringRes stringRes: Int, action: String, requestCode: Int, objectId: Int
+        label: String, action: String, requestCode: Int, objectId: Int
     ): NotificationCompat.Action {
-        val intent = Intent(UPDATE_STATE_ACTION).putExtra(ACTION_EXTRA_KEY, action)
-            .putExtra(ID_EXTRA_KEY, objectId)
         val pendingIntent = PendingIntent.getBroadcast(
             this,
             requestCode + objectId,
-            intent,
+            updateStateIntent(action, objectId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        return NotificationCompat.Action.Builder(null, getString(stringRes), pendingIntent).build()
+        return NotificationCompat.Action.Builder(null, label, pendingIntent).build()
     }
 
     private fun stopAction(timerObject: TimerObject) = getAction(
-        R.string.stop, ACTION_STOP, 4, timerObject.id
+        getString(R.string.stop), ACTION_STOP, 4, timerObject.id
     )
 
     private fun resetAction(timerObject: TimerObject) = getAction(
-        R.string.timer_reset, TIMER_RESTART, 7, timerObject.id
+        getString(R.string.timer_reset), TIMER_RESTART, 7, timerObject.id
     )
 
-    private fun addMinuteAction(timerObject: TimerObject) = getAction(
-        R.string.add_one_minute, ACTION_ADD_MINUTE, 6, timerObject.id
+    private fun addTimeAction(timerObject: TimerObject) = getAction(
+        incrementSeconds.let { seconds ->
+            if (seconds == 60) {
+                getString(R.string.add_one_minute)
+            } else {
+                resources.getQuantityString(R.plurals.add_seconds, seconds, seconds)
+            }
+        },
+        ACTION_ADD_TIME,
+        6,
+        timerObject.id
     )
 
     fun updateTimer(id: Int, settings: TimerSettings) {
@@ -555,7 +544,14 @@ class TimerService : Service() {
         const val ACTION_STOP = "stop"
         private const val UPDATE_DELAY = 100
         const val TIMER_RESTART = "timer_restart"
-        const val ACTION_ADD_MINUTE = "add_minute"
+        const val ACTION_ADD_TIME = "add_time"
+        const val UPDATE_STATE_SCHEME = "jaytimer"
+
+        fun updateStateIntent(action: String, objectId: Int): Intent =
+            Intent(UPDATE_STATE_ACTION)
+                .setData("$UPDATE_STATE_SCHEME://$objectId/$action".toUri())
+                .putExtra(ACTION_EXTRA_KEY, action)
+                .putExtra(ID_EXTRA_KEY, objectId)
         const val ACTION_TIMER_EXPIRED = "com.bnyro.clock.TIMER_EXPIRED"
     }
 }
