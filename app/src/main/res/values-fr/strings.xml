@@ -120,7 +120,6 @@
     <string name="show_widget_background">Afficher l\'arrière-plan du widget</string>
     <string name="show_time">Afficher l\'heure</string>
     <string name="delete_alarms">Supprimer des alarmes</string>
-    <string name="add_5_minutes">5 min</string>
     <string name="timer_restart">Redémarrer</string>
     <string name="altname">Horloge</string>
     <string name="battery_optimization_title">Désactiver les optimisations de la batterie</string>

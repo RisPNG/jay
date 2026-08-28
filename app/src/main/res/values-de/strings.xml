@@ -119,7 +119,6 @@
     <string name="alarm_permission_description">Um Sie rechtzeitig aufzuwecken braucht Clock You die Erlaubnis, Wecker zu planen.</string>
     <string name="alarm_permission_title">Alarmberechtigung</string>
     <string name="snooze_minutes">%d Minuten schlummern</string>
-    <string name="add_5_minutes">5 Min</string>
     <string name="timer_restart">Neustart</string>
     <string name="show_clock_bottom_tab">Elemente umschalten</string>
     <string name="altname">Uhr</string>

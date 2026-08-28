@@ -113,7 +113,6 @@
     <string name="subtract_minutes">减少 %d 分钟</string>
     <string name="date_text_color">日期文本颜色</string>
     <string name="time_text_color">时间文本颜色</string>
-    <string name="add_5_minutes">5 分钟</string>
     <string name="timer_restart">重启</string>
     <string name="show_clock_bottom_tab">切换项目</string>
     <string name="altname">时钟</string>
@@ -130,8 +129,6 @@
     <string name="importdescr">从 Fossify 导入闹钟</string>
     <string name="upcoming_alarm">预定的闹钟</string>
     <string name="upcoming_alarm_content">将在 %1$s 响起</string>
-    <string name="running_named_timer">%1$s 定时器正在运行</string>
-    <string name="paused_named_timer">%1$s 定时器已暂停</string>
     <string name="finished_named_timer">%1$s 定时器已结束</string>
     <string name="running_stopwatch">秒表正在运行</string>
     <string name="paused_stopwatch">秒表已暂停</string>

@@ -126,7 +126,6 @@
     <string name="time_text_color">Колір тексту часу</string>
     <string name="date_text_color">Колір тексту дати</string>
     <string name="delete_alarms">Видалити будильник(-и)</string>
-    <string name="add_5_minutes">5 хв</string>
     <string name="timer_restart">Перезапустити</string>
     <string name="show_clock_bottom_tab">Перемкнути елементи</string>
     <string name="altname">Годинник</string>

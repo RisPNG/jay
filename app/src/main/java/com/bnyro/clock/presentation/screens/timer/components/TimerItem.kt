@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -156,6 +157,10 @@ fun TimerItem(
                         horizontalArrangement = Arrangement.spacedBy((-10).dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        ClickableIcon(imageVector = Icons.Default.MoreTime) {
+                            timerModel.addMinuteToTimer(context, obj.id)
+                        }
+
                         ClickableIcon(imageVector = Icons.Default.Refresh) {
                             timerModel.restartTimer(context, obj.id)
                         }

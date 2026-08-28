@@ -54,7 +54,6 @@
     <string name="same_time">نفس الوقت</string>
     <string name="repeat">تكرار</string>
     <string name="timer_restart">إعادة البدء</string>
-    <string name="add_5_minutes">٥ دقائق</string>
     <string name="show_clock_bottom_tab">عناصر التبديل</string>
     <string name="altname">الساعة</string>
     <plurals name="hour_minute_offset_negative">
@@ -191,8 +190,6 @@
     <string name="number_pad">لوحة الأرقام</string>
     <string name="paused_stopwatch">ساعة التوقيف مُتوقفة مؤقتًا</string>
     <string name="running_stopwatch">ساعة التوقيف قيد التشغيل</string>
-    <string name="running_named_timer">مؤقت %1$s قيد التشغيل</string>
-    <string name="paused_named_timer">مؤقت %1$s مُتوقف مؤقتًا</string>
     <string name="finished_named_timer">انتهى مؤقت %1$s</string>
     <plurals name="alarm_rang_for_minutes">
         <item quantity="zero">أنه رن لمدة %d دقيقة</item>
