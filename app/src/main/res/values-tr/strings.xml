@@ -121,7 +121,6 @@
     <string name="date_text_color">Tarih metni rengi</string>
     <string name="time_text_color">Zaman metni rengi</string>
     <string name="delete_alarms">Alarm(lar)ı sil</string>
-    <string name="add_5_minutes">5 Dak</string>
     <string name="timer_restart">Yeniden başlat</string>
     <string name="show_clock_bottom_tab">Ögeleri değiştir</string>
     <string name="altname">Saat</string>

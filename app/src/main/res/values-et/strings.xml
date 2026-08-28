@@ -120,7 +120,6 @@
     <string name="subtract_minutes">Vähenda %d minuti võrra</string>
     <string name="time_text_color">Kellaaja teksti värv</string>
     <string name="date_text_color">Kuupäeva teksti värv</string>
-    <string name="add_5_minutes">Lisa 5 min</string>
     <string name="timer_restart">Käivita uuesti</string>
     <string name="show_clock_bottom_tab">Lülita objektid sisse/välja</string>
     <string name="altname">Kell</string>

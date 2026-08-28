@@ -109,6 +109,19 @@ class TimerModel : ViewModel() {
         context.sendBroadcast(stopIntent)
     }
 
+    fun addMinuteToTimer(context: Context, index: Int) {
+        val addMinuteIntent = Intent(TimerService.UPDATE_STATE_ACTION)
+            .putExtra(
+                TimerService.ID_EXTRA_KEY,
+                index
+            )
+            .putExtra(
+                TimerService.ACTION_EXTRA_KEY,
+                TimerService.ACTION_ADD_MINUTE
+            )
+        context.sendBroadcast(addMinuteIntent)
+    }
+
     fun restartTimer(context: Context, index: Int) {
         val restartIntent = Intent(TimerService.UPDATE_STATE_ACTION)
             .putExtra(

@@ -119,8 +119,12 @@ class TimerService : Service() {
                     if (obj.state.value == WatchState.PAUSED) resume(obj) else pause(obj)
                 }
 
-                ACTION_ADD_5_MIN -> {
-                    obj.currentPosition.value += 300000
+                ACTION_ADD_MINUTE -> {
+                    obj.currentPosition.value += 60000
+                    if (obj.state.value == WatchState.RUNNING) {
+                        cancelAlarm(obj)
+                        scheduleAlarm(obj)
+                    }
                     updateNotification(obj)
                 }
 
@@ -295,14 +299,11 @@ class TimerService : Service() {
     private fun getNotification(timerObject: TimerObject) = NotificationCompat.Builder(
         this, NotificationHelper.TIMER_CHANNEL
     ).setContentTitle(
-        getString(
-            if (timerObject.state.value == WatchState.RUNNING) {
-                R.string.running_named_timer
-            } else {
-                R.string.paused_named_timer
-            },
+        if (timerObject.state.value == WatchState.RUNNING) {
             timerObject.label.value
-        )
+        } else {
+            getString(R.string.paused_timer_title, timerObject.label.value)
+        }
     )
         .setContentIntent(contentIntent)
         .apply {
@@ -327,9 +328,16 @@ class TimerService : Service() {
                 setShowWhen(false)
             }
         }
-        .addAction(stopAction(timerObject)).addAction(pauseResumeAction(timerObject))
-        .addAction(restarttimer(timerObject)).addAction(add5MinAction(timerObject))
-        .setSmallIcon(R.drawable.ic_notification).setOngoing(true).build()
+        .addAction(pauseResumeAction(timerObject))
+        .addAction(
+            if (timerObject.state.value == WatchState.RUNNING) {
+                addMinuteAction(timerObject)
+            } else {
+                resetAction(timerObject)
+            }
+        )
+        .addAction(stopAction(timerObject))
+        .setSmallIcon(R.drawable.ic_timer).setOngoing(true).build()
 
     fun invokeChangeListener() {
         onChangeTimers.invoke(timerObjects.toTypedArray())
@@ -460,7 +468,7 @@ class TimerService : Service() {
         )
 
         val notification = NotificationCompat.Builder(this, notificationChannelId)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_timer)
             .setSilent(true)
             .setContentTitle(getString(R.string.finished_named_timer, timerObject.label.value))
             .setContentIntent(contentIntent)
@@ -501,12 +509,12 @@ class TimerService : Service() {
         R.string.stop, ACTION_STOP, 4, timerObject.id
     )
 
-    private fun restarttimer(timerObject: TimerObject) = getAction(
-        R.string.timer_restart, TIMER_RESTART, 7, timerObject.id
+    private fun resetAction(timerObject: TimerObject) = getAction(
+        R.string.timer_reset, TIMER_RESTART, 7, timerObject.id
     )
 
-    private fun add5MinAction(timerObject: TimerObject) = getAction(
-        R.string.add_5_minutes, ACTION_ADD_5_MIN, 6, timerObject.id
+    private fun addMinuteAction(timerObject: TimerObject) = getAction(
+        R.string.add_one_minute, ACTION_ADD_MINUTE, 6, timerObject.id
     )
 
     fun updateTimer(id: Int, settings: TimerSettings) {
@@ -547,7 +555,7 @@ class TimerService : Service() {
         const val ACTION_STOP = "stop"
         private const val UPDATE_DELAY = 100
         const val TIMER_RESTART = "timer_restart"
-        const val ACTION_ADD_5_MIN = "add_5_min"
+        const val ACTION_ADD_MINUTE = "add_minute"
         const val ACTION_TIMER_EXPIRED = "com.bnyro.clock.TIMER_EXPIRED"
     }
 }

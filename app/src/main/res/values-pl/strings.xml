@@ -126,7 +126,6 @@
     <string name="select_vibration_pattern">Wybierz wzór wibracji</string>
     <string name="digital_clock_widget">Widżet zegara cyfrowego</string>
     <string name="delete_alarms">Usuń alarm(y)</string>
-    <string name="add_5_minutes">5 minut</string>
     <string name="timer_restart">Uruchom ponownie</string>
     <string name="show_clock_bottom_tab">Wybrane zakładki</string>
     <string name="altname">Zegar</string>
@@ -142,8 +141,6 @@
     <string name="importdescr">Importuj alarmy z Fossify</string>
     <string name="upcoming_alarm">Nadchodzący alarm</string>
     <string name="upcoming_alarm_content">Włączy się o %1$s</string>
-    <string name="running_named_timer">Minutnik %1$s jest uruchomiony</string>
-    <string name="paused_named_timer">Minutnik (%1$s) jest wstrzymany</string>
     <string name="finished_named_timer">Minutnik %1$s zakończył odliczanie</string>
     <string name="running_stopwatch">Stoper uruchomiony</string>
     <string name="paused_stopwatch">Stoper wstrzymany</string>

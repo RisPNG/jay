@@ -121,7 +121,6 @@
     <string name="add_minutes">Přidat %d minut</string>
     <string name="date_text_color">Barva textu data</string>
     <string name="time_text_color">Barva textu času</string>
-    <string name="add_5_minutes">5 min</string>
     <string name="timer_restart">Restart</string>
     <string name="altname">Hodiny</string>
     <string name="all_done_permission">Zkontrolujte to ještě jednou!</string>
