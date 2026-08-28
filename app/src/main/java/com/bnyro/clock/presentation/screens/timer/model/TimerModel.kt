@@ -38,17 +38,21 @@ class TimerModel : ViewModel() {
         _timerObjects.value = listOf(*objects)
     }
 
-    fun removeSavedTimer(index: Int) {
-        savedTimers = savedTimers.filterIndexed { i, _ -> i != index }
+    fun removeSavedTimer(id: Int) {
+        savedTimers = savedTimers.filter { it.id != id }
     }
 
     fun addSavedTimer(seconds: Int) {
         if (seconds == 0) return
-        savedTimers = (savedTimers + TimerSettings(seconds)).distinct()
+        val newTimer = TimerSettings(seconds = seconds)
+        if (savedTimers.any { it.copy(id = 0) == newTimer }) return
+        savedTimers = savedTimers + newTimer.copy(
+            id = (savedTimers.maxOfOrNull { it.id } ?: 0) + 1
+        )
     }
 
-    fun updateSavedTimer(index: Int, settings: TimerSettings) {
-        savedTimers = savedTimers.mapIndexed { i, timer -> if (i == index) settings else timer }
+    fun updateSavedTimer(settings: TimerSettings) {
+        savedTimers = savedTimers.map { if (it.id == settings.id) settings else it }
     }
 
     fun startTimer(context: Context, settings: TimerSettings) {

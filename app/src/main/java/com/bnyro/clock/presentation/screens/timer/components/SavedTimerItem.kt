@@ -25,13 +25,18 @@ import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.util.extensions.addZero
 
 @Composable
-fun SavedTimerItem(timer: TimerSettings, onStart: () -> Unit, onEdit: () -> Unit) {
+fun SavedTimerItem(
+    timer: TimerSettings,
+    onStart: () -> Unit,
+    onEdit: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val hours = timer.seconds / 3600
     val minutes = timer.seconds % 3600 / 60
     val seconds = timer.seconds % 60
 
     ElevatedCard(
-        modifier = Modifier
+        modifier = modifier
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .clickable(onClick = onEdit),
         shape = RoundedCornerShape(20.dp),
