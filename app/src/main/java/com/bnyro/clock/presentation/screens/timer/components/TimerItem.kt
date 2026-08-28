@@ -43,7 +43,12 @@ import com.bnyro.clock.util.extensions.addZero
 import java.time.ZonedDateTime
 
 @Composable
-fun TimerItem(obj: TimerObject, timerModel: TimerModel, onEdit: () -> Unit) {
+fun TimerItem(
+    obj: TimerObject,
+    timerModel: TimerModel,
+    onEdit: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
     val isFinished = obj.currentPosition.value <= 0
     val hours = obj.currentPosition.value / 3600000
@@ -51,7 +56,7 @@ fun TimerItem(obj: TimerObject, timerModel: TimerModel, onEdit: () -> Unit) {
     val seconds = (obj.currentPosition.value % 60000) / 1000
 
     ElevatedCard(
-        modifier = Modifier
+        modifier = modifier
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .clickable(onClick = onEdit),
         shape = RoundedCornerShape(20.dp),

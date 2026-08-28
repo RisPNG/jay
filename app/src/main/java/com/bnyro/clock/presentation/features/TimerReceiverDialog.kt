@@ -39,7 +39,7 @@ fun TimerReceiverDialog(duration: Int) {
             },
             confirmButton = {
                 DialogButton(R.string.start, DialogButtonStyle.PRIMARY) {
-                    timerModel.startTimer(context, TimerSettings(duration))
+                    timerModel.startTimer(context, TimerSettings(seconds = duration))
                     showDialog = false
                 }
             },

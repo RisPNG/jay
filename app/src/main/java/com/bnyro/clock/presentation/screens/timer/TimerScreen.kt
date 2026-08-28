@@ -1,5 +1,7 @@
 package com.bnyro.clock.presentation.screens.timer
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -28,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.TimerObject
@@ -43,6 +45,9 @@ import com.bnyro.clock.presentation.screens.timer.components.TimerPickerSelector
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import com.bnyro.clock.util.extensions.KeepScreenOn
 
+private val CARD_FADE = tween<Float>(durationMillis = 120, easing = FastOutSlowInEasing)
+private val SECTION_SLIDE = tween<IntOffset>(durationMillis = 220, easing = FastOutSlowInEasing)
+
 @Composable
 fun TimerScreen(
     onClickSettings: () -> Unit, timerModel: TimerModel, settingsModel: SettingsModel
@@ -51,7 +56,7 @@ fun TimerScreen(
     val activeTimers by timerModel.scheduledObjects.collectAsState()
 
     var editedTimer by remember { mutableStateOf<TimerObject?>(null) }
-    var editedSavedTimerIndex by remember { mutableStateOf<Int?>(null) }
+    var editedSavedTimerId by remember { mutableStateOf<Int?>(null) }
 
     TopBarScaffold(
         title = stringResource(R.string.timer),
@@ -63,35 +68,41 @@ fun TimerScreen(
                 .padding(paddingValues),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            item {
-                TimerPickerSelector(
-                    pickerStyle = settingsModel.timerPickerStyle,
-                    seconds = timerModel.timePickerSeconds,
-                    onSecondsChanged = { timerModel.timePickerSeconds = it }
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    LargeFloatingActionButton(
-                        shape = CircleShape,
-                        onClick = {
-                            timerModel.startTimer(
-                                context,
-                                TimerSettings(timerModel.timePickerSeconds)
-                            )
-                        }
+            item(key = "picker") {
+                Column {
+                    TimerPickerSelector(
+                        pickerStyle = settingsModel.timerPickerStyle,
+                        seconds = timerModel.timePickerSeconds,
+                        onSecondsChanged = { timerModel.timePickerSeconds = it }
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        LargeFloatingActionButton(
+                            shape = CircleShape,
+                            onClick = {
+                                timerModel.startTimer(
+                                    context,
+                                    TimerSettings(seconds = timerModel.timePickerSeconds)
+                                )
+                            }
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        }
                     }
                 }
             }
 
             if (activeTimers.isNotEmpty()) {
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                item(key = "activeTimers") {
+                    Column(
+                        modifier = Modifier
+                            .animateItem(CARD_FADE, SECTION_SLIDE, CARD_FADE)
+                            .padding(horizontal = 16.dp)
+                    ) {
                         HorizontalDivider(
                             modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant
@@ -102,12 +113,21 @@ fun TimerScreen(
                     }
                 }
                 items(activeTimers, key = { it.id }) { timer ->
-                    TimerItem(timer, timerModel, onEdit = { editedTimer = timer })
+                    TimerItem(
+                        obj = timer,
+                        timerModel = timerModel,
+                        onEdit = { editedTimer = timer },
+                        modifier = Modifier.animateItem(CARD_FADE, SECTION_SLIDE, CARD_FADE)
+                    )
                 }
             }
 
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            item(key = "savedTimers") {
+                Column(
+                    modifier = Modifier
+                        .animateItem(CARD_FADE, SECTION_SLIDE, CARD_FADE)
+                        .padding(horizontal = 16.dp)
+                ) {
                     HorizontalDivider(
                         modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant
@@ -124,11 +144,12 @@ fun TimerScreen(
                     }
                 }
             }
-            itemsIndexed(timerModel.savedTimers) { index, timer ->
+            items(timerModel.savedTimers, key = { it.id }) { timer ->
                 SavedTimerItem(
                     timer = timer,
                     onStart = { timerModel.startTimer(context, timer) },
-                    onEdit = { editedSavedTimerIndex = index }
+                    onEdit = { editedSavedTimerId = timer.id },
+                    modifier = Modifier.animateItem(CARD_FADE, SECTION_SLIDE, CARD_FADE)
                 )
             }
         }
@@ -150,19 +171,19 @@ fun TimerScreen(
         )
     }
 
-    editedSavedTimerIndex?.let { index ->
+    editedSavedTimerId?.let { id ->
         TimerEditSheet(
-            currentTimer = timerModel.savedTimers[index],
+            currentTimer = timerModel.savedTimers.first { it.id == id },
             pickerStyle = settingsModel.timerPickerStyle,
             onSave = { settings ->
-                timerModel.updateSavedTimer(index, settings)
-                editedSavedTimerIndex = null
+                timerModel.updateSavedTimer(settings)
+                editedSavedTimerId = null
             },
             onDelete = {
-                timerModel.removeSavedTimer(index)
-                editedSavedTimerIndex = null
+                timerModel.removeSavedTimer(id)
+                editedSavedTimerId = null
             },
-            onDismiss = { editedSavedTimerIndex = null }
+            onDismiss = { editedSavedTimerId = null }
         )
     }
 }
