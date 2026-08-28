@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -54,12 +55,14 @@ fun TimerItem(
     val hours = obj.currentPosition.value / 3600000
     val minutes = (obj.currentPosition.value % 3600000) / 60000
     val seconds = (obj.currentPosition.value % 60000) / 1000
+    val cardShape = RoundedCornerShape(20.dp)
 
     ElevatedCard(
         modifier = modifier
             .padding(horizontal = 12.dp, vertical = 6.dp)
+            .clip(cardShape)
             .clickable(onClick = onEdit),
-        shape = RoundedCornerShape(20.dp),
+        shape = cardShape,
         colors = CardDefaults.elevatedCardColors()
     ) {
         Column {
