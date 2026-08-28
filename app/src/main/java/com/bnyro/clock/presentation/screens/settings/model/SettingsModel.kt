@@ -65,12 +65,12 @@ class SettingsModel : ViewModel() {
         TimerPickerBehaviour.valueOf(
             Preferences.instance.getString(
                 Preferences.timerPickerBehaviourKey,
-                TimerPickerBehaviour.KEEP_OPEN.name
-            ) ?: TimerPickerBehaviour.KEEP_OPEN.name
+                TimerPickerBehaviour.HIDE.name
+            ) ?: TimerPickerBehaviour.HIDE.name
         )
     )
     var timerBigStartButton by mutableStateOf(
-        Preferences.instance.getBoolean(Preferences.timerBigStartButtonKey, true)
+        Preferences.instance.getBoolean(Preferences.timerBigStartButtonKey, false)
     )
     var alarmPickerStyle by mutableStateOf(
         PickerStyle.valueOf(

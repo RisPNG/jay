@@ -304,8 +304,8 @@ fun SettingsScreen(
                 options = TimerPickerBehaviour.entries.map {
                     stringResource(
                         when (it) {
-                            TimerPickerBehaviour.KEEP_OPEN -> R.string.picker_keep_open
                             TimerPickerBehaviour.HIDE -> R.string.picker_hide
+                            TimerPickerBehaviour.KEEP_OPEN -> R.string.picker_keep_open
                         }
                     )
                 },
@@ -319,7 +319,7 @@ fun SettingsScreen(
             SwitchPref(
                 prefKey = Preferences.timerBigStartButtonKey,
                 title = stringResource(R.string.timer_use_big_start),
-                defaultValue = true
+                defaultValue = false
             ) {
                 settingsModel.timerBigStartButton = it
             }
