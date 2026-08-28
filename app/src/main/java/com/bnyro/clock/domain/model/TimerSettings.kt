@@ -31,10 +31,10 @@ data class TimerSettings(
 ) : Parcelable {
     companion object {
         private val exampleTimers = listOf(
+            60 * 5,
             60 * 10,
             60 * 15,
-            60 * 30,
-            60 * 60
+            60 * 30
         ).mapIndexed { index, seconds -> TimerSettings(id = index + 1, seconds = seconds) }
 
         fun setSavedTimers(timers: List<TimerSettings>) {
