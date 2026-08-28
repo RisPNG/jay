@@ -19,7 +19,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
-import android.os.SystemClock
 import android.os.Vibrator
 import android.provider.AlarmClock
 import android.text.format.DateUtils
@@ -49,7 +48,7 @@ class TimerService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var isPlaying = false
-    private var oldnow = SystemClock.elapsedRealtime()
+    private var oldnow = System.currentTimeMillis()
     private val vibrator: Vibrator by lazy {
         getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
     }
@@ -308,7 +307,7 @@ class TimerService : Service() {
     private fun getNotification(timerObject: TimerObject) = NotificationCompat.Builder(
         this, NotificationHelper.TIMER_CHANNEL
     ).setContentTitle(
-        DateUtils.formatElapsedTime((timerObject.currentPosition.value / 1000).toLong())
+        DateUtils.formatElapsedTime(timerObject.secondsLeft.toLong())
     )
         .setContentText(
             if (timerObject.state.value == WatchState.RUNNING) {
@@ -341,10 +340,11 @@ class TimerService : Service() {
 
         timerObjects.forEach {
             if (it.state.value == WatchState.RUNNING) {
-                val before = it.currentPosition.value
-                it.currentPosition.value = (before - delta.toInt()).coerceAtLeast(0)
+                val before = it.secondsLeft
+                it.currentPosition.value =
+                    (it.currentPosition.value - delta.toInt()).coerceAtLeast(0)
 
-                if (before / 1000 != it.currentPosition.value / 1000) {
+                if (before != it.secondsLeft) {
                     updateNotification(it)
                 }
             }

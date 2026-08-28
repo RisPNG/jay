@@ -53,9 +53,9 @@ fun TimerItem(
 ) {
     val context = LocalContext.current
     val isFinished = obj.currentPosition.value <= 0
-    val hours = obj.currentPosition.value / 3600000
-    val minutes = (obj.currentPosition.value % 3600000) / 60000
-    val seconds = (obj.currentPosition.value % 60000) / 1000
+    val hours = obj.secondsLeft / 3600
+    val minutes = (obj.secondsLeft % 3600) / 60
+    val seconds = obj.secondsLeft % 60
     val cardShape = RoundedCornerShape(20.dp)
 
     ElevatedCard(
