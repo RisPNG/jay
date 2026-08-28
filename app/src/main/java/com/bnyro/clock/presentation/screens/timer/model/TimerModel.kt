@@ -51,6 +51,12 @@ class TimerModel : ViewModel() {
         )
     }
 
+    fun copySavedTimer(timer: TimerSettings) {
+        savedTimers = savedTimers + timer.copy(
+            id = (savedTimers.maxOfOrNull { it.id } ?: 0) + 1
+        )
+    }
+
     fun updateSavedTimer(settings: TimerSettings) {
         savedTimers = savedTimers.map { if (it.id == settings.id) settings else it }
     }

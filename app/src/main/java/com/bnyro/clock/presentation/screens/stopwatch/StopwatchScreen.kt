@@ -54,6 +54,8 @@ import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.WatchState
 import com.bnyro.clock.navigation.TopBarScaffold
 import com.bnyro.clock.presentation.screens.stopwatch.model.StopwatchModel
+import com.bnyro.clock.ui.theme.ItemFade
+import com.bnyro.clock.ui.theme.ItemSlide
 import com.bnyro.clock.util.extensions.KeepScreenOn
 import com.bnyro.clock.util.extensions.addZero
 import kotlinx.coroutines.CoroutineScope
@@ -152,11 +154,15 @@ private fun StopwatchController(
                 FloatingActionButton(
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     onClick = {
+                        val tableOverflows = timeStampsState.canScrollForward ||
+                            timeStampsState.canScrollBackward
                         stopwatchModel.onLapClicked()
-                        scope.launch {
-                            timeStampsState.scrollToItem(
-                                stopwatchModel.rememberedTimeStamps.size - 1
-                            )
+                        if (tableOverflows) {
+                            scope.launch {
+                                timeStampsState.scrollToItem(
+                                    stopwatchModel.rememberedTimeStamps.size - 1
+                                )
+                            }
                         }
                     }
                 ) {
@@ -222,7 +228,7 @@ private fun LapTable(
             .padding(16.dp),
         state = timeStampsState
     ) {
-        item {
+        item(key = "header") {
             Column {
                 Row {
                     Text(
@@ -247,9 +253,13 @@ private fun LapTable(
                 HorizontalDivider()
             }
         }
-        itemsIndexed(stopwatchModel.rememberedTimeStamps) { index, time ->
+        itemsIndexed(
+            items = stopwatchModel.rememberedTimeStamps,
+            key = { index, _ -> index }
+        ) { index, time ->
             Row(
                 modifier = Modifier
+                    .animateItem(ItemFade, ItemSlide, ItemFade)
                     .padding(vertical = 6.dp)
             ) {
                 Text(
