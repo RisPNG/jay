@@ -3,6 +3,7 @@ package com.bnyro.clock.util.services
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
@@ -304,30 +305,34 @@ class TimerService : Service() {
         return START_STICKY
     }
 
-    private fun getNotification(timerObject: TimerObject) = NotificationCompat.Builder(
-        this, NotificationHelper.TIMER_CHANNEL
-    ).setContentTitle(
-        DateUtils.formatElapsedTime(timerObject.secondsLeft.toLong())
-    )
-        .setContentText(
-            if (timerObject.state.value == WatchState.RUNNING) {
-                timerObject.label.value
-            } else {
-                getString(R.string.paused_timer_title, timerObject.label.value)
-            }
-        )
-        .setContentIntent(contentIntent)
-        .setShowWhen(false)
-        .addAction(pauseResumeAction(timerObject))
-        .addAction(
-            if (timerObject.state.value == WatchState.RUNNING) {
-                addTimeAction(timerObject)
-            } else {
-                resetAction(timerObject)
-            }
-        )
-        .addAction(stopAction(timerObject))
-        .setSmallIcon(R.drawable.ic_timer).setOngoing(true).build()
+    private fun getNotification(timerObject: TimerObject): Notification {
+        val timeLeft = DateUtils.formatElapsedTime(timerObject.secondsLeft.toLong())
+
+        return NotificationCompat.Builder(
+            this, NotificationHelper.TIMER_CHANNEL
+        ).setContentTitle(timeLeft)
+            .setShortCriticalText(timeLeft)
+            .setRequestPromotedOngoing(true)
+            .setContentText(
+                if (timerObject.state.value == WatchState.RUNNING) {
+                    timerObject.label.value
+                } else {
+                    getString(R.string.paused_timer_title, timerObject.label.value)
+                }
+            )
+            .setContentIntent(contentIntent)
+            .setShowWhen(false)
+            .addAction(pauseResumeAction(timerObject))
+            .addAction(
+                if (timerObject.state.value == WatchState.RUNNING) {
+                    addTimeAction(timerObject)
+                } else {
+                    resetAction(timerObject)
+                }
+            )
+            .addAction(stopAction(timerObject))
+            .setSmallIcon(R.drawable.ic_timer).setOngoing(true).build()
+    }
 
     fun invokeChangeListener() {
         onChangeTimers.invoke(timerObjects.toTypedArray())
