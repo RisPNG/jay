@@ -49,6 +49,7 @@ class AlarmService : Service() {
     private var currentAlarm: Alarm? = null
     private var occurrenceId: String? = null
     private var outcomeRecorded = false
+    private var alertScreenVisible = false
 
     val timer = Timer()
     private var volume: Float = 0.1f
@@ -74,7 +75,7 @@ class AlarmService : Service() {
                 stopSelf()
                 return
             }
-            when (intent?.getStringExtra(ACTION_EXTRA_KEY)) {
+            when (val action = intent?.getStringExtra(ACTION_EXTRA_KEY)) {
                 DISMISS_ACTION -> {
                     currentAlarm?.let {
                         outcomeRecorded = true
@@ -98,6 +99,15 @@ class AlarmService : Service() {
                     }
                     AlarmHelper.snooze(this@AlarmService, currentAlarm!!)
                     stopSelf()
+                }
+                ALERT_SHOWN_ACTION, ALERT_HIDDEN_ACTION -> {
+                    alertScreenVisible = action == ALERT_SHOWN_ACTION
+                    currentAlarm?.let {
+                        startForeground(
+                            notificationId,
+                            createNotification(this@AlarmService, it)
+                        )
+                    }
                 }
             }
         }
@@ -342,7 +352,8 @@ class AlarmService : Service() {
             priority = NotificationCompat.PRIORITY_MAX
             foregroundServiceBehavior = FOREGROUND_SERVICE_IMMEDIATE
             setCategory(NotificationCompat.CATEGORY_ALARM)
-            setFullScreenIntent(pendingIntent, true)
+            setSilent(alertScreenVisible)
+            if (!alertScreenVisible) setFullScreenIntent(pendingIntent, true)
             if (alarm.snoozeEnabled) {
                 val snoozeIntent = Intent(ALARM_INTENT_ACTION)
                     .putExtra(ACTION_EXTRA_KEY, SNOOZE_ACTION)
@@ -373,6 +384,8 @@ class AlarmService : Service() {
         const val ACTION_EXTRA_KEY = "action"
         const val DISMISS_ACTION = "DISMISS"
         const val SNOOZE_ACTION = "SNOOZE"
+        const val ALERT_SHOWN_ACTION = "ALERT_SHOWN"
+        const val ALERT_HIDDEN_ACTION = "ALERT_HIDDEN"
         const val CANCEL_SHARED_ALARM_INTENT_ACTION = "com.rispng.jay.CANCEL_SHARED_ALARM"
         const val EXTRA_OCCURRENCE_ID = "com.rispng.jay.ALARM_OCCURRENCE_ID"
         const val ALARM_TIMEOUT_MINUTES = 10

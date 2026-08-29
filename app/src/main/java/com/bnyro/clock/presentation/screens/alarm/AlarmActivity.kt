@@ -193,6 +193,24 @@ class AlarmActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    override fun onStart() {
+        super.onStart()
+        sendBroadcast(
+            Intent(AlarmService.ALARM_INTENT_ACTION)
+                .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.ALERT_SHOWN_ACTION)
+                .setPackage(packageName)
+        )
+    }
+
+    override fun onStop() {
+        sendBroadcast(
+            Intent(AlarmService.ALARM_INTENT_ACTION)
+                .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.ALERT_HIDDEN_ACTION)
+                .setPackage(packageName)
+        )
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
         sensorManager.registerListener(
