@@ -322,6 +322,7 @@ class TimerService : Service() {
             )
             .setContentIntent(contentIntent)
             .setShowWhen(false)
+            .setOnlyAlertOnce(true)
             .addAction(pauseResumeAction(timerObject))
             .addAction(
                 if (timerObject.state.value == WatchState.RUNNING) {
