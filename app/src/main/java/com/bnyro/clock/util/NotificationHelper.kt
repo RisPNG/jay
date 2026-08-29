@@ -13,11 +13,11 @@ import com.bnyro.clock.util.receivers.DeleteNotificationChannelReceiver
 object NotificationHelper {
     const val STOPWATCH_CHANNEL = "stopwatch"
     const val TIMER_CHANNEL = "timer"
-    const val TIMER_FINISHED_CHANNEL = "timer_finished"
-    const val ALARM_CHANNEL = "alarm"
+    const val TIMER_FINISHED_CHANNEL = "timer_finished_silent"
+    const val ALARM_CHANNEL = "alarm_silent"
     const val MISSED_ALARM_CHANNEL = "missed_alarm"
 
-    val vibrationPattern = longArrayOf(1000, 1000, 1000, 1000, 1000)
+    val vibrationPattern = longArrayOf(0, 1000, 1000, 1000, 1000)
 
     val audioAttributes: AudioAttributes? = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -78,12 +78,14 @@ object NotificationHelper {
                 NotificationManagerCompat.IMPORTANCE_MAX
             )
                 .setName(context.getString(R.string.timer_finished))
+                .setSound(null, null)
                 .build(),
             NotificationChannelCompat.Builder(
                 ALARM_CHANNEL,
                 NotificationManagerCompat.IMPORTANCE_MAX
             )
                 .setName(context.getString(R.string.alarm))
+                .setSound(null, null)
                 .build(),
             NotificationChannelCompat.Builder(
                 MISSED_ALARM_CHANNEL,
@@ -94,5 +96,6 @@ object NotificationHelper {
         )
 
         nManager.createNotificationChannelsCompat(channels)
+        nManager.deleteUnlistedNotificationChannels(channels.map { it.id })
     }
 }
