@@ -35,6 +35,8 @@ import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.TimeHelper
+import com.bnyro.clock.util.widgets.TextColor
+import com.bnyro.clock.util.widgets.getColorValue
 import kotlinx.coroutines.runBlocking
 import java.util.Timer
 import java.util.TimerTask
@@ -349,6 +351,8 @@ class AlarmService : Service() {
                 } ?: context.getString(R.string.ringing_alarm, formattedTime)
             )
             setAutoCancel(true)
+            setColorized(true)
+            setColor(TextColor.Primary.getColorValue(context))
             priority = NotificationCompat.PRIORITY_MAX
             foregroundServiceBehavior = FOREGROUND_SERVICE_IMMEDIATE
             setCategory(NotificationCompat.CATEGORY_ALARM)
