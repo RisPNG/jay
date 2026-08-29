@@ -14,7 +14,7 @@ data class TimerObject(
     var soundUri: String? = null,
     var soundEnabled: Boolean = true,
     var vibrate: Boolean = true,
-    var vibrationPattern: List<Int> = List(5) { 1000 },
+    var vibrationPattern: List<Int> = listOf(0, 1000, 1000, 1000, 1000),
     var vibrationPatternName: String = "Default"
 ) {
     val secondsLeft: Int
