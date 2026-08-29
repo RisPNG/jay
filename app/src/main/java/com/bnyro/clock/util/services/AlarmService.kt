@@ -352,7 +352,7 @@ class AlarmService : Service() {
             )
             setAutoCancel(true)
             setColorized(true)
-            setColor(TextColor.Primary.getColorValue(context))
+            setColor(TextColor.PrimaryDark.getColorValue(context))
             priority = NotificationCompat.PRIORITY_MAX
             foregroundServiceBehavior = FOREGROUND_SERVICE_IMMEDIATE
             setCategory(NotificationCompat.CATEGORY_ALARM)
