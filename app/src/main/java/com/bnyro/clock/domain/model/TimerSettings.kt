@@ -26,7 +26,7 @@ data class TimerSettings(
     val soundUri: String? = null,
     val soundEnabled: Boolean = true,
     val vibrate: Boolean = true,
-    val vibrationPattern: List<Int> = List(5) { 1000 },
+    val vibrationPattern: List<Int> = listOf(0, 1000, 1000, 1000, 1000),
     val vibrationPatternName: String = "Default"
 ) : Parcelable {
     companion object {
