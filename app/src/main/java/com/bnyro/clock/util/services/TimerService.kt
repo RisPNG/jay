@@ -35,6 +35,8 @@ import com.bnyro.clock.domain.model.TimerDescriptor
 import com.bnyro.clock.domain.model.TimerObject
 import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.domain.model.WatchState
+import com.bnyro.clock.presentation.screens.ringing.RingingActivity
+import com.bnyro.clock.presentation.screens.timer.TimerAlertActivity
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
@@ -60,6 +62,7 @@ class TimerService : Service() {
     var timerObjects = mutableListOf<TimerObject>()
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var alertedTimerId: Int? = null
 
     @SuppressLint("ServiceCast", "ScheduleExactAlarm")
     private fun scheduleAlarm(timerObject: TimerObject) {
@@ -108,13 +111,16 @@ class TimerService : Service() {
     private val incrementSeconds
         get() = Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60)
 
+    private val fullScreenAlertEnabled
+        get() = Preferences.instance.getBoolean(Preferences.timerFullScreenAlertKey, true)
+
     private val receiver = object : BroadcastReceiver() {
         @RequiresApi(Build.VERSION_CODES.N)
         override fun onReceive(context: Context, intent: Intent) {
             Log.e("receive", intent.toString())
             val id = intent.getIntExtra(ID_EXTRA_KEY, 0)
             val obj = timerObjects.find { it.id == id } ?: return
-            when (intent.getStringExtra(ACTION_EXTRA_KEY)) {
+            when (val action = intent.getStringExtra(ACTION_EXTRA_KEY)) {
                 ACTION_STOP -> {
                     stop(obj, cancelled = true)
                 }
@@ -123,17 +129,42 @@ class TimerService : Service() {
                     if (obj.state.value == WatchState.PAUSED) resume(obj) else pause(obj)
                 }
 
+                ACTION_ALERT_SHOWN, ACTION_ALERT_HIDDEN -> {
+                    alertedTimerId = obj.id.takeIf { action == ACTION_ALERT_SHOWN }
+                    if (obj.currentPosition.value == 0) showFinishedNotification(obj)
+                }
+
                 ACTION_ADD_TIME -> {
+                    // a timer that has finished ringing has run out of time to add to, so the
+                    // time added starts it running again rather than sitting on a finished timer
+                    val finished = obj.currentPosition.value == 0
+                    if (finished) {
+                        stopAudio()
+                        closeAlert(obj)
+                        oldnow = System.currentTimeMillis()
+                        obj.state.value = WatchState.RUNNING
+                    }
+
                     obj.currentPosition.value += incrementSeconds * 1000
+
                     if (obj.state.value == WatchState.RUNNING) {
                         cancelAlarm(obj)
                         scheduleAlarm(obj)
+                        if (finished) acquireWakeLock()
                     }
+
+                    if (finished) {
+                        val notificationManager = NotificationManagerCompat.from(context)
+                        notificationManager.cancel(finishedNotificationId(obj))
+                        invokeChangeListener()
+                    }
+
                     updateNotification(obj)
                 }
 
                 TIMER_RESTART -> {
                     stopAudio()
+                    closeAlert(obj)
 
                     oldnow = System.currentTimeMillis()
 
@@ -147,9 +178,8 @@ class TimerService : Service() {
                         acquireWakeLock()
                     }
 
-                    val finishedNotificationId = (Integer.MAX_VALUE / 3) + obj.id * 10
                     val notificationManager = NotificationManagerCompat.from(context)
-                    notificationManager.cancel(finishedNotificationId)
+                    notificationManager.cancel(finishedNotificationId(obj))
                     notificationManager.cancel(obj.id)
 
                     invokeChangeListener()
@@ -269,6 +299,7 @@ class TimerService : Service() {
             }
 
             play(obj)
+            cancelAlarm(obj)
 
             val notificationManager = NotificationManagerCompat.from(this)
             notificationManager.cancel(obj.id)
@@ -278,6 +309,8 @@ class TimerService : Service() {
             }
 
             showFinishedNotification(obj)
+            if (fullScreenAlertEnabled) startActivity(alertIntent(obj))
+
             obj.currentPosition.value = 0
             obj.state.value = WatchState.PAUSED
 
@@ -405,16 +438,39 @@ class TimerService : Service() {
             releaseWakeLock()
         }
 
+        closeAlert(timerObject)
         invokeChangeListener()
         val notificationManager = NotificationManagerCompat.from(this)
         notificationManager.cancel(timerObject.id)
-        val finishedNotificationId = (Integer.MAX_VALUE / 3) + timerObject.id * 10
-        notificationManager.cancel(finishedNotificationId)
+        notificationManager.cancel(finishedNotificationId(timerObject))
 
         if (timerObjects.isEmpty()) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
+    }
+
+    private fun finishedNotificationId(timerObject: TimerObject) =
+        (Integer.MAX_VALUE / 3) + timerObject.id * 10
+
+    /**
+     * The screen a finished timer takes over the phone with, named after the timer it belongs to so
+     * that whichever timer is showing can be answered on its own.
+     */
+    private fun alertIntent(timerObject: TimerObject) =
+        Intent(this, TimerAlertActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+            .putExtra(ID_EXTRA_KEY, timerObject.id)
+            .putExtra(LABEL_EXTRA_KEY, timerObject.label.value)
+
+    private fun closeAlert(timerObject: TimerObject) {
+        if (alertedTimerId == timerObject.id) alertedTimerId = null
+        sendBroadcast(
+            Intent(TIMER_ALERT_CLOSE_ACTION)
+                .putExtra(RingingActivity.ACTION_EXTRA_KEY, RingingActivity.CLOSE_ACTION)
+                .putExtra(ID_EXTRA_KEY, timerObject.id)
+                .setPackage(packageName)
+        )
     }
 
     private fun showFinishedNotification(timerObject: TimerObject) {
@@ -424,7 +480,8 @@ class TimerService : Service() {
         ) return
 
         val notificationChannelId = NotificationHelper.TIMER_FINISHED_CHANNEL
-        val finishedNotificationId = (Integer.MAX_VALUE / 3) + timerObject.id * 10
+        val finishedNotificationId = finishedNotificationId(timerObject)
+        val alertShowing = alertedTimerId == timerObject.id
 
         val stopIntent = updateStateIntent(ACTION_STOP, timerObject.id)
         val stopPendingIntent = PendingIntent.getBroadcast(
@@ -445,10 +502,26 @@ class TimerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val restartAction = NotificationCompat.Action.Builder(
-            null, getString(R.string.timer_restart), restartPendingIntent
+            null, getString(R.string.timer_reset), restartPendingIntent
         ).build()
 
-        cancelAlarm(timerObject)
+        val snoozeIntent = updateStateIntent(ACTION_ADD_TIME, timerObject.id)
+        val snoozePendingIntent = PendingIntent.getBroadcast(
+            this,
+            finishedNotificationId + 3,
+            snoozeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val snoozeAction = NotificationCompat.Action.Builder(
+            null, addTimeLabel(), snoozePendingIntent
+        ).build()
+
+        val alertPendingIntent = PendingIntent.getActivity(
+            this,
+            finishedNotificationId + 4,
+            alertIntent(timerObject),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val deleteIntent = updateStateIntent(ACTION_STOP, timerObject.id)
         val deletePendingIntent = PendingIntent.getBroadcast(
@@ -463,7 +536,14 @@ class TimerService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setDeleteIntent(deletePendingIntent)
             .setOngoing(false)
+            .setSilent(alertShowing)
+            .apply {
+                if (fullScreenAlertEnabled && !alertShowing) {
+                    setFullScreenIntent(alertPendingIntent, true)
+                }
+            }
             .addAction(stopAction)
+            .addAction(snoozeAction)
             .addAction(restartAction)
             .build()
 
@@ -497,17 +577,19 @@ class TimerService : Service() {
     )
 
     private fun addTimeAction(timerObject: TimerObject) = getAction(
-        incrementSeconds.let { seconds ->
-            if (seconds == 60) {
-                getString(R.string.add_one_minute)
-            } else {
-                resources.getQuantityString(R.plurals.add_seconds, seconds, seconds)
-            }
-        },
+        addTimeLabel(),
         ACTION_ADD_TIME,
         6,
         timerObject.id
     )
+
+    private fun addTimeLabel() = incrementSeconds.let { seconds ->
+        if (seconds == 60) {
+            getString(R.string.add_one_minute)
+        } else {
+            resources.getQuantityString(R.plurals.add_seconds, seconds, seconds)
+        }
+    }
 
     fun updateTimer(id: Int, settings: TimerSettings) {
         timerObjects.firstOrNull { it.id == id }?.let {
@@ -549,6 +631,10 @@ class TimerService : Service() {
         const val TIMER_RESTART = "timer_restart"
         const val ACTION_ADD_TIME = "add_time"
         const val UPDATE_STATE_SCHEME = "jaytimer"
+        const val ACTION_ALERT_SHOWN = "alert_shown"
+        const val ACTION_ALERT_HIDDEN = "alert_hidden"
+        const val LABEL_EXTRA_KEY = "label"
+        const val TIMER_ALERT_CLOSE_ACTION = "com.bnyro.clock.TIMER_ALERT_CLOSE_ACTION"
 
         fun updateStateIntent(action: String, objectId: Int): Intent =
             Intent(UPDATE_STATE_ACTION)

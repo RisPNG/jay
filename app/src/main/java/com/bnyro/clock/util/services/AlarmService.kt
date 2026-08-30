@@ -30,6 +30,7 @@ import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.Permission
 import com.bnyro.clock.presentation.screens.alarm.AlarmActivity
+import com.bnyro.clock.presentation.screens.ringing.RingingActivity
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.NotificationHelper
@@ -285,7 +286,7 @@ class AlarmService : Service() {
         vibrator?.cancel()
 
         val closeAlarmAlertIntent = Intent(AlarmActivity.ALARM_ALERT_CLOSE_ACTION).apply {
-            putExtra(AlarmActivity.ACTION_EXTRA_KEY, AlarmActivity.CLOSE_ACTION)
+            putExtra(RingingActivity.ACTION_EXTRA_KEY, RingingActivity.CLOSE_ACTION)
             `package` = packageName
         }
         sendBroadcast(closeAlarmAlertIntent)
