@@ -94,6 +94,7 @@
     <string name="timer_picker_behaviour">Picker with a timer running</string>
     <string name="picker_keep_open">Keep open</string>
     <string name="picker_hide">Hide</string>
+    <string name="timer_full_screen_alert">Full-screen timer alert</string>
     <string name="timer_use_big_start">Use big start button</string>
     <string name="timer_increment">Increment amount</string>
     <string name="select_timer_increment">Select increment amount</string>

@@ -18,6 +18,7 @@ object Preferences {
     const val timerBigStartButtonKey = "timerBigStartButton"
     const val timerIncrementSecondsKey = "timerIncrementSeconds"
     const val timerPickerBehaviourKey = "timerPickerBehaviour"
+    const val timerFullScreenAlertKey = "timerFullScreenAlert"
     const val snoozeTimeMinutesKey = "snoozeTimeMinutes"
     const val alarmTimeoutMinutesKey = "alarmTimeoutMinutes"
     const val customColorKey = "customColor"

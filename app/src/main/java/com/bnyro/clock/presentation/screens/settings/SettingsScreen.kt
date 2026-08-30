@@ -322,6 +322,12 @@ fun SettingsScreen(
                 settingsModel.timerBigStartButton = it
             }
 
+            SwitchPref(
+                prefKey = Preferences.timerFullScreenAlertKey,
+                title = stringResource(R.string.timer_full_screen_alert),
+                defaultValue = true
+            )
+
             IconPreference(
                 title = stringResource(R.string.timer_increment),
                 summary = pluralStringResource(
