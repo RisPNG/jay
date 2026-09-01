@@ -73,14 +73,14 @@ fun TimerItem(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val colorTextLowerAlpha = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                val mutedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = obj.label.value,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Normal,
-                        color = colorTextLowerAlpha,
+                        color = mutedContentColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -106,7 +106,7 @@ fun TimerItem(
                                     modifier = Modifier.size(16.dp),
                                     imageVector = Icons.Default.Notifications,
                                     contentDescription = null,
-                                    tint = colorTextLowerAlpha
+                                    tint = mutedContentColor
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
@@ -115,7 +115,7 @@ fun TimerItem(
                                         ZonedDateTime.now().plusHours(hours.toLong())
                                             .plusMinutes(minutes.toLong()).plusSeconds(seconds.toLong())
                                     ),
-                                    color = colorTextLowerAlpha,
+                                    color = mutedContentColor,
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }

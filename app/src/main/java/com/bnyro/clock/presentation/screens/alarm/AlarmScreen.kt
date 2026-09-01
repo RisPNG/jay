@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
+import com.bnyro.clock.ui.theme.primaryFade
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -109,7 +110,7 @@ fun AlarmScreen(
                             modifier = Modifier
                                 .padding(vertical = 12.dp)
                                 .width(1.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                            color = MaterialTheme.colorScheme.primaryFade
                         )
                         Box(
                             modifier = Modifier
