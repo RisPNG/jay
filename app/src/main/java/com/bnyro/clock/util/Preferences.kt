@@ -27,6 +27,7 @@ object Preferences {
     const val customColorKey = "customColor"
     const val colorThemeKey = "colorTheme"
     const val startTabKey = "startTab"
+    const val weekStartKey = "weekStart"
     const val volumeButtonActionKey = "volumeButtonAction"
 
 
