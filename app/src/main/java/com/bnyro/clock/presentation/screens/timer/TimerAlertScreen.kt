@@ -1,6 +1,7 @@
 package com.bnyro.clock.presentation.screens.timer
 
 import android.content.res.Configuration
+import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +20,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -29,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.presentation.screens.ringing.RingingAlert
 import com.bnyro.clock.presentation.screens.ringing.RingingTitle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 @Composable
 fun TimerAlertScreen(
@@ -36,22 +41,36 @@ fun TimerAlertScreen(
     onSnooze: () -> Unit,
     onReset: () -> Unit,
     label: String? = null,
+    ringingSince: Long,
     incrementSeconds: Int
 ) {
     RingingAlert(rememberVectorPainter(Icons.Rounded.Timer)) {
-        TimerAlertControls(label, incrementSeconds, onDismiss, onSnooze, onReset)
+        TimerAlertControls(label, ringingSince, incrementSeconds, onDismiss, onSnooze, onReset)
     }
 }
 
 @Composable
 private fun TimerAlertControls(
     label: String?,
+    ringingSince: Long,
     incrementSeconds: Int,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
     onReset: () -> Unit
 ) {
     RingingTitle(label)
+
+    // the timer does not stop at zero, it goes on counting the wait for an answer
+    val rung by produceState(initialValue = 0L, ringingSince) {
+        while (isActive) {
+            value = (System.currentTimeMillis() - ringingSince) / 1000
+            delay(1000)
+        }
+    }
+    Text(
+        text = "-" + DateUtils.formatElapsedTime(rung),
+        style = MaterialTheme.typography.headlineMedium
+    )
     Column(
         Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -133,6 +152,7 @@ private fun DefaultPreview() {
         onSnooze = {},
         onReset = {},
         label = "Pasta",
+        ringingSince = 0L,
         incrementSeconds = 60
     )
 }

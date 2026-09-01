@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.bnyro.clock.presentation.screens.ringing.RingingActivity
@@ -14,6 +15,7 @@ import com.bnyro.clock.util.services.TimerService
 class TimerAlertActivity : RingingActivity() {
     private var timerId by mutableIntStateOf(0)
     private var label by mutableStateOf<String?>(null)
+    private var ringingSince by mutableLongStateOf(0L)
 
     override val closeAction = TimerService.TIMER_ALERT_CLOSE_ACTION
 
@@ -27,6 +29,7 @@ class TimerAlertActivity : RingingActivity() {
                 onSnooze = this@TimerAlertActivity::snooze,
                 onReset = this@TimerAlertActivity::reset,
                 label = label,
+                ringingSince = ringingSince,
                 incrementSeconds = Preferences.instance.getInt(
                     Preferences.timerIncrementSecondsKey,
                     60
@@ -64,12 +67,18 @@ class TimerAlertActivity : RingingActivity() {
     }
 
     override fun onNewIntent(intent: Intent) {
-        handleIntent(intent)
         super.onNewIntent(intent)
+        handleIntent(intent)
+        // a takeover hands the showing screen to another timer, which counts as showing it anew
+        reportAlert(TimerService.ACTION_ALERT_SHOWN)
     }
 
     private fun handleIntent(intent: Intent) {
         timerId = intent.getIntExtra(TimerService.ID_EXTRA_KEY, 0)
         label = intent.getStringExtra(TimerService.LABEL_EXTRA_KEY)
+        ringingSince = intent.getLongExtra(
+            TimerService.RINGING_SINCE_EXTRA_KEY,
+            System.currentTimeMillis()
+        )
     }
 }

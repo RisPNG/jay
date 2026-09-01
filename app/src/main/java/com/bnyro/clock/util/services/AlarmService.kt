@@ -13,9 +13,7 @@ import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.os.Vibrator
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -36,6 +34,7 @@ import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.TimeHelper
+import com.bnyro.clock.util.VolumeRamp
 import com.bnyro.clock.util.widgets.TextColor
 import com.bnyro.clock.util.widgets.getColorValue
 import kotlinx.coroutines.runBlocking
@@ -55,18 +54,7 @@ class AlarmService : Service() {
     private var alertScreenVisible = false
 
     val timer = Timer()
-    private var volume: Float = 0.1f
-
-    private val volumeHandler = Handler(Looper.getMainLooper())
-    private val volumeRunnable = object : Runnable {
-        override fun run() {
-            if (volume < MAX_VOLUME) {
-                mediaPlayer!!.setVolume(volume, volume)
-                volume += VOLUME_INCREASE_STEP
-                volumeHandler.postDelayed(this, VOLUME_INCREASE_INTERVAL)
-            }
-        }
-    }
+    private var volumeRamp: VolumeRamp? = null
 
     private val alarmActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -264,7 +252,10 @@ class AlarmService : Service() {
         player.setAudioAttributes(NotificationHelper.audioAttributes)
         player.prepare()
         player.start()
-        volumeHandler.post(volumeRunnable)
+        volumeRamp = VolumeRamp(
+            player,
+            Preferences.instance.getInt(Preferences.alarmVolumeRampSecondsKey, 0)
+        ).apply { start() }
     }
     /**
      * Stops alarm
@@ -273,8 +264,8 @@ class AlarmService : Service() {
         if (!isPlaying) return
         isPlaying = false
 
-        volumeHandler.removeCallbacks(volumeRunnable)
-        volume = 0.1f
+        volumeRamp?.cancel()
+        volumeRamp = null
         // Stop audio playing
         if (mediaPlayer != null) {
             mediaPlayer?.stop()
@@ -396,8 +387,5 @@ class AlarmService : Service() {
         const val ALARM_TIMEOUT_MINUTES = 10
         private const val MISSED_ALARM_ID_OFFSET = 8000
 
-        private const val MAX_VOLUME: Float = 1.0f
-        private const val VOLUME_INCREASE_STEP: Float = 0.05f
-        private const val VOLUME_INCREASE_INTERVAL: Long = 1000
     }
 }

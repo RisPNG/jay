@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Backup
@@ -57,6 +58,7 @@ import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.social.presentation.SocialSettingsSection
 import com.bnyro.clock.util.services.AlarmService
+import com.bnyro.clock.util.services.TimerService
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -71,7 +73,10 @@ fun SettingsScreen(
         rememberTopAppBarState()
     )
     var showAlarmTimeoutDialog by remember { mutableStateOf(false) }
+    var showTimerTimeoutDialog by remember { mutableStateOf(false) }
     var showTimerIncrementDialog by remember { mutableStateOf(false) }
+    var showAlarmVolumeRampDialog by remember { mutableStateOf(false) }
+    var showTimerVolumeRampDialog by remember { mutableStateOf(false) }
     var timerIncrementSeconds by remember {
         mutableIntStateOf(
             Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60)
@@ -83,6 +88,24 @@ fun SettingsScreen(
                 Preferences.alarmTimeoutMinutesKey,
                 AlarmService.ALARM_TIMEOUT_MINUTES
             )
+        )
+    }
+    var timerTimeoutMinutes by remember {
+        mutableIntStateOf(
+            Preferences.instance.getInt(
+                Preferences.timerTimeoutMinutesKey,
+                TimerService.TIMER_TIMEOUT_MINUTES
+            )
+        )
+    }
+    var alarmVolumeRampSeconds by remember {
+        mutableIntStateOf(
+            Preferences.instance.getInt(Preferences.alarmVolumeRampSecondsKey, 0)
+        )
+    }
+    var timerVolumeRampSeconds by remember {
+        mutableIntStateOf(
+            Preferences.instance.getInt(Preferences.timerVolumeRampSecondsKey, 0)
         )
     }
 
@@ -261,6 +284,14 @@ fun SettingsScreen(
                 showAlarmTimeoutDialog = true
             }
 
+            IconPreference(
+                title = stringResource(R.string.volume_ramp),
+                summary = volumeRampSummary(alarmVolumeRampSeconds),
+                imageVector = Icons.AutoMirrored.Rounded.VolumeUp
+            ) {
+                showAlarmVolumeRampDialog = true
+            }
+
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant
@@ -340,6 +371,26 @@ fun SettingsScreen(
                 imageVector = Icons.Rounded.MoreTime
             ) {
                 showTimerIncrementDialog = true
+            }
+
+            IconPreference(
+                title = stringResource(R.string.timeout_after),
+                summary = pluralStringResource(
+                    R.plurals.minutes,
+                    timerTimeoutMinutes,
+                    timerTimeoutMinutes
+                ),
+                imageVector = Icons.Rounded.Timer
+            ) {
+                showTimerTimeoutDialog = true
+            }
+
+            IconPreference(
+                title = stringResource(R.string.volume_ramp),
+                summary = volumeRampSummary(timerVolumeRampSeconds),
+                imageVector = Icons.AutoMirrored.Rounded.VolumeUp
+            ) {
+                showTimerVolumeRampDialog = true
             }
 
             HorizontalDivider(
@@ -453,4 +504,63 @@ fun SettingsScreen(
             }
         )
     }
+    if (showTimerTimeoutDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showTimerTimeoutDialog = false },
+            title = stringResource(R.string.select_timer_timeout),
+            unit = stringResource(R.string.minutes),
+            value = timerTimeoutMinutes,
+            maxValue = 120,
+            offset = 1,
+            label = { it.toString() },
+            onValueSet = {
+                timerTimeoutMinutes = it
+                Preferences.edit { putInt(Preferences.timerTimeoutMinutesKey, it) }
+                showTimerTimeoutDialog = false
+            }
+        )
+    }
+    if (showAlarmVolumeRampDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showAlarmVolumeRampDialog = false },
+            title = stringResource(R.string.select_volume_ramp),
+            unit = stringResource(R.string.seconds),
+            value = alarmVolumeRampSeconds,
+            maxValue = 60,
+            offset = 0,
+            label = { it.toString() },
+            onValueSet = {
+                alarmVolumeRampSeconds = it
+                Preferences.edit { putInt(Preferences.alarmVolumeRampSecondsKey, it) }
+                showAlarmVolumeRampDialog = false
+            }
+        )
+    }
+    if (showTimerVolumeRampDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showTimerVolumeRampDialog = false },
+            title = stringResource(R.string.select_volume_ramp),
+            unit = stringResource(R.string.seconds),
+            value = timerVolumeRampSeconds,
+            maxValue = 60,
+            offset = 0,
+            label = { it.toString() },
+            onValueSet = {
+                timerVolumeRampSeconds = it
+                Preferences.edit { putInt(Preferences.timerVolumeRampSecondsKey, it) }
+                showTimerVolumeRampDialog = false
+            }
+        )
+    }
+}
+
+/**
+ * A rise of no seconds at all is the sound arriving at once, which reads as never rather than as
+ * zero seconds of rising.
+ */
+@Composable
+private fun volumeRampSummary(seconds: Int) = if (seconds == 0) {
+    stringResource(R.string.volume_ramp_never)
+} else {
+    pluralStringResource(R.plurals.seconds_count, seconds, seconds)
 }

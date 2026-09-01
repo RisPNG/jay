@@ -10,6 +10,7 @@
     <string name="about">About</string>
     <string name="timer_service">Timer service</string>
     <string name="finished_named_timer">%1$s timer finished</string>
+    <string name="finished_named_timer_for">%1$s timer finished for %2$s</string>
     <string name="running_stopwatch">Stopwatch is running</string>
     <string name="paused_stopwatch">Stopwatch is paused</string>
     <!-- Actions -->
@@ -106,6 +107,10 @@
     <string name="delete">Delete</string>
     <string name="timeout_after">Timeout after</string>
     <string name="select_alarm_timeout">Select alarm timeout</string>
+    <string name="select_timer_timeout">Select timer timeout</string>
+    <string name="volume_ramp">Gradually increase volume</string>
+    <string name="select_volume_ramp">Select how long the volume takes to rise</string>
+    <string name="volume_ramp_never">Never</string>
     <string name="missed_alarms">Missed alarms</string>
     <string name="named_alarm_missed">%1$s alarm at %2$s was missed</string>
     <string name="alarm_missed">Alarm at %1$s was missed</string>
