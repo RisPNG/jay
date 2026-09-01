@@ -40,6 +40,10 @@ import com.bnyro.clock.presentation.screens.timer.TimerAlertActivity
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
+import com.bnyro.clock.util.widgets.TextColor
+import com.bnyro.clock.util.widgets.getColorValue
+import com.bnyro.clock.util.TimeHelper
+import com.bnyro.clock.util.VolumeRamp
 
 import java.util.Timer
 import java.util.TimerTask
@@ -63,6 +67,11 @@ class TimerService : Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var alertedTimerId: Int? = null
+    private var ringingTimerId: Int? = null
+    private var ringingSince = 0L
+    private var lastRungSeconds = 0L
+    private var ringTimeout: TimerTask? = null
+    private var volumeRamp: VolumeRamp? = null
 
     @SuppressLint("ServiceCast", "ScheduleExactAlarm")
     private fun scheduleAlarm(timerObject: TimerObject) {
@@ -114,6 +123,15 @@ class TimerService : Service() {
     private val fullScreenAlertEnabled
         get() = Preferences.instance.getBoolean(Preferences.timerFullScreenAlertKey, true)
 
+    private val timeoutMinutes
+        get() = Preferences.instance.getInt(
+            Preferences.timerTimeoutMinutesKey,
+            TIMER_TIMEOUT_MINUTES
+        )
+
+    /** How long the timer that is ringing has been ringing for. */
+    private val ringDuration get() = System.currentTimeMillis() - ringingSince
+
     private val receiver = object : BroadcastReceiver() {
         @RequiresApi(Build.VERSION_CODES.N)
         override fun onReceive(context: Context, intent: Intent) {
@@ -131,7 +149,9 @@ class TimerService : Service() {
 
                 ACTION_ALERT_SHOWN, ACTION_ALERT_HIDDEN -> {
                     alertedTimerId = obj.id.takeIf { action == ACTION_ALERT_SHOWN }
-                    if (obj.currentPosition.value == 0) showFinishedNotification(obj)
+                    if (obj.id == ringingTimerId) {
+                        promoteForeground(announcing = action == ACTION_ALERT_HIDDEN)
+                    }
                 }
 
                 ACTION_ADD_TIME -> {
@@ -139,8 +159,7 @@ class TimerService : Service() {
                     // time added starts it running again rather than sitting on a finished timer
                     val finished = obj.currentPosition.value == 0
                     if (finished) {
-                        stopAudio()
-                        closeAlert(obj)
+                        endRinging(obj)
                         oldnow = System.currentTimeMillis()
                         obj.state.value = WatchState.RUNNING
                     }
@@ -154,8 +173,9 @@ class TimerService : Service() {
                     }
 
                     if (finished) {
-                        val notificationManager = NotificationManagerCompat.from(context)
-                        notificationManager.cancel(finishedNotificationId(obj))
+                        NotificationManagerCompat.from(context)
+                            .cancel(finishedNotificationId(obj))
+                        promoteForeground()
                         invokeChangeListener()
                     }
 
@@ -163,8 +183,7 @@ class TimerService : Service() {
                 }
 
                 TIMER_RESTART -> {
-                    stopAudio()
-                    closeAlert(obj)
+                    endRinging(obj)
 
                     oldnow = System.currentTimeMillis()
 
@@ -182,6 +201,7 @@ class TimerService : Service() {
                     notificationManager.cancel(finishedNotificationId(obj))
                     notificationManager.cancel(obj.id)
 
+                    promoteForeground()
                     invokeChangeListener()
                     updateNotification(obj)
                 }
@@ -218,6 +238,10 @@ class TimerService : Service() {
         player.setAudioAttributes(NotificationHelper.audioAttributes)
         player.prepare()
         player.start()
+        volumeRamp = VolumeRamp(
+            player,
+            Preferences.instance.getInt(Preferences.timerVolumeRampSecondsKey, 0)
+        ).apply { start() }
     }
 
     /**
@@ -226,6 +250,9 @@ class TimerService : Service() {
     private fun stopAudio() {
         if (!isPlaying) return
         isPlaying = false
+
+        volumeRamp?.cancel()
+        volumeRamp = null
 
         if (mediaPlayer != null) {
             mediaPlayer?.stop()
@@ -298,21 +325,11 @@ class TimerService : Service() {
                 return START_STICKY
             }
 
-            play(obj)
             cancelAlarm(obj)
-
-            val notificationManager = NotificationManagerCompat.from(this)
-            notificationManager.cancel(obj.id)
-
-            if (timerObjects.size <= 1) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            }
-
-            showFinishedNotification(obj)
-            if (fullScreenAlertEnabled) startActivity(alertIntent(obj))
-
             obj.currentPosition.value = 0
             obj.state.value = WatchState.PAUSED
+
+            startRinging(obj)
 
             if (timerObjects.none { t -> t.state.value == WatchState.RUNNING }) {
                 releaseWakeLock()
@@ -388,6 +405,14 @@ class TimerService : Service() {
                 }
             }
         }
+
+        timerObjects.find { it.id == ringingTimerId }?.let {
+            val rung = ringDuration / 1000
+            if (rung != lastRungSeconds) {
+                lastRungSeconds = rung
+                showFinishedNotification(it)
+            }
+        }
     }
 
     fun enqueueNew(timerObject: TimerObject) {
@@ -431,22 +456,87 @@ class TimerService : Service() {
     @RequiresApi(Build.VERSION_CODES.N)
     private fun stop(timerObject: TimerObject, cancelled: Boolean) {
         cancelAlarm(timerObject)
-        stopAudio()
+        endRinging(timerObject)
         timerObjects.remove(timerObject)
 
         if (timerObjects.none { it.state.value == WatchState.RUNNING }) {
             releaseWakeLock()
         }
 
-        closeAlert(timerObject)
         invokeChangeListener()
+        promoteForeground()
         val notificationManager = NotificationManagerCompat.from(this)
         notificationManager.cancel(timerObject.id)
         notificationManager.cancel(finishedNotificationId(timerObject))
 
         if (timerObjects.isEmpty()) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
+        }
+    }
+
+    /**
+     * A timer that has run out takes over the ringing from whichever timer was ringing before it,
+     * which keeps its own record of how long it rang for. The screen the earlier timer was showing
+     * is left standing for the new timer's intent to take over rather than closed and reopened.
+     */
+    private fun startRinging(timerObject: TimerObject) {
+        val silenced = timerObjects.find { it.id == ringingTimerId }
+            ?.let { it to endRinging(it, keepAlert = true) }
+
+        ringingTimerId = timerObject.id
+        ringingSince = System.currentTimeMillis()
+        lastRungSeconds = 0
+        NotificationManagerCompat.from(this).cancel(timerObject.id)
+        play(timerObject)
+
+        ringTimeout = object : TimerTask() {
+            override fun run() {
+                handler.post {
+                    val rangFor = endRinging(timerObject)
+                    promoteForeground()
+                    showFinishedNotification(timerObject, rangFor)
+                }
+            }
+        }.also { timer.schedule(it, timeoutMinutes * 60 * 1000L) }
+
+        promoteForeground(announcing = true)
+        // the silenced timer's last word is posted only after the foreground has moved to the new
+        // timer, because a notification still bound as the foreground one is removed by that move
+        silenced?.let { (ringing, rangFor) -> showFinishedNotification(ringing, rangFor) }
+        if (fullScreenAlertEnabled) startActivity(alertIntent(timerObject))
+    }
+
+    private fun endRinging(timerObject: TimerObject, keepAlert: Boolean = false): Long {
+        if (ringingTimerId != timerObject.id) return 0
+
+        val rangFor = ringDuration
+        stopAudio()
+        ringTimeout?.cancel()
+        ringTimeout = null
+        ringingTimerId = null
+        if (!keepAlert) closeAlert(timerObject)
+        return rangFor
+    }
+
+    /**
+     * The notification the service is held in the foreground by is the one the reader most needs to
+     * see: the timer that is ringing, or failing that whichever timer is still counting.
+     */
+    private fun promoteForeground(announcing: Boolean = false) {
+        val ringing = timerObjects.find { it.id == ringingTimerId }
+        if (ringing != null) {
+            startForeground(
+                finishedNotificationId(ringing),
+                finishedNotification(ringing, announcing = announcing)
+            )
+            return
+        }
+
+        val counting = timerObjects.firstOrNull { it.state.value == WatchState.RUNNING }
+        if (counting != null) {
+            startForeground(counting.id, getNotification(counting))
+        } else {
+            stopForeground(STOP_FOREGROUND_REMOVE)
         }
     }
 
@@ -462,6 +552,7 @@ class TimerService : Service() {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
             .putExtra(ID_EXTRA_KEY, timerObject.id)
             .putExtra(LABEL_EXTRA_KEY, timerObject.label.value)
+            .putExtra(RINGING_SINCE_EXTRA_KEY, ringingSince)
 
     private fun closeAlert(timerObject: TimerObject) {
         if (alertedTimerId == timerObject.id) alertedTimerId = null
@@ -473,15 +564,39 @@ class TimerService : Service() {
         )
     }
 
-    private fun showFinishedNotification(timerObject: TimerObject) {
+    private fun showFinishedNotification(
+        timerObject: TimerObject,
+        rangFor: Long? = null,
+        announcing: Boolean = false
+    ) {
         if (ActivityCompat.checkSelfPermission(
                 this, Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
         ) return
 
+        NotificationManagerCompat.from(this).notify(
+            finishedNotificationId(timerObject),
+            finishedNotification(timerObject, rangFor, announcing)
+        )
+    }
+
+    /**
+     * What a finished timer says for itself. While it is ringing it goes on counting, past zero and
+     * into the time it has been waiting to be answered; once the ringing is over it keeps the count
+     * it stopped at as the length it rang for, and gives its title back to the app.
+     */
+    private fun finishedNotification(
+        timerObject: TimerObject,
+        rangFor: Long? = null,
+        announcing: Boolean = false
+    ): Notification {
         val notificationChannelId = NotificationHelper.TIMER_FINISHED_CHANNEL
         val finishedNotificationId = finishedNotificationId(timerObject)
+        val ringing = rangFor == null
         val alertShowing = alertedTimerId == timerObject.id
+        // the ring announces itself once, and again whenever the screen that was answering for it
+        // goes away; the counting that follows is the same announcement wearing a newer number
+        val announces = ringing && announcing && !alertShowing
 
         val stopIntent = updateStateIntent(ACTION_STOP, timerObject.id)
         val stopPendingIntent = PendingIntent.getBroadcast(
@@ -528,17 +643,34 @@ class TimerService : Service() {
             this, finishedNotificationId + 1, deleteIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(this, notificationChannelId)
+        return NotificationCompat.Builder(this, notificationChannelId)
             .setSmallIcon(R.drawable.ic_timer)
-            .setContentTitle(getString(R.string.finished_named_timer, timerObject.label.value))
+            .setContentTitle(
+                if (ringing) "-" + DateUtils.formatElapsedTime(ringDuration / 1000) else null
+            )
+            .setContentText(
+                if (ringing) {
+                    getString(R.string.finished_named_timer, timerObject.label.value)
+                } else {
+                    getString(
+                        R.string.finished_named_timer_for,
+                        timerObject.label.value,
+                        TimeHelper.durationToName((rangFor / 1000).toInt())
+                    )
+                }
+            )
             .setContentIntent(contentIntent)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setDeleteIntent(deletePendingIntent)
             .setOngoing(false)
-            .setSilent(alertShowing)
+            .setSilent(!announces)
             .apply {
-                if (fullScreenAlertEnabled && !alertShowing) {
+                if (ringing) {
+                    setColorized(true)
+                    setColor(TextColor.PrimaryDark.getColorValue(this@TimerService))
+                }
+                if (announces && fullScreenAlertEnabled) {
                     setFullScreenIntent(alertPendingIntent, true)
                 }
             }
@@ -546,8 +678,6 @@ class TimerService : Service() {
             .addAction(snoozeAction)
             .addAction(restartAction)
             .build()
-
-        NotificationManagerCompat.from(this).notify(finishedNotificationId, notification)
     }
 
     private fun pauseResumeAction(timerObject: TimerObject): NotificationCompat.Action {
@@ -634,6 +764,8 @@ class TimerService : Service() {
         const val ACTION_ALERT_SHOWN = "alert_shown"
         const val ACTION_ALERT_HIDDEN = "alert_hidden"
         const val LABEL_EXTRA_KEY = "label"
+        const val RINGING_SINCE_EXTRA_KEY = "ringing_since"
+        const val TIMER_TIMEOUT_MINUTES = 10
         const val TIMER_ALERT_CLOSE_ACTION = "com.bnyro.clock.TIMER_ALERT_CLOSE_ACTION"
 
         fun updateStateIntent(action: String, objectId: Int): Intent =
