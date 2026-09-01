@@ -329,6 +329,23 @@ fun SettingsScreen(
             }
 
             ButtonGroupPref(
+                title = stringResource(R.string.volume_buttons_during_timer),
+                options = listOf(
+                    stringResource(R.string.snooze),
+                    stringResource(R.string.dismiss),
+                    stringResource(R.string.control_volume),
+                    stringResource(R.string.do_nothing)
+                ),
+                values = VolumeButtonAction.entries,
+                currentValue = settingsModel.timerVolumeButtonAction
+            ) { action ->
+                settingsModel.timerVolumeButtonAction = action
+                Preferences.edit {
+                    putString(Preferences.timerVolumeButtonActionKey, action.name)
+                }
+            }
+
+            ButtonGroupPref(
                 title = stringResource(R.string.timer_picker_behaviour),
                 options = TimerPickerBehaviour.entries.map {
                     stringResource(
