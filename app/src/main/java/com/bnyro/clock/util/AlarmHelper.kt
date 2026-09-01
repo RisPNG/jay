@@ -29,6 +29,7 @@ import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
 import java.util.Calendar
 import java.util.Date
+import java.util.GregorianCalendar
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 //schweiny ass file
@@ -347,23 +348,15 @@ object AlarmHelper {
         schedule(context, oldAlarm, calendar.timeInMillis)
     }
     /**
-     * @return the day the week starts on, from the start week on preference or the locale
-     * default when the user has not chosen one.
-     */
-    fun getWeekStart(): WeekStart =
-        Preferences.instance.getString(Preferences.weekStartKey, null)
-            ?.let { WeekStart.valueOf(it) }
-            ?: WeekStart.entries.first {
-                it.dayOfWeek == WeekFields.of(Locale.getDefault()).firstDayOfWeek
-            }
-
-    /**
      * @return the days of the week mapped to an index 0-Sunday, 1-Monday, ..., 6-Saturday.
-     * The list order will match the user preferred days of the week order.
+     * The list order is only for presentation and follows the user's preference or locale without
+     * changing an alarm's recurrence.
      */
-    fun getDaysOfWeek(context: Context): List<Pair<String, Int>> {
+    fun getDaysOfWeekForDisplay(context: Context): List<Pair<String, Int>> {
         val availableDays = context.resources.getStringArray(R.array.available_days).toList()
-        val firstDayIndex = getWeekStart().dayOfWeek.value % DAYS_PER_WEEK
+        val firstDayIndex = Preferences.instance.getString(Preferences.weekStartKey, null)
+            ?.let { WeekStart.valueOf(it).dayOfWeek.value % DAYS_PER_WEEK }
+            ?: GregorianCalendar().firstDayOfWeek - 1
         val daysWithIndex = availableDays.mapIndexed { index, s -> s to index }
         return daysWithIndex.subList(firstDayIndex, 7) + daysWithIndex.subList(0, firstDayIndex)
     }

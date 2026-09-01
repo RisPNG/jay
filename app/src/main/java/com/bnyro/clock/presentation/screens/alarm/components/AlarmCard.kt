@@ -155,7 +155,7 @@ fun AlarmCard(
 
                         else -> {
                             val daysOfWeek = remember {
-                                AlarmHelper.getDaysOfWeek(context)
+                                AlarmHelper.getDaysOfWeekForDisplay(context)
                             }
                             daysOfWeek.forEach { (day, index) ->
                                 val enabled = alarm.days.contains(index)
