@@ -19,6 +19,8 @@ class TimerAlertActivity : RingingActivity() {
 
     override val closeAction = TimerService.TIMER_ALERT_CLOSE_ACTION
 
+    override val volumeButtonActionKey = Preferences.timerVolumeButtonActionKey
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)

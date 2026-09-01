@@ -120,6 +120,7 @@
     <string name="snooze">Snooze</string>
     <string name="dismiss">Dismiss</string>
     <string name="volume_buttons_during_alarm">Volume buttons</string>
+    <string name="volume_buttons_during_timer">Volume buttons</string>
     <string name="control_volume">Volume</string>
     <string name="do_nothing">Nothing</string>
     <string name="same_time">Same time</string>

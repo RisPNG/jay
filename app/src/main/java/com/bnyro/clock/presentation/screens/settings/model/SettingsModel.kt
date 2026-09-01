@@ -119,6 +119,15 @@ class SettingsModel : ViewModel() {
         )
     )
 
+    var timerVolumeButtonAction by mutableStateOf(
+        VolumeButtonAction.valueOf(
+            Preferences.instance.getString(
+                Preferences.timerVolumeButtonActionKey,
+                VolumeButtonAction.SNOOZE.name
+            ) ?: VolumeButtonAction.SNOOZE.name
+        )
+    )
+
     fun updateFabAlignment(alignment: FabAlignment) {
         Preferences.edit { putString("fab_alignment", alignment.name) }
         fabAlignment = alignment

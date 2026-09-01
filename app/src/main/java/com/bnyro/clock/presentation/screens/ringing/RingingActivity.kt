@@ -31,6 +31,9 @@ abstract class RingingActivity : ComponentActivity() {
     /** The broadcast the service sends once the thing being shown has stopped ringing. */
     protected abstract val closeAction: String
 
+    /** The preference naming what the volume keys do while this screen is up. */
+    protected abstract val volumeButtonActionKey: String
+
     protected abstract fun dismiss()
 
     protected abstract fun snooze()
@@ -119,7 +122,7 @@ abstract class RingingActivity : ComponentActivity() {
         return when (
             VolumeButtonAction.valueOf(
                 Preferences.instance.getString(
-                    Preferences.volumeButtonActionKey,
+                    volumeButtonActionKey,
                     VolumeButtonAction.SNOOZE.name
                 ) ?: VolumeButtonAction.SNOOZE.name
             )

@@ -10,6 +10,7 @@ import com.bnyro.clock.App
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.presentation.screens.ringing.RingingActivity
 import com.bnyro.clock.util.AlarmHelper
+import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.AlarmService
 import com.bnyro.clock.social.data.SocialAlarmEvents
 import kotlinx.coroutines.runBlocking
@@ -18,6 +19,8 @@ class AlarmActivity : RingingActivity() {
     private var alarm by mutableStateOf(Alarm(0, 0))
 
     override val closeAction = ALARM_ALERT_CLOSE_ACTION
+
+    override val volumeButtonActionKey = Preferences.volumeButtonActionKey
 
     override val snoozeAvailable get() = alarm.snoozeEnabled
 
