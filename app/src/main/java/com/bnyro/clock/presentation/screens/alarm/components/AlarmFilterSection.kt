@@ -115,7 +115,7 @@ fun WeekDayRow(weekDays: List<Int>, onClickWeekDay: (List<Int>) -> Unit) {
             .padding(20.dp),
         horizontalArrangement = Arrangement.Start
     ) {
-        val daysOfWeek = remember { AlarmHelper.getDaysOfWeekByLocale(context) }
+        val daysOfWeek = remember { AlarmHelper.getDaysOfWeek(context) }
         val chosenDays = remember { weekDays.toMutableList() }
 
         Icon(

@@ -17,9 +17,11 @@ import com.bnyro.clock.App
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.PickerStyle
+import com.bnyro.clock.domain.model.WeekStart
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.navigation.HomeRoutes
 import com.bnyro.clock.navigation.homeRoutes
+import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.catpucchinLatte
 import kotlinx.coroutines.Dispatchers
@@ -68,6 +70,7 @@ class SettingsModel : ViewModel() {
             ) ?: PickerStyle.WHEEL.name
         )
     )
+    var weekStart by mutableStateOf(AlarmHelper.getWeekStart())
     var customColor by mutableStateOf(
         Preferences.instance.getInt(Preferences.customColorKey, catpucchinLatte.first())
     )
