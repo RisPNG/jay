@@ -25,11 +25,9 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
-import java.time.temporal.WeekFields
 import java.util.Calendar
 import java.util.Date
 import java.util.GregorianCalendar
-import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 //schweiny ass file
 object AlarmHelper {
@@ -265,13 +263,8 @@ object AlarmHelper {
             }
 
             RepeatUnit.WEEK -> {
-                val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
-                val startWeek = startDate.with(TemporalAdjusters.previousOrSame(firstDayOfWeek))
-                val elapsed = ChronoUnit.WEEKS.between(
-                    startWeek,
-                    from.with(TemporalAdjusters.previousOrSame(firstDayOfWeek))
-                ) / interval
-                generateSequence(startWeek.plusWeeks(elapsed * interval)) { it.plusWeeks(interval) }
+                val elapsed = ChronoUnit.WEEKS.between(startDate, from) / interval
+                generateSequence(startDate.plusWeeks(elapsed * interval)) { it.plusWeeks(interval) }
             }
 
             RepeatUnit.MONTH, RepeatUnit.YEAR -> {
