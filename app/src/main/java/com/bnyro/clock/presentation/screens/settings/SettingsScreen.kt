@@ -42,6 +42,7 @@ import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.PickerStyle
 import com.bnyro.clock.domain.model.VolumeButtonAction
+import com.bnyro.clock.domain.model.WeekStart
 import com.bnyro.clock.navigation.NavRoutes
 import com.bnyro.clock.navigation.homeRoutes
 import com.bnyro.clock.presentation.components.ClickableIcon
@@ -197,6 +198,16 @@ fun SettingsScreen(
                 val key = selectedKey as String
                 val currentState = Preferences.instance.getBoolean("show_tab_$key", true)
                 settingsModel.toggleTab(key, !currentState)
+            }
+
+            ButtonGroupPref(
+                title = stringResource(R.string.start_week_on),
+                options = WeekStart.entries.map { stringResource(it.resId) },
+                values = WeekStart.entries,
+                currentValue = settingsModel.weekStart
+            ) {
+                settingsModel.weekStart = it
+                Preferences.edit { putString(Preferences.weekStartKey, it.name) }
             }
 
             HorizontalDivider(

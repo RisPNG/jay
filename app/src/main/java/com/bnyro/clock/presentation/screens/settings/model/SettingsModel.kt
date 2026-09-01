@@ -17,6 +17,7 @@ import com.bnyro.clock.App
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.PickerStyle
+import com.bnyro.clock.domain.model.WeekStart
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.navigation.HomeRoutes
 import com.bnyro.clock.navigation.homeRoutes
@@ -31,6 +32,7 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.util.GregorianCalendar
 import com.bnyro.clock.domain.model.VolumeButtonAction
 
 class SettingsModel : ViewModel() {
@@ -67,6 +69,13 @@ class SettingsModel : ViewModel() {
                 PickerStyle.WHEEL.name
             ) ?: PickerStyle.WHEEL.name
         )
+    )
+    var weekStart by mutableStateOf(
+        Preferences.instance.getString(Preferences.weekStartKey, null)
+            ?.let { WeekStart.valueOf(it) }
+            ?: WeekStart.entries.first {
+                it.dayOfWeek.value % 7 == GregorianCalendar().firstDayOfWeek - 1
+            }
     )
     var customColor by mutableStateOf(
         Preferences.instance.getInt(Preferences.customColorKey, catpucchinLatte.first())

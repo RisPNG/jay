@@ -539,7 +539,7 @@ private fun WeekdaySelector(chosenDays: MutableList<Int>) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         val daysOfWeek = remember {
-            AlarmHelper.getDaysOfWeekByLocale(context)
+            AlarmHelper.getDaysOfWeekForDisplay(context)
         }
 
         daysOfWeek.forEach { (day, index) ->

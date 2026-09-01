@@ -14,6 +14,7 @@ import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.RepeatAnchor
 import com.bnyro.clock.domain.model.Permission
 import com.bnyro.clock.domain.model.RepeatUnit
+import com.bnyro.clock.domain.model.WeekStart
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.receivers.AlarmReceiver
 import com.bnyro.clock.util.receivers.PreAlarmReceiver
@@ -348,12 +349,14 @@ object AlarmHelper {
     }
     /**
      * @return the days of the week mapped to an index 0-Sunday, 1-Monday, ..., 6-Saturday.
-     * The list order will match the user preferred days of the week order.
+     * The list order is only for presentation and follows the user's preference or locale without
+     * changing an alarm's recurrence.
      */
-
-    fun getDaysOfWeekByLocale(context: Context): List<Pair<String, Int>> {
+    fun getDaysOfWeekForDisplay(context: Context): List<Pair<String, Int>> {
         val availableDays = context.resources.getStringArray(R.array.available_days).toList()
-        val firstDayIndex = GregorianCalendar().firstDayOfWeek - 1
+        val firstDayIndex = Preferences.instance.getString(Preferences.weekStartKey, null)
+            ?.let { WeekStart.valueOf(it).dayOfWeek.value % DAYS_PER_WEEK }
+            ?: GregorianCalendar().firstDayOfWeek - 1
         val daysWithIndex = availableDays.mapIndexed { index, s -> s to index }
         return daysWithIndex.subList(firstDayIndex, 7) + daysWithIndex.subList(0, firstDayIndex)
     }
