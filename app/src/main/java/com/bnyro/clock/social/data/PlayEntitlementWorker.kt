@@ -12,19 +12,24 @@ class PlayEntitlementWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result = try {
         val status = (applicationContext as App).container.socialRepository.refreshPlayEntitlement()
-        applicationContext.getSharedPreferences("clock_you", Context.MODE_PRIVATE).edit()
+        val preferences = applicationContext.getSharedPreferences("clock_you", Context.MODE_PRIVATE)
+        val wasEntitled = preferences.getBoolean(ENTITLEMENT_SHARED_UPLOAD, false)
+        preferences.edit()
+            .putBoolean(ENTITLEMENT_SHARED_UPLOAD, status.sharedSoundUpload)
             .putString(ENTITLEMENT_EXPIRES_AT, status.expiresAt)
             .apply()
-        if (!status.sharedSoundUpload) {
+        if (status.sharedSoundUpload) {
+            androidx.core.app.NotificationManagerCompat.from(applicationContext).cancel(
+                SocialNotificationHelper.ENTITLEMENT_NOTIFICATION_ID
+            )
+        } else if (wasEntitled) {
             SocialNotificationHelper.notifyDeviceIssue(
                 applicationContext,
                 SocialNotificationHelper.ENTITLEMENT_NOTIFICATION_ID,
                 applicationContext.getString(R.string.play_entitlement_lost_title),
                 applicationContext.getString(R.string.play_entitlement_lost_message)
             )
-        } else androidx.core.app.NotificationManagerCompat.from(applicationContext).cancel(
-            SocialNotificationHelper.ENTITLEMENT_NOTIFICATION_ID
-        )
+        }
         Result.success()
     } catch (_: Exception) {
         val expiresAt = applicationContext.getSharedPreferences(
@@ -44,5 +49,6 @@ class PlayEntitlementWorker(context: Context, parameters: WorkerParameters) :
 
     companion object {
         private const val ENTITLEMENT_EXPIRES_AT = "jayPlayEntitlementExpiresAt"
+        private const val ENTITLEMENT_SHARED_UPLOAD = "jayPlayEntitlementSharedUpload"
     }
 }
