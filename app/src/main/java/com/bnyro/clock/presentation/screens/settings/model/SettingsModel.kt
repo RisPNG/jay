@@ -85,9 +85,9 @@ class SettingsModel : ViewModel() {
     var weekStart by mutableStateOf(
         Preferences.instance.getString(Preferences.weekStartKey, null)
             ?.let { WeekStart.valueOf(it) }
-            ?: WeekStart.entries.firstOrNull {
+            ?: WeekStart.entries.first {
                 it.dayOfWeek.value % 7 == GregorianCalendar().firstDayOfWeek - 1
-            } ?: WeekStart.SATURDAY
+            }
     )
     var customColor by mutableStateOf(
         Preferences.instance.getInt(Preferences.customColorKey, catpucchinLatte.first())
