@@ -518,7 +518,7 @@ fun ColorSelectSetting(
                         .background(colorValue)
                         .border(
                             width = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            color = MaterialTheme.colorScheme.outlineVariant,
                             shape = CircleShape
                         )
                         .clickable {

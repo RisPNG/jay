@@ -40,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
+import com.bnyro.clock.ui.theme.primarySoft
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -173,7 +174,7 @@ fun WidgetsScreen(
                         imageVector = Icons.Rounded.Widgets,
                         contentDescription = null,
                         modifier = Modifier.size(72.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                        tint = MaterialTheme.colorScheme.primarySoft
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
