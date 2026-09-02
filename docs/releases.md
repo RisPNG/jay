@@ -36,6 +36,8 @@ The stable tag is `v<jayVersionName>`. Artifact names use `jayVersionName` from 
 
 The production APK and AAB use the same `com.rispng.jay` application ID and runtime entitlement behavior. Paid access is not baked into a separate artifact.
 
+Publishing a stable release removes every prerelease that came before it, along with its tag, so the list of releases keeps one entry per stable release.
+
 `main`, `jay-group-addon`, and feature branches do not publish releases.
 
 ## Secrets
