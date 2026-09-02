@@ -99,6 +99,7 @@
     <string name="timer_use_big_start">Use big start button</string>
     <string name="timer_increment">Increment amount</string>
     <string name="select_timer_increment">Select increment amount</string>
+    <string name="default_increment">Default</string>
     <string name="show_timer_picker">Show picker</string>
     <string name="hide_timer_picker">Hide picker</string>
     <string name="alarm_picker_style">Picker style</string>
