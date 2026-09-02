@@ -59,8 +59,8 @@ object TimeHelper {
         )
     }
 
-    fun formatTime(context: Context, time: ZonedDateTime): String =
-        formatSystemTime(context, time.toInstant(), TimeZone.getTimeZone(time.zone), false)
+    fun formatTime(context: Context, time: ZonedDateTime, showSeconds: Boolean = false): String =
+        formatSystemTime(context, time.toInstant(), TimeZone.getTimeZone(time.zone), showSeconds)
 
     fun getOffsetMillisByZoneId(timeZoneId: String): Int {
         val zone = TimeZone.getTimeZone(timeZoneId)

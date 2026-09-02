@@ -58,7 +58,7 @@ private fun TimerAlertControls(
     onSnooze: () -> Unit,
     onReset: () -> Unit
 ) {
-    RingingTitle(label)
+    RingingTitle(label, showSeconds = true)
 
     // the timer does not stop at zero, it goes on counting the wait for an answer
     val rung by produceState(initialValue = 0L, ringingSince) {
