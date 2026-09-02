@@ -1,5 +1,6 @@
 package com.bnyro.clock.presentation.screens.timer.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -14,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.MoreTime
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -41,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.PickerStyle
 import com.bnyro.clock.domain.model.TimerSettings
+import com.bnyro.clock.presentation.components.ScrollPickerDialog
 import com.bnyro.clock.presentation.components.SwitchWithDivider
 import com.bnyro.clock.presentation.features.RingtonePickerDialog
 import com.bnyro.clock.presentation.features.VibrationPatternPickerDialog
@@ -57,6 +62,7 @@ fun TimerEditSheet(
 ) {
     var showRingtoneDialog by remember { mutableStateOf(false) }
     var showVibrationDialog by remember { mutableStateOf(false) }
+    var showIncrementDialog by remember { mutableStateOf(false) }
 
     var seconds by remember { mutableIntStateOf(currentTimer.seconds) }
     var label by remember { mutableStateOf(currentTimer.label) }
@@ -66,6 +72,7 @@ fun TimerEditSheet(
     var vibrationEnabled by remember { mutableStateOf(currentTimer.vibrate) }
     var vibrationPattern by remember { mutableStateOf(currentTimer.vibrationPattern) }
     var vibrationPatternName by remember { mutableStateOf(currentTimer.vibrationPatternName) }
+    var incrementSeconds by remember { mutableIntStateOf(currentTimer.incrementSeconds) }
 
     val scrollState = rememberScrollState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -147,6 +154,36 @@ fun TimerEditSheet(
                             vibrationEnabled = newValue
                         }
                     )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showIncrementDialog = true }
+                            .padding(8.dp, 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreTime,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .padding(start = 8.dp, end = 16.dp)
+                                .size(24.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.timer_increment),
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Text(
+                                text = pluralStringResource(
+                                    R.plurals.seconds_count,
+                                    incrementSeconds,
+                                    incrementSeconds
+                                ),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                 }
             }
 
@@ -183,7 +220,8 @@ fun TimerEditSheet(
                                 soundEnabled = soundEnabled,
                                 vibrate = vibrationEnabled,
                                 vibrationPattern = vibrationPattern,
-                                vibrationPatternName = vibrationPatternName
+                                vibrationPatternName = vibrationPatternName,
+                                incrementSeconds = incrementSeconds
                             )
                         )
                     }
@@ -210,6 +248,21 @@ fun TimerEditSheet(
                 showVibrationDialog = false
             },
             selectedPattern = vibrationPatternName
+        )
+    }
+    if (showIncrementDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showIncrementDialog = false },
+            title = stringResource(R.string.select_timer_increment),
+            unit = stringResource(R.string.seconds),
+            value = incrementSeconds,
+            maxValue = 60,
+            offset = 1,
+            label = { it.toString() },
+            onValueSet = {
+                incrementSeconds = it
+                showIncrementDialog = false
+            }
         )
     }
 }

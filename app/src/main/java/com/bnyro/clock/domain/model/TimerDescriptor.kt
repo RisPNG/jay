@@ -19,7 +19,8 @@ data class TimerDescriptor(
             soundEnabled = settings.soundEnabled,
             vibrate = settings.vibrate,
             vibrationPattern = settings.vibrationPattern,
-            vibrationPatternName = settings.vibrationPatternName
+            vibrationPatternName = settings.vibrationPatternName,
+            incrementSeconds = settings.incrementSeconds
         )
     }
 }

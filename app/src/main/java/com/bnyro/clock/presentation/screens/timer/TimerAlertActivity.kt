@@ -16,6 +16,7 @@ class TimerAlertActivity : RingingActivity() {
     private var timerId by mutableIntStateOf(0)
     private var label by mutableStateOf<String?>(null)
     private var ringingSince by mutableLongStateOf(0L)
+    private var incrementSeconds by mutableIntStateOf(60)
 
     override val closeAction = TimerService.TIMER_ALERT_CLOSE_ACTION
 
@@ -32,10 +33,7 @@ class TimerAlertActivity : RingingActivity() {
                 onReset = this@TimerAlertActivity::reset,
                 label = label,
                 ringingSince = ringingSince,
-                incrementSeconds = Preferences.instance.getInt(
-                    Preferences.timerIncrementSecondsKey,
-                    60
-                )
+                incrementSeconds = incrementSeconds
             )
         }
     }
@@ -82,5 +80,6 @@ class TimerAlertActivity : RingingActivity() {
             TimerService.RINGING_SINCE_EXTRA_KEY,
             System.currentTimeMillis()
         )
+        incrementSeconds = intent.getIntExtra(TimerService.INCREMENT_EXTRA_KEY, 60)
     }
 }
