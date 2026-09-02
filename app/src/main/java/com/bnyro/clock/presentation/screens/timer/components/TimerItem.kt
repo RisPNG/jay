@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.Notifications
@@ -76,14 +77,22 @@ fun TimerItem(
                 val mutedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = obj.label.value,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Normal,
-                        color = mutedContentColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Label,
+                            contentDescription = null,
+                            tint = mutedContentColor
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = obj.label.value,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Normal,
+                            color = mutedContentColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
 
                     Text(
                         text = if (isFinished) "0:00:00" else "$hours:${minutes.addZero()}:${seconds.addZero()}",
