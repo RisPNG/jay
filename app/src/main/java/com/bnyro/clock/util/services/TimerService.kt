@@ -24,6 +24,7 @@ import android.os.Vibrator
 import android.provider.AlarmClock
 import android.text.format.DateUtils
 import android.util.Log
+import androidx.compose.runtime.mutableStateOf
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -40,6 +41,7 @@ import com.bnyro.clock.presentation.screens.timer.TimerAlertActivity
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
+import com.bnyro.clock.social.data.SocialTimerActions
 import com.bnyro.clock.util.widgets.TextColor
 import com.bnyro.clock.util.widgets.getColorValue
 import com.bnyro.clock.util.TimeHelper
@@ -47,6 +49,7 @@ import com.bnyro.clock.util.VolumeRamp
 
 import java.util.Timer
 import java.util.TimerTask
+import kotlin.math.abs
 
 class TimerService : Service() {
     private val timer = Timer()
@@ -137,6 +140,16 @@ class TimerService : Service() {
             val obj = timerObjects.find { it.id == id } ?: return
             when (val action = intent.getStringExtra(ACTION_EXTRA_KEY)) {
                 ACTION_STOP -> {
+                    // answering a ring is each member's own answer, while stopping one that is
+                    // still counting cancels it for the whole group when this member may edit it
+                    val answeringTheRing = ringingTimerId == obj.id
+                    obj.sharedTimerId?.let { sharedId ->
+                        if (!answeringTheRing && obj.sharedCanEdit) {
+                            SocialTimerActions.cancel(applicationContext, sharedId)
+                        } else {
+                            SocialTimerActions.dismissed(applicationContext, sharedId)
+                        }
+                    }
                     stop(obj, cancelled = true)
                 }
 
@@ -177,6 +190,10 @@ class TimerService : Service() {
                     }
 
                     updateNotification(obj)
+
+                    obj.sharedTimerId?.takeIf { obj.sharedCanEdit }?.let { sharedId ->
+                        SocialTimerActions.adjust(applicationContext, sharedId, "add")
+                    }
                 }
 
                 TIMER_RESTART -> {
@@ -201,6 +218,10 @@ class TimerService : Service() {
                     promoteForeground()
                     invokeChangeListener()
                     updateNotification(obj)
+
+                    obj.sharedTimerId?.takeIf { obj.sharedCanEdit }?.let { sharedId ->
+                        SocialTimerActions.adjust(applicationContext, sharedId, "reset")
+                    }
                 }
             }
         }
@@ -308,6 +329,14 @@ class TimerService : Service() {
 
     @RequiresApi(Build.VERSION_CODES.N)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == SYNC_SHARED_TIMER_ACTION) {
+            syncSharedTimer(intent)
+            return START_STICKY
+        }
+        if (intent?.action == PRUNE_SHARED_TIMERS_ACTION) {
+            pruneSharedTimers(intent)
+            return START_STICKY
+        }
         if (intent?.action == ACTION_TIMER_EXPIRED) {
             val id = intent.getIntExtra(ID_EXTRA_KEY, 0)
             val obj = timerObjects.find { it.id == id }
@@ -354,6 +383,7 @@ class TimerService : Service() {
 
     private fun getNotification(timerObject: TimerObject): Notification {
         val timeLeft = DateUtils.formatElapsedTime(timerObject.secondsLeft.toLong())
+        val shared = timerObject.sharedTimerId != null
 
         return NotificationCompat.Builder(
             this, NotificationHelper.TIMER_CHANNEL
@@ -370,15 +400,19 @@ class TimerService : Service() {
             .setContentIntent(contentIntent)
             .setShowWhen(false)
             .setOnlyAlertOnce(true)
-            .addAction(pauseResumeAction(timerObject))
-            .addAction(
-                if (timerObject.state.value == WatchState.RUNNING) {
-                    addTimeAction(timerObject)
-                } else {
-                    resetAction(timerObject)
+            .apply {
+                if (!shared) addAction(pauseResumeAction(timerObject))
+                if (!shared || timerObject.sharedCanEdit) {
+                    addAction(
+                        if (timerObject.state.value == WatchState.RUNNING) {
+                            addTimeAction(timerObject)
+                        } else {
+                            resetAction(timerObject)
+                        }
+                    )
                 }
-            )
-            .addAction(stopAction(timerObject))
+                addAction(stopAction(timerObject))
+            }
             .setSmallIcon(R.drawable.ic_timer).setOngoing(true).build()
     }
 
@@ -421,6 +455,79 @@ class TimerService : Service() {
 
         invokeChangeListener()
         updateNotification(timerObject)
+    }
+
+    /**
+     * Brings a group timer this device has not answered onto this device: a new one is
+     * materialized from the group's shared expiry, and one already here is corrected to whatever
+     * the group has since done with it, which also answers a ring the group has moved on from.
+     */
+    private fun syncSharedTimer(intent: Intent) {
+        val sharedId = intent.getStringExtra(SHARED_TIMER_ID_EXTRA_KEY) ?: return
+        val groupName = intent.getStringExtra(SHARED_TIMER_GROUP_NAME_EXTRA_KEY)
+        val label = intent.getStringExtra(SHARED_TIMER_LABEL_EXTRA_KEY)
+        val durationSeconds = intent.getIntExtra(SHARED_TIMER_DURATION_EXTRA_KEY, 0)
+        val incrementSeconds = intent.getIntExtra(SHARED_TIMER_INCREMENT_EXTRA_KEY, 60)
+        val expiresAt = intent.getLongExtra(SHARED_TIMER_EXPIRES_EXTRA_KEY, 0L)
+        val canEdit = intent.getBooleanExtra(SHARED_TIMER_CAN_EDIT_EXTRA_KEY, false)
+        if (durationSeconds <= 0) return
+
+        val existing = timerObjects.find { it.sharedTimerId == sharedId }
+        val remaining = expiresAt - System.currentTimeMillis()
+        if (existing == null) {
+            // a timer that finished long before this device heard of it is not worth ringing about
+            if (remaining < -timeoutMinutes * 60_000L) return
+            val obj = TimerObject(
+                id = sharedId.hashCode(),
+                label = mutableStateOf(label ?: TimeHelper.durationToName(durationSeconds)),
+                currentPosition = mutableStateOf(remaining.coerceAtLeast(0L).toInt()),
+                initialPosition = mutableStateOf(durationSeconds * 1000),
+                state = mutableStateOf(WatchState.RUNNING),
+                incrementSeconds = incrementSeconds,
+                sharedTimerId = sharedId,
+                sharedGroupName = groupName,
+                sharedCanEdit = canEdit
+            )
+            if (remaining > 0) {
+                startForeground(obj.id, getNotification(obj))
+                enqueueNew(obj)
+            } else {
+                timerObjects.add(obj)
+                invokeChangeListener()
+                startRinging(obj)
+                if (timerObjects.none { it.state.value == WatchState.RUNNING }) {
+                    releaseWakeLock()
+                }
+            }
+            return
+        }
+
+        existing.sharedGroupName = groupName
+        existing.sharedCanEdit = canEdit
+        existing.incrementSeconds = incrementSeconds
+        existing.initialPosition.value = durationSeconds * 1000
+        if (remaining > 0) {
+            val drifted = abs(existing.currentPosition.value - remaining.toInt()) > 1000
+            if (existing.state.value != WatchState.RUNNING || drifted) {
+                endRinging(existing)
+                existing.state.value = WatchState.RUNNING
+                existing.currentPosition.value = remaining.toInt()
+                cancelAlarm(existing)
+                scheduleAlarm(existing)
+                acquireWakeLock()
+            }
+        }
+        invokeChangeListener()
+        promoteForeground()
+        updateNotification(existing)
+    }
+
+    private fun pruneSharedTimers(intent: Intent) {
+        val active = intent.getStringArrayListExtra(ACTIVE_SHARED_TIMER_IDS_EXTRA_KEY)
+            .orEmpty().toSet()
+        timerObjects.filter { it.sharedTimerId != null && it.sharedTimerId !in active }.forEach {
+            stop(it, cancelled = true)
+        }
     }
 
     private fun pause(timerObject: TimerObject) {
@@ -551,6 +658,7 @@ class TimerService : Service() {
             .putExtra(LABEL_EXTRA_KEY, timerObject.label.value)
             .putExtra(RINGING_SINCE_EXTRA_KEY, ringingSince)
             .putExtra(INCREMENT_EXTRA_KEY, timerObject.effectiveIncrementSeconds)
+            .putExtra(CAN_EDIT_EXTRA_KEY, timerObject.sharedTimerId == null || timerObject.sharedCanEdit)
 
     private fun closeAlert(timerObject: TimerObject) {
         if (alertedTimerId == timerObject.id) alertedTimerId = null
@@ -673,8 +781,12 @@ class TimerService : Service() {
                 }
             }
             .addAction(stopAction)
-            .addAction(snoozeAction)
-            .addAction(restartAction)
+            .apply {
+                if (timerObject.sharedTimerId == null || timerObject.sharedCanEdit) {
+                    addAction(snoozeAction)
+                    addAction(restartAction)
+                }
+            }
             .build()
     }
 
@@ -765,6 +877,17 @@ class TimerService : Service() {
         const val INCREMENT_EXTRA_KEY = "increment"
         const val TIMER_TIMEOUT_MINUTES = 10
         const val TIMER_ALERT_CLOSE_ACTION = "com.bnyro.clock.TIMER_ALERT_CLOSE_ACTION"
+        const val SYNC_SHARED_TIMER_ACTION = "com.bnyro.clock.SYNC_SHARED_TIMER"
+        const val PRUNE_SHARED_TIMERS_ACTION = "com.bnyro.clock.PRUNE_SHARED_TIMERS"
+        const val SHARED_TIMER_ID_EXTRA_KEY = "shared_timer_id"
+        const val SHARED_TIMER_GROUP_NAME_EXTRA_KEY = "shared_timer_group_name"
+        const val SHARED_TIMER_LABEL_EXTRA_KEY = "shared_timer_label"
+        const val SHARED_TIMER_DURATION_EXTRA_KEY = "shared_timer_duration"
+        const val SHARED_TIMER_INCREMENT_EXTRA_KEY = "shared_timer_increment"
+        const val SHARED_TIMER_EXPIRES_EXTRA_KEY = "shared_timer_expires"
+        const val SHARED_TIMER_CAN_EDIT_EXTRA_KEY = "shared_timer_can_edit"
+        const val ACTIVE_SHARED_TIMER_IDS_EXTRA_KEY = "active_shared_timer_ids"
+        const val CAN_EDIT_EXTRA_KEY = "can_edit"
 
         fun updateStateIntent(action: String, objectId: Int): Intent =
             Intent(UPDATE_STATE_ACTION)

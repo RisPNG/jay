@@ -23,11 +23,14 @@ import com.bnyro.clock.social.domain.MemberNotificationUpdate
 import com.bnyro.clock.social.domain.SharedAlarmLink
 import com.bnyro.clock.social.domain.SharedAlarmRequest
 import com.bnyro.clock.social.domain.SocialChange
+import com.bnyro.clock.social.domain.SharedTimerRequest
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
+import com.bnyro.clock.social.domain.canEditAlarms
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.AlarmService
+import com.bnyro.clock.util.services.TimerService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -206,6 +209,9 @@ class SocialRepository(
             }
 
             Preferences.edit { putLong(SocialPreferences.syncCursorKey, response.cursor) }
+
+            applySharedTimers(response.timers, synchronizedGroups)
+
             SocialSyncResult(
                 if (previousCursor == 0L) emptyList() else response.changes.map {
                     SocialChange(
@@ -604,6 +610,102 @@ class SocialRepository(
             )
         }
 
+    /**
+     * Hands the group timers the server still holds to the timer service, which materializes the
+     * ones this device has not answered yet and drops the ones the group is done with. A timer
+     * this device dismissed is suppressed until the server forgets it, so answering a group timer
+     * stays everyone's own.
+     */
+    private suspend fun applySharedTimers(
+        timers: List<com.bnyro.clock.social.domain.SharedTimerDto>,
+        groups: List<SocialGroup>
+    ) {
+        val now = System.currentTimeMillis()
+        socialDao.clearDismissedTimers(now - SUPPRESSED_TIMER_LIFETIME_MILLIS)
+        val suppressedTimerIds = socialDao.getDismissedTimers().map { it.timerId }.toSet()
+        val activeTimerIds = mutableListOf<String>()
+        timers.forEach { remote ->
+            val expiresAt = runCatching {
+                java.time.OffsetDateTime.parse(remote.expiresAt).toInstant().toEpochMilli()
+            }.getOrNull() ?: return@forEach
+            if (expiresAt < now - SHARED_TIMER_LINGER_MILLIS) return@forEach
+            if (remote.id in suppressedTimerIds) return@forEach
+            val group = groups.firstOrNull { it.id == remote.groupId } ?: return@forEach
+            activeTimerIds += remote.id
+            runCatching {
+                context.startService(
+                    Intent(context, TimerService::class.java)
+                        .setAction(TimerService.SYNC_SHARED_TIMER_ACTION)
+                        .putExtra(TimerService.SHARED_TIMER_ID_EXTRA_KEY, remote.id)
+                        .putExtra(TimerService.SHARED_TIMER_GROUP_NAME_EXTRA_KEY, group.name)
+                        .putExtra(TimerService.SHARED_TIMER_LABEL_EXTRA_KEY, remote.label)
+                        .putExtra(TimerService.SHARED_TIMER_DURATION_EXTRA_KEY, remote.durationSeconds)
+                        .putExtra(TimerService.SHARED_TIMER_INCREMENT_EXTRA_KEY, remote.incrementSeconds)
+                        .putExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, expiresAt)
+                        .putExtra(TimerService.SHARED_TIMER_CAN_EDIT_EXTRA_KEY, group.canEditAlarms)
+                )
+            }
+        }
+        runCatching {
+            context.startService(
+                Intent(context, TimerService::class.java)
+                    .setAction(TimerService.PRUNE_SHARED_TIMERS_ACTION)
+                    .putExtra(
+                        TimerService.ACTIVE_SHARED_TIMER_IDS_EXTRA_KEY,
+                        ArrayList(activeTimerIds)
+                    )
+            )
+        }
+    }
+
+    suspend fun startSharedTimer(
+        groupId: String,
+        label: String?,
+        durationSeconds: Int,
+        incrementSeconds: Int
+    ) = withContext(Dispatchers.IO) {
+        val serverUrl = Preferences.instance.getString(
+            SocialPreferences.serverUrlKey,
+            DEFAULT_SERVER_URL
+        ) ?: DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+        SocialApi(serverUrl, identity).startTimer(
+            groupId,
+            SharedTimerRequest(label, durationSeconds, incrementSeconds)
+        )
+        synchronize()
+    }
+
+    suspend fun adjustSharedTimer(timerId: String, action: String) =
+        withContext(Dispatchers.IO) {
+            val serverUrl = Preferences.instance.getString(
+                SocialPreferences.serverUrlKey,
+                DEFAULT_SERVER_URL
+            ) ?: DEFAULT_SERVER_URL
+            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+            SocialApi(serverUrl, identity).adjustTimer(timerId, action)
+            synchronize()
+        }
+
+    suspend fun cancelSharedTimer(timerId: String) = withContext(Dispatchers.IO) {
+        val serverUrl = Preferences.instance.getString(
+            SocialPreferences.serverUrlKey,
+            DEFAULT_SERVER_URL
+        ) ?: DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+        SocialApi(serverUrl, identity).cancelTimer(timerId)
+        synchronize()
+    }
+
+    suspend fun suppressSharedTimer(timerId: String) = withContext(Dispatchers.IO) {
+        socialDao.putDismissedTimer(
+            com.bnyro.clock.social.domain.DismissedSharedTimer(
+                timerId,
+                System.currentTimeMillis() + SUPPRESSED_TIMER_LIFETIME_MILLIS
+            )
+        )
+    }
+
     suspend fun renameDevice(name: String) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
             SocialPreferences.serverUrlKey,
@@ -729,5 +831,8 @@ class SocialRepository(
 
     companion object {
         const val DEFAULT_SERVER_URL = "https://jay.poppybit.com"
+
+        private const val SHARED_TIMER_LINGER_MILLIS = 15 * 60_000L
+        private const val SUPPRESSED_TIMER_LIFETIME_MILLIS = 30 * 60_000L
     }
 }

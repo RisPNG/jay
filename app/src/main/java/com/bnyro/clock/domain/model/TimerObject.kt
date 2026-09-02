@@ -17,7 +17,10 @@ data class TimerObject(
     var vibrate: Boolean = true,
     var vibrationPattern: List<Int> = listOf(0, 1000, 1000, 1000, 1000),
     var vibrationPatternName: String = "Default",
-    var incrementSeconds: Int? = null
+    var incrementSeconds: Int? = null,
+    var sharedTimerId: String? = null,
+    var sharedGroupName: String? = null,
+    var sharedCanEdit: Boolean = true
 ) {
     val secondsLeft: Int
         get() = ceil(currentPosition.value / 1000.0).toInt()

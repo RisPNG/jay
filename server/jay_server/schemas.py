@@ -149,3 +149,18 @@ class AlarmOccurrenceSchedule(BaseModel):
     occurrence_id: str = Field(min_length=1, max_length=200)
     trigger_at: datetime
     deadline_at: datetime
+
+
+class SharedTimerCreate(BaseModel):
+    label: str | None = Field(default=None, max_length=120)
+    duration_seconds: int = Field(ge=1, le=86_400)
+    increment_seconds: int = Field(ge=1, le=3_600)
+
+
+class SharedTimerAction(StrEnum):
+    ADD = "add"
+    RESET = "reset"
+
+
+class SharedTimerUpdate(BaseModel):
+    action: SharedTimerAction

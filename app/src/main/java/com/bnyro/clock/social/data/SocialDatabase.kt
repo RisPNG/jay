@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.bnyro.clock.social.domain.DismissedSharedTimer
 import com.bnyro.clock.social.domain.SharedAlarmLink
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
@@ -14,9 +15,10 @@ import com.bnyro.clock.social.domain.SocialMember
     entities = [
         SocialGroup::class,
         SocialMember::class,
-        SharedAlarmLink::class
+        SharedAlarmLink::class,
+        DismissedSharedTimer::class
     ],
-    version = 2
+    version = 3
 )
 abstract class SocialDatabase : RoomDatabase() {
     abstract fun socialDao(): SocialDao
@@ -47,6 +49,15 @@ abstract class SocialDatabase : RoomDatabase() {
                             db.execSQL(
                                 "ALTER TABLE social_groups ADD COLUMN notifyAdministrative " +
                                     "INTEGER NOT NULL DEFAULT 1"
+                            )
+                        }
+                    },
+                    object : Migration(2, 3) {
+                        override fun migrate(db: SupportSQLiteDatabase) {
+                            db.execSQL(
+                                "CREATE TABLE IF NOT EXISTS dismissed_shared_timers (" +
+                                    "timerId TEXT NOT NULL PRIMARY KEY, " +
+                                    "expiresAt INTEGER NOT NULL)"
                             )
                         }
                     }

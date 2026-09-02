@@ -132,7 +132,8 @@ fun HomeNavContainer(
                             TimerScreen(
                                 onClickSettings = { onNavigate(NavRoutes.Settings.route) },
                                 timerModel = timerModel,
-                                settingsModel = settingsModel
+                                settingsModel = settingsModel,
+                                socialModel = socialModel
                             )
                         }
 

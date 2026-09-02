@@ -44,10 +44,19 @@ fun TimerAlertScreen(
     onReset: () -> Unit,
     label: String? = null,
     ringingSince: Long,
-    incrementSeconds: Int
+    incrementSeconds: Int,
+    canEdit: Boolean = true
 ) {
     RingingAlert(rememberVectorPainter(Icons.Rounded.Timer)) {
-        TimerAlertControls(label, ringingSince, incrementSeconds, onDismiss, onSnooze, onReset)
+        TimerAlertControls(
+            label,
+            ringingSince,
+            incrementSeconds,
+            canEdit,
+            onDismiss,
+            onSnooze,
+            onReset
+        )
     }
 }
 
@@ -56,6 +65,7 @@ private fun TimerAlertControls(
     label: String?,
     ringingSince: Long,
     incrementSeconds: Int,
+    canEdit: Boolean,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
     onReset: () -> Unit
@@ -100,45 +110,47 @@ private fun TimerAlertControls(
             }
         }
         Spacer(modifier = Modifier.height(32.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FilledTonalButton(
-                onClick = {
-                    onSnooze.invoke()
-                }
+        if (canEdit) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (incrementSeconds == 60) {
-                        stringResource(R.string.add_one_minute)
-                    } else {
-                        pluralStringResource(
-                            R.plurals.add_seconds,
-                            incrementSeconds,
-                            incrementSeconds
-                        )
-                    },
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-            FilledTonalButton(
-                onClick = {
-                    onReset.invoke()
-                }
-            ) {
-                Row {
-                    Icon(
-                        modifier = Modifier.align(alignment = Alignment.CenterVertically),
-                        imageVector = Icons.Rounded.Refresh,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                FilledTonalButton(
+                    onClick = {
+                        onSnooze.invoke()
+                    }
+                ) {
                     Text(
-                        text = stringResource(R.string.timer_reset),
+                        text = if (incrementSeconds == 60) {
+                            stringResource(R.string.add_one_minute)
+                        } else {
+                            pluralStringResource(
+                                R.plurals.add_seconds,
+                                incrementSeconds,
+                                incrementSeconds
+                            )
+                        },
                         style = MaterialTheme.typography.titleLarge
                     )
+                }
+                FilledTonalButton(
+                    onClick = {
+                        onReset.invoke()
+                    }
+                ) {
+                    Row {
+                        Icon(
+                            modifier = Modifier.align(alignment = Alignment.CenterVertically),
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.timer_reset),
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
                 }
             }
         }

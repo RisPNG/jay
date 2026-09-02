@@ -20,6 +20,10 @@ The intentional Clock You integration points are:
 - the alarm editor's group selector;
 - alarm create, edit, and delete dispatch;
 - ringing, snooze, and early-dismiss actions;
+- the timer's start dispatch, including the group a group timer is started for;
+- timer add-time, reset, and stop dispatch, and the ringing timer's answer actions;
+- the timer list's group labels and action permissions;
+- the saved-timer sheet's group template field;
 - settings, launcher branding, dependencies, resources, and manifest declarations.
 
 Base clock behavior belongs to Clock You. Develop improvements to alarms, clocks, timers, stopwatches, settings, onboarding, notifications, pickers, and other generally useful Clock You behavior on focused branches from `main`, then submit them upstream. Social groups, shared alarms, membership, synchronization, social notifications, entitlements, and the Jay server belong to `jay`. A social feature may modify a Clock You-owned file only at an integration point above and should reuse the existing Clock You domain behavior rather than create a parallel implementation.

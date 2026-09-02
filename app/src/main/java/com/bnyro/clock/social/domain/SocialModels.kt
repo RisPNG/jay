@@ -67,6 +67,12 @@ data class AlarmGroupName(
     val groupName: String
 )
 
+@Entity(tableName = "dismissed_shared_timers")
+data class DismissedSharedTimer(
+    @androidx.room.PrimaryKey val timerId: String,
+    val expiresAt: Long
+)
+
 data class SocialChange(
     val sequence: Long,
     val groupId: String,
@@ -292,10 +298,32 @@ data class ActivityPageDto(
 )
 
 @Serializable
+data class SharedTimerRequest(
+    val label: String? = null,
+    @SerialName("duration_seconds") val durationSeconds: Int,
+    @SerialName("increment_seconds") val incrementSeconds: Int
+)
+
+@Serializable
+data class SharedTimerActionRequest(val action: String)
+
+@Serializable
+data class SharedTimerDto(
+    val id: String,
+    @SerialName("group_id") val groupId: String,
+    val label: String?,
+    @SerialName("duration_seconds") val durationSeconds: Int,
+    @SerialName("increment_seconds") val incrementSeconds: Int,
+    @SerialName("expires_at") val expiresAt: String,
+    @SerialName("started_by") val startedBy: String
+)
+
+@Serializable
 data class SyncResponse(
     val cursor: Long,
     val groups: List<SocialGroupDto>,
     val members: List<SocialMemberDto>,
     val alarms: List<SharedAlarmDto>,
+    val timers: List<SharedTimerDto> = emptyList(),
     val changes: List<SocialChangeDto> = emptyList()
 )

@@ -53,6 +53,8 @@ fun TimerItem(
 ) {
     val context = LocalContext.current
     val isFinished = obj.currentPosition.value <= 0
+    val isShared = obj.sharedTimerId != null
+    val canAct = !isShared || obj.sharedCanEdit
     val hours = obj.secondsLeft / 3600
     val minutes = (obj.secondsLeft % 3600) / 60
     val seconds = obj.secondsLeft % 60
@@ -62,7 +64,7 @@ fun TimerItem(
         modifier = modifier
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .clip(cardShape)
-            .clickable(onClick = onEdit),
+            .clickable(enabled = !isShared, onClick = onEdit),
         shape = cardShape,
         colors = CardDefaults.elevatedCardColors()
     ) {
@@ -84,6 +86,16 @@ fun TimerItem(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+
+                    obj.sharedGroupName?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = mutedContentColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
 
                     Text(
                         text = if (isFinished) "0:00:00" else "$hours:${minutes.addZero()}:${seconds.addZero()}",
@@ -128,15 +140,17 @@ fun TimerItem(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        FilledIconButton(
-                            modifier = Modifier.size(48.dp),
-                            onClick = { timerModel.restartTimer(context, obj.id) }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(26.dp)
-                            )
+                        if (canAct) {
+                            FilledIconButton(
+                                modifier = Modifier.size(48.dp),
+                                onClick = { timerModel.restartTimer(context, obj.id) }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
                         }
 
                         FilledIconButton(
@@ -157,12 +171,14 @@ fun TimerItem(
                         horizontalArrangement = Arrangement.spacedBy((-10).dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        ClickableIcon(imageVector = Icons.Default.MoreTime) {
-                            timerModel.addTimeToTimer(context, obj.id)
-                        }
+                        if (canAct) {
+                            ClickableIcon(imageVector = Icons.Default.MoreTime) {
+                                timerModel.addTimeToTimer(context, obj.id)
+                            }
 
-                        ClickableIcon(imageVector = Icons.Default.Refresh) {
-                            timerModel.restartTimer(context, obj.id)
+                            ClickableIcon(imageVector = Icons.Default.Refresh) {
+                                timerModel.restartTimer(context, obj.id)
+                            }
                         }
 
                         ClickableIcon(imageVector = Icons.Default.Close) {
@@ -170,7 +186,7 @@ fun TimerItem(
                         }
                     }
                 }
-                if (!isFinished) {
+                if (!isFinished && !isShared) {
                     FilledIconButton(
                         modifier = Modifier
                             .padding(start = 4.dp)

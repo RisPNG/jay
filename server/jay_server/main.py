@@ -35,6 +35,9 @@ from jay_server.schemas import (
     SharedAlarmCreate,
     SharedAlarmDelete,
     SharedAlarmUpdate,
+    SharedTimerAction,
+    SharedTimerCreate,
+    SharedTimerUpdate,
     PushTokenUpdate,
 )
 from jay_server.push import send_group_sync
@@ -59,6 +62,15 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Jay Server", version="1", lifespan=lifespan)
+
+SHARED_TIMER_LINGER = timedelta(minutes=15)
+
+
+def sweep_shared_timers(connection) -> None:
+    connection.execute(
+        "DELETE FROM shared_timers WHERE expires_at < now() - %s",
+        (SHARED_TIMER_LINGER,),
+    )
 
 
 @app.get("/health")
@@ -1191,6 +1203,91 @@ def get_alarm_activity(
     }
 
 
+@app.post("/v1/groups/{group_id}/timers", status_code=status.HTTP_201_CREATED)
+def start_shared_timer(
+    group_id: UUID,
+    timer: SharedTimerCreate,
+    device: dict = Depends(authenticated_device),
+) -> dict:
+    timer_id = uuid4()
+    with transaction() as connection:
+        require_alarm_editor(connection, group_id, device["id"])
+        sweep_shared_timers(connection)
+        expires_at = datetime.now(UTC) + timedelta(seconds=timer.duration_seconds)
+        connection.execute(
+            """
+            INSERT INTO shared_timers (
+                id, group_id, label, duration_seconds, increment_seconds,
+                expires_at, started_by
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                timer_id,
+                group_id,
+                timer.label,
+                timer.duration_seconds,
+                timer.increment_seconds,
+                expires_at,
+                device["id"],
+            ),
+        )
+        push_tokens = get_group_push_tokens(connection, group_id, device["id"])
+    send_group_sync(push_tokens)
+    return {"id": timer_id}
+
+
+@app.patch("/v1/timers/{timer_id}")
+def adjust_shared_timer(
+    timer_id: UUID,
+    update: SharedTimerUpdate,
+    device: dict = Depends(authenticated_device),
+) -> dict:
+    with transaction() as connection:
+        timer = connection.execute(
+            "SELECT * FROM shared_timers WHERE id = %s", (timer_id,)
+        ).fetchone()
+        if timer is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Shared timer not found")
+        require_alarm_editor(connection, timer["group_id"], device["id"])
+        now = datetime.now(UTC)
+        if update.action == SharedTimerAction.ADD:
+            base = max(timer["expires_at"], now)
+            expires_at = base + timedelta(seconds=timer["increment_seconds"])
+        else:
+            expires_at = now + timedelta(seconds=timer["duration_seconds"])
+        changed = connection.execute(
+            "UPDATE shared_timers SET expires_at = %s WHERE id = %s RETURNING *",
+            (expires_at, timer_id),
+        ).fetchone()
+        push_tokens = get_group_push_tokens(connection, timer["group_id"], device["id"])
+    send_group_sync(push_tokens)
+    return {
+        "id": changed["id"],
+        "group_id": changed["group_id"],
+        "label": changed["label"],
+        "duration_seconds": changed["duration_seconds"],
+        "increment_seconds": changed["increment_seconds"],
+        "expires_at": changed["expires_at"],
+        "started_by": changed["started_by"],
+    }
+
+
+@app.delete("/v1/timers/{timer_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_shared_timer(
+    timer_id: UUID, device: dict = Depends(authenticated_device)
+) -> None:
+    with transaction() as connection:
+        timer = connection.execute(
+            "SELECT group_id FROM shared_timers WHERE id = %s", (timer_id,)
+        ).fetchone()
+        if timer is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Shared timer not found")
+        require_alarm_editor(connection, timer["group_id"], device["id"])
+        connection.execute("DELETE FROM shared_timers WHERE id = %s", (timer_id,))
+        push_tokens = get_group_push_tokens(connection, timer["group_id"], device["id"])
+    send_group_sync(push_tokens)
+
+
 @app.get("/v1/sync")
 def synchronize(
     since: int = Query(default=0, ge=0),
@@ -1228,6 +1325,11 @@ def synchronize(
         ).fetchall()
         alarms = connection.execute(
             "SELECT * FROM shared_alarms WHERE group_id = ANY(%s)", (group_ids,)
+        ).fetchall()
+        sweep_shared_timers(connection)
+        timers = connection.execute(
+            "SELECT * FROM shared_timers WHERE group_id = ANY(%s) ORDER BY created_at",
+            (group_ids,),
         ).fetchall()
         changes = connection.execute(
             """
@@ -1278,5 +1380,6 @@ def synchronize(
         "groups": groups,
         "members": members,
         "alarms": alarms,
+        "timers": timers,
         "changes": changes,
     }

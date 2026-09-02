@@ -17,6 +17,8 @@ import com.bnyro.clock.social.domain.PlayEntitlementStatus
 import com.bnyro.clock.social.domain.PlayEntitlementVerification
 import com.bnyro.clock.social.domain.SharedAlarmDelete
 import com.bnyro.clock.social.domain.SharedAlarmRequest
+import com.bnyro.clock.social.domain.SharedTimerActionRequest
+import com.bnyro.clock.social.domain.SharedTimerRequest
 import com.bnyro.clock.social.domain.SyncResponse
 import com.bnyro.clock.social.domain.PushTokenUpdate
 import kotlinx.serialization.encodeToString
@@ -150,6 +152,23 @@ class SocialApi(
             "PUT",
             json.encodeToString(occurrence)
         )
+    }
+
+    fun startTimer(groupId: String, timer: SharedTimerRequest): IdResponse =
+        json.decodeFromString(
+            request("/v1/groups/$groupId/timers", "POST", json.encodeToString(timer))
+        )
+
+    fun adjustTimer(timerId: String, action: String) {
+        request(
+            "/v1/timers/$timerId",
+            "PATCH",
+            json.encodeToString(SharedTimerActionRequest(action))
+        )
+    }
+
+    fun cancelTimer(timerId: String) {
+        request("/v1/timers/$timerId", "DELETE")
     }
 
     fun getGroupActivity(groupId: String, before: Long?): ActivityPageDto =

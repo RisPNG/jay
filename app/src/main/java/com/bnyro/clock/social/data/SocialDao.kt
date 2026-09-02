@@ -9,6 +9,7 @@ import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
 import kotlinx.coroutines.flow.Flow
 import com.bnyro.clock.social.domain.AlarmGroupName
+import com.bnyro.clock.social.domain.DismissedSharedTimer
 
 @Dao
 interface SocialDao {
@@ -51,5 +52,14 @@ interface SocialDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putMembers(members: List<SocialMember>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putDismissedTimer(timer: DismissedSharedTimer)
+
+    @Query("SELECT * FROM dismissed_shared_timers")
+    suspend fun getDismissedTimers(): List<DismissedSharedTimer>
+
+    @Query("DELETE FROM dismissed_shared_timers WHERE expiresAt < :before")
+    suspend fun clearDismissedTimers(before: Long)
 
 }

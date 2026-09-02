@@ -81,6 +81,21 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun startGroupTimer(
+        groupId: String,
+        label: String?,
+        durationSeconds: Int,
+        incrementSeconds: Int
+    ) {
+        viewModelScope.launch {
+            busy = true
+            runCatching {
+                repository.startSharedTimer(groupId, label, durationSeconds, incrementSeconds)
+            }.onFailure { message = it.message ?: "Unable to start group timer" }
+            busy = false
+        }
+    }
+
     fun createGroup(
         name: String,
         permission: AlarmPermission,

@@ -20,7 +20,10 @@ import androidx.compose.material.icons.rounded.MoreTime
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +50,7 @@ import com.bnyro.clock.domain.model.PickerStyle
 import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.presentation.components.ScrollPickerDialog
 import com.bnyro.clock.presentation.components.SwitchWithDivider
+import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.presentation.features.RingtonePickerDialog
 import com.bnyro.clock.presentation.features.VibrationPatternPickerDialog
 import com.bnyro.clock.util.Preferences
@@ -59,14 +63,17 @@ fun TimerEditSheet(
     pickerStyle: PickerStyle,
     onSave: (TimerSettings) -> Unit,
     onDelete: (() -> Unit)? = null,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    groups: List<SocialGroup>? = null
 ) {
     var showRingtoneDialog by remember { mutableStateOf(false) }
     var showVibrationDialog by remember { mutableStateOf(false) }
     var showIncrementDialog by remember { mutableStateOf(false) }
+    var groupMenuExpanded by remember { mutableStateOf(false) }
 
     var seconds by remember { mutableIntStateOf(currentTimer.seconds) }
     var label by remember { mutableStateOf(currentTimer.label) }
+    var selectedGroupId by remember { mutableStateOf(currentTimer.groupId) }
     var soundName by remember { mutableStateOf(currentTimer.soundName) }
     var soundUri by remember { mutableStateOf(currentTimer.soundUri) }
     var soundEnabled by remember { mutableStateOf(currentTimer.soundEnabled) }
@@ -99,6 +106,50 @@ fun TimerEditSheet(
                     onSecondsChanged = { seconds = it }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
+
+                groups?.let { editableGroups ->
+                    Row(modifier = Modifier.padding(8.dp, 16.dp)) {
+                        ExposedDropdownMenuBox(
+                            expanded = groupMenuExpanded,
+                            onExpandedChange = { groupMenuExpanded = !groupMenuExpanded }
+                        ) {
+                            OutlinedTextField(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(),
+                                value = editableGroups.firstOrNull { it.id == selectedGroupId }?.name
+                                    ?: stringResource(R.string.personal_timer),
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text(stringResource(R.string.alarm_group)) },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(groupMenuExpanded)
+                                }
+                            )
+                            ExposedDropdownMenu(
+                                expanded = groupMenuExpanded,
+                                onDismissRequest = { groupMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.personal_timer)) },
+                                    onClick = {
+                                        selectedGroupId = null
+                                        groupMenuExpanded = false
+                                    }
+                                )
+                                editableGroups.forEach { group ->
+                                    DropdownMenuItem(
+                                        text = { Text(group.name) },
+                                        onClick = {
+                                            selectedGroupId = group.id
+                                            groupMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Column {
                     Row(
@@ -220,7 +271,8 @@ fun TimerEditSheet(
                                 vibrate = vibrationEnabled,
                                 vibrationPattern = vibrationPattern,
                                 vibrationPatternName = vibrationPatternName,
-                                incrementSeconds = incrementSeconds
+                                incrementSeconds = incrementSeconds,
+                                groupId = selectedGroupId
                             )
                         )
                     }

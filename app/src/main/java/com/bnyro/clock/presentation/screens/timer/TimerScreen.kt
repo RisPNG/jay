@@ -1,5 +1,8 @@
 package com.bnyro.clock.presentation.screens.timer
 
+import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,11 +24,16 @@ import androidx.compose.material.icons.rounded.AddAlarm
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFloatingActionButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,21 +63,32 @@ import com.bnyro.clock.presentation.screens.timer.components.TimerEditSheet
 import com.bnyro.clock.presentation.screens.timer.components.TimerItem
 import com.bnyro.clock.presentation.screens.timer.components.TimerPickerSelector
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
+import com.bnyro.clock.social.domain.canEditAlarms
+import com.bnyro.clock.social.presentation.SocialModel
 import com.bnyro.clock.ui.theme.ItemFade
 import com.bnyro.clock.ui.theme.ItemFadeDurationMillis
 import com.bnyro.clock.ui.theme.ItemSlide
+import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.extensions.KeepScreenOn
 import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun TimerScreen(
-    onClickSettings: () -> Unit, timerModel: TimerModel, settingsModel: SettingsModel
+    onClickSettings: () -> Unit,
+    timerModel: TimerModel,
+    settingsModel: SettingsModel,
+    socialModel: SocialModel
 ) {
     val context = LocalContext.current
     val activeTimers by timerModel.scheduledObjects.collectAsState()
+    val groups by socialModel.groups.collectAsState()
 
     var editedTimer by remember { mutableStateOf<TimerObject?>(null) }
     var editedSavedTimerId by remember { mutableStateOf<Int?>(null) }
+    var showGroupTimerDialog by remember { mutableStateOf(false) }
+    var selectedGroupTimerId by remember { mutableStateOf<String?>(null) }
+    val editableGroups = groups.filter { it.canEditAlarms }
 
     // the picker has nowhere to go until something is running, and how it starts out
     // once something is is what the setting decides rather than where it was left
@@ -152,16 +171,29 @@ fun TimerScreen(
                                     TimerSettings(seconds = timerModel.timePickerSeconds)
                                 )
                             }
+                            val askForGroup = {
+                                selectedGroupTimerId = editableGroups.firstOrNull()?.id
+                                showGroupTimerDialog = true
+                            }
                             if (settingsModel.timerBigStartButton) {
                                 LargeFloatingActionButton(
                                     shape = CircleShape,
-                                    onClick = startTimer
+                                    onClick = startTimer,
+                                    modifier = Modifier.combinedClickable(
+                                        onClick = {},
+                                        onLongClick = askForGroup
+                                    )
                                 ) {
                                     Icon(Icons.Default.PlayArrow, contentDescription = null)
                                 }
                             } else {
                                 FilledIconButton(
-                                    modifier = Modifier.size(48.dp),
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .combinedClickable(
+                                            onClick = {},
+                                            onLongClick = askForGroup
+                                        ),
                                     onClick = startTimer
                                 ) {
                                     Icon(Icons.Default.PlayArrow, contentDescription = null)
@@ -246,7 +278,32 @@ fun TimerScreen(
                     timer = timer,
                     isSelected = isSelected,
                     onStart = {
-                        if (!isSelectionMode) timerModel.startTimer(context, timer)
+                        if (!isSelectionMode) {
+                            val groupId = timer.groupId
+                            if (groupId == null) {
+                                timerModel.startTimer(context, timer)
+                            } else {
+                                val group = groups.firstOrNull { it.id == groupId }
+                                if (group == null || !group.canEditAlarms) {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.group_timer_requires_leader),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    socialModel.startGroupTimer(
+                                        groupId,
+                                        timer.label,
+                                        timer.seconds,
+                                        timer.incrementSeconds
+                                            ?: Preferences.instance.getInt(
+                                                Preferences.timerIncrementSecondsKey,
+                                                60
+                                            )
+                                    )
+                                }
+                            }
+                        }
                     },
                     onClick = {
                         if (isSelectionMode) {
@@ -270,6 +327,74 @@ fun TimerScreen(
 
     if (activeTimers.isNotEmpty()) {
         KeepScreenOn()
+    }
+
+    if (showGroupTimerDialog) {
+        AlertDialog(
+            onDismissRequest = { showGroupTimerDialog = false },
+            title = { Text(text = stringResource(R.string.start_group_timer)) },
+            text = {
+                if (editableGroups.isEmpty()) {
+                    Text(text = stringResource(R.string.group_timer_requires_leader))
+                } else {
+                    var groupMenuExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = groupMenuExpanded,
+                        onExpandedChange = { groupMenuExpanded = !groupMenuExpanded }
+                    ) {
+                        OutlinedTextField(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            value = editableGroups.firstOrNull { it.id == selectedGroupTimerId }
+                                ?.name ?: editableGroups.first().name,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.alarm_group)) },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(groupMenuExpanded)
+                            }
+                        )
+                        ExposedDropdownMenu(
+                            expanded = groupMenuExpanded,
+                            onDismissRequest = { groupMenuExpanded = false }
+                        ) {
+                            editableGroups.forEach { group ->
+                                DropdownMenuItem(
+                                    text = { Text(group.name) },
+                                    onClick = {
+                                        selectedGroupTimerId = group.id
+                                        groupMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (editableGroups.isNotEmpty()) {
+                    DialogButton(label = R.string.start, style = DialogButtonStyle.PRIMARY) {
+                        val groupId = selectedGroupTimerId ?: editableGroups.first().id
+                        showGroupTimerDialog = false
+                        socialModel.startGroupTimer(
+                            groupId,
+                            null,
+                            timerModel.timePickerSeconds,
+                            Preferences.instance.getInt(
+                                Preferences.timerIncrementSecondsKey,
+                                60
+                            )
+                        )
+                    }
+                }
+            },
+            dismissButton = {
+                DialogButton(label = android.R.string.cancel, style = DialogButtonStyle.SECONDARY) {
+                    showGroupTimerDialog = false
+                }
+            }
+        )
     }
 
     editedTimer?.let { timer ->
@@ -308,6 +433,7 @@ fun TimerScreen(
         TimerEditSheet(
             currentTimer = timerModel.savedTimers.first { it.id == id },
             pickerStyle = settingsModel.timerPickerStyle,
+            groups = editableGroups,
             onSave = { settings ->
                 timerModel.updateSavedTimer(settings)
                 editedSavedTimerId = null
