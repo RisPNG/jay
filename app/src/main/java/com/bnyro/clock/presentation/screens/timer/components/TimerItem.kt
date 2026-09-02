@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pause
@@ -78,19 +79,26 @@ fun TimerItem(
                 val mutedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = obj.label.value,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Normal,
-                        color = mutedContentColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    obj.sharedGroupName?.let {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        obj.sharedGroupName?.let {
+                            Icon(
+                                imageVector = Icons.Default.Groups,
+                                contentDescription = null,
+                                tint = mutedContentColor
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = it,
+                                modifier = Modifier.weight(1f, fill = false),
+                                color = mutedContentColor,
+                                overflow = TextOverflow.Ellipsis,
+                                maxLines = 1
+                            )
+                        }
                         Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
+                            text = obj.label.value,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Normal,
                             color = mutedContentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
