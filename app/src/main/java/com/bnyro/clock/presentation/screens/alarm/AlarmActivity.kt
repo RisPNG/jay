@@ -13,10 +13,12 @@ import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.AlarmService
 import com.bnyro.clock.social.data.SocialAlarmEvents
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 class AlarmActivity : RingingActivity() {
     private var alarm by mutableStateOf(Alarm(0, 0))
+    private var groupName by mutableStateOf<String?>(null)
 
     override val closeAction = ALARM_ALERT_CLOSE_ACTION
 
@@ -31,6 +33,7 @@ class AlarmActivity : RingingActivity() {
                 onDismiss = this@AlarmActivity::dismiss,
                 onSnooze = this@AlarmActivity::snooze,
                 label = alarm.label,
+                groupName = groupName,
                 snoozeEnabled = alarm.snoozeEnabled,
                 snoozeTime = alarm.snoozeMinutes,
                 alarmTimeMillis = alarm.time
@@ -82,9 +85,15 @@ class AlarmActivity : RingingActivity() {
     private fun handleIntent(intent: Intent) {
         val id = intent.getLongExtra(AlarmHelper.EXTRA_ID, -1).takeIf { it != -1L } ?: return
         val alarmRepository = (application as App).container.alarmRepository
+        val socialRepository = (application as App).container.socialRepository
         this.alarm = runBlocking {
             alarmRepository.getAlarmById(id)
         } ?: return
+        groupName = runBlocking {
+            socialRepository.alarmGroupNames.first()
+                .firstOrNull { it.localAlarmId == id }
+                ?.groupName
+        }
     }
 
     override fun onStart() {

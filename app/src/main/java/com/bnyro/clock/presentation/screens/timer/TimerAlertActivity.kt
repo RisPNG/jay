@@ -15,6 +15,7 @@ import com.bnyro.clock.util.services.TimerService
 class TimerAlertActivity : RingingActivity() {
     private var timerId by mutableIntStateOf(0)
     private var label by mutableStateOf<String?>(null)
+    private var groupName by mutableStateOf<String?>(null)
     private var ringingSince by mutableLongStateOf(0L)
     private var incrementSeconds by mutableIntStateOf(60)
     private var canEdit by mutableStateOf(true)
@@ -33,6 +34,7 @@ class TimerAlertActivity : RingingActivity() {
                 onSnooze = this@TimerAlertActivity::snooze,
                 onReset = this@TimerAlertActivity::reset,
                 label = label,
+                groupName = groupName,
                 ringingSince = ringingSince,
                 incrementSeconds = incrementSeconds,
                 canEdit = canEdit
@@ -78,6 +80,7 @@ class TimerAlertActivity : RingingActivity() {
     private fun handleIntent(intent: Intent) {
         timerId = intent.getIntExtra(TimerService.ID_EXTRA_KEY, 0)
         label = intent.getStringExtra(TimerService.LABEL_EXTRA_KEY)
+        groupName = intent.getStringExtra(TimerService.GROUP_NAME_EXTRA_KEY)
         ringingSince = intent.getLongExtra(
             TimerService.RINGING_SINCE_EXTRA_KEY,
             System.currentTimeMillis()

@@ -14,10 +14,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -97,10 +102,16 @@ fun RingingAlert(icon: Painter, controls: @Composable ColumnScope.() -> Unit) {
 
 /**
  * The time a ringing screen leads with, which is the time an alarm was set for and the moment a
- * timer finished, over the name of whatever is ringing, which a reader woken by it reads first.
+ * timer finished, over the group whatever is ringing comes from, and the name of whatever is
+ * ringing, which a reader woken by it reads first.
  */
 @Composable
-fun RingingTitle(label: String?, showSeconds: Boolean = false, time: ZonedDateTime? = null) {
+fun RingingTitle(
+    label: String?,
+    showSeconds: Boolean = false,
+    time: ZonedDateTime? = null,
+    groupName: String? = null
+) {
     val context = LocalContext.current
     val shownTime = if (time != null) {
         TimeHelper.formatTime(context, time, showSeconds)
@@ -128,6 +139,21 @@ fun RingingTitle(label: String?, showSeconds: Boolean = false, time: ZonedDateTi
         text = shownTime,
         style = MaterialTheme.typography.displayMedium
     )
+    groupName?.let {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Default.Groups,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(5.dp))
+            Text(
+                text = it,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
     label?.let {
         Text(text = it, style = MaterialTheme.typography.headlineMedium)
     }

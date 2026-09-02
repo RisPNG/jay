@@ -43,6 +43,7 @@ fun TimerAlertScreen(
     onSnooze: () -> Unit,
     onReset: () -> Unit,
     label: String? = null,
+    groupName: String? = null,
     ringingSince: Long,
     incrementSeconds: Int,
     canEdit: Boolean = true
@@ -50,6 +51,7 @@ fun TimerAlertScreen(
     RingingAlert(rememberVectorPainter(Icons.Rounded.Timer)) {
         TimerAlertControls(
             label,
+            groupName,
             ringingSince,
             incrementSeconds,
             canEdit,
@@ -63,6 +65,7 @@ fun TimerAlertScreen(
 @Composable
 private fun TimerAlertControls(
     label: String?,
+    groupName: String?,
     ringingSince: Long,
     incrementSeconds: Int,
     canEdit: Boolean,
@@ -73,7 +76,8 @@ private fun TimerAlertControls(
     RingingTitle(
         label,
         showSeconds = true,
-        time = Instant.ofEpochMilli(ringingSince).atZone(ZoneId.systemDefault())
+        time = Instant.ofEpochMilli(ringingSince).atZone(ZoneId.systemDefault()),
+        groupName = groupName
     )
 
     // the timer does not stop at zero, it goes on counting the wait for an answer
@@ -170,6 +174,7 @@ private fun DefaultPreview() {
         onSnooze = {},
         onReset = {},
         label = "Pasta",
+        groupName = "Family",
         ringingSince = System.currentTimeMillis(),
         incrementSeconds = 60
     )

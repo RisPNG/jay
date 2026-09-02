@@ -670,6 +670,7 @@ class TimerService : Service() {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
             .putExtra(ID_EXTRA_KEY, timerObject.id)
             .putExtra(LABEL_EXTRA_KEY, timerObject.label.value)
+            .putExtra(GROUP_NAME_EXTRA_KEY, timerObject.sharedGroupName)
             .putExtra(RINGING_SINCE_EXTRA_KEY, ringingSince)
             .putExtra(INCREMENT_EXTRA_KEY, timerObject.effectiveIncrementSeconds)
             .putExtra(CAN_EDIT_EXTRA_KEY, timerObject.sharedTimerId == null || timerObject.sharedCanEdit)
@@ -887,6 +888,7 @@ class TimerService : Service() {
         const val ACTION_ALERT_SHOWN = "alert_shown"
         const val ACTION_ALERT_HIDDEN = "alert_hidden"
         const val LABEL_EXTRA_KEY = "label"
+        const val GROUP_NAME_EXTRA_KEY = "group_name"
         const val RINGING_SINCE_EXTRA_KEY = "ringing_since"
         const val INCREMENT_EXTRA_KEY = "increment"
         const val TIMER_TIMEOUT_MINUTES = 10

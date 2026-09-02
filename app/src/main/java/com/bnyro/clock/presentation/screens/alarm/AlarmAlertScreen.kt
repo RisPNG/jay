@@ -42,18 +42,20 @@ fun AlarmAlertScreen(
     onDismiss: () -> Unit,
     onSnooze: (minutes: Int) -> Unit,
     label: String? = null,
+    groupName: String? = null,
     snoozeEnabled: Boolean,
     snoozeTime: Int,
     alarmTimeMillis: Long
 ) {
     RingingAlert(painterResource(id = R.drawable.ic_alarm)) {
-        AlarmControls(label, alarmTimeMillis, snoozeTime, snoozeEnabled, onSnooze, onDismiss)
+        AlarmControls(label, groupName, alarmTimeMillis, snoozeTime, snoozeEnabled, onSnooze, onDismiss)
     }
 }
 
 @Composable
 private fun AlarmControls(
     label: String?,
+    groupName: String?,
     alarmTimeMillis: Long,
     snoozeTime: Int,
     snoozeEnabled: Boolean,
@@ -62,6 +64,7 @@ private fun AlarmControls(
 ) {
     RingingTitle(
         label,
+        groupName = groupName,
         time = LocalDate.now()
             .atTime(LocalTime.ofSecondOfDay(alarmTimeMillis / 1000))
             .atZone(ZoneId.systemDefault())
@@ -136,7 +139,8 @@ private fun AlarmControls(
 @Composable
 private fun DefaultPreview() {
     AlarmAlertScreen(onDismiss = {}, onSnooze = {}, snoozeTime = 10, label = "Test Alarm",
-        snoozeEnabled = true, alarmTimeMillis = 7 * 60 * 60 * 1000L + 30 * 60 * 1000L
+        groupName = "Family", snoozeEnabled = true,
+        alarmTimeMillis = 7 * 60 * 60 * 1000L + 30 * 60 * 1000L
     )
 }
 
@@ -145,7 +149,9 @@ private fun DefaultPreview() {
 )
 @Composable
 private fun ControllerPreview() {
-    AlarmControls(label = "Alarm", alarmTimeMillis = 7 * 60 * 60 * 1000L + 30 * 60 * 1000L, snoozeTime = 10, snoozeEnabled = true, onSnooze = {}) {
+    AlarmControls(label = "Alarm", groupName = "Family",
+        alarmTimeMillis = 7 * 60 * 60 * 1000L + 30 * 60 * 1000L, snoozeTime = 10,
+        snoozeEnabled = true, onSnooze = {}) {
 
     }
 }
