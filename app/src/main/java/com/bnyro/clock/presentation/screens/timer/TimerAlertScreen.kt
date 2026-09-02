@@ -34,6 +34,8 @@ import com.bnyro.clock.presentation.screens.ringing.RingingAlert
 import com.bnyro.clock.presentation.screens.ringing.RingingTitle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import java.time.Instant
+import java.time.ZoneId
 
 @Composable
 fun TimerAlertScreen(
@@ -58,7 +60,11 @@ private fun TimerAlertControls(
     onSnooze: () -> Unit,
     onReset: () -> Unit
 ) {
-    RingingTitle(label, showSeconds = true)
+    RingingTitle(
+        label,
+        showSeconds = true,
+        time = Instant.ofEpochMilli(ringingSince).atZone(ZoneId.systemDefault())
+    )
 
     // the timer does not stop at zero, it goes on counting the wait for an answer
     val rung by produceState(initialValue = 0L, ringingSince) {
@@ -152,7 +158,7 @@ private fun DefaultPreview() {
         onSnooze = {},
         onReset = {},
         label = "Pasta",
-        ringingSince = 0L,
+        ringingSince = System.currentTimeMillis(),
         incrementSeconds = 60
     )
 }

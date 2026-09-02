@@ -39,6 +39,7 @@ import com.bnyro.clock.util.ThemeUtil
 import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import java.time.ZonedDateTime
 
 /**
  * The shape every ringing screen takes: a dark page carrying the icon of whatever is ringing beside
@@ -95,18 +96,24 @@ fun RingingAlert(icon: Painter, controls: @Composable ColumnScope.() -> Unit) {
 }
 
 /**
- * The time it is now over the name of whatever is ringing, which a reader woken by it reads first.
+ * The time a ringing screen leads with, which is now for an alarm that is still ringing and the
+ * moment a timer finished, over the name of whatever is ringing, which a reader woken by it
+ * reads first.
  */
 @Composable
-fun RingingTitle(label: String?, showSeconds: Boolean = false) {
+fun RingingTitle(label: String?, showSeconds: Boolean = false, time: ZonedDateTime? = null) {
     val context = LocalContext.current
-    val time by produceState(
-        initialValue = TimeHelper.formatTime(
-            context,
-            TimeHelper.getTimeByZone(),
+    val shownTime = if (time != null) {
+        TimeHelper.formatTime(context, time, showSeconds)
+    } else {
+        val now by produceState(
+            initialValue = TimeHelper.formatTime(
+                context,
+                TimeHelper.getTimeByZone(),
+                showSeconds
+            ),
             showSeconds
-        ),
-        producer = {
+        ) {
             while (isActive) {
                 value = TimeHelper.formatTime(
                     context,
@@ -116,9 +123,10 @@ fun RingingTitle(label: String?, showSeconds: Boolean = false) {
                 delay(1000)
             }
         }
-    )
+        now
+    }
     Text(
-        text = time,
+        text = shownTime,
         style = MaterialTheme.typography.displayMedium
     )
     label?.let {
