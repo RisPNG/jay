@@ -15,7 +15,8 @@ data class TimerObject(
     var soundEnabled: Boolean = true,
     var vibrate: Boolean = true,
     var vibrationPattern: List<Int> = listOf(0, 1000, 1000, 1000, 1000),
-    var vibrationPatternName: String = "Default"
+    var vibrationPatternName: String = "Default",
+    var incrementSeconds: Int = 60
 ) {
     val secondsLeft: Int
         get() = ceil(currentPosition.value / 1000.0).toInt()
@@ -29,6 +30,7 @@ data class TimerObject(
             soundEnabled = soundEnabled,
             vibrate = vibrate,
             vibrationPattern = vibrationPattern,
-            vibrationPatternName = vibrationPatternName
+            vibrationPatternName = vibrationPatternName,
+            incrementSeconds = incrementSeconds
         )
 }

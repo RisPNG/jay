@@ -98,13 +98,21 @@ fun RingingAlert(icon: Painter, controls: @Composable ColumnScope.() -> Unit) {
  * The time it is now over the name of whatever is ringing, which a reader woken by it reads first.
  */
 @Composable
-fun RingingTitle(label: String?) {
+fun RingingTitle(label: String?, showSeconds: Boolean = false) {
     val context = LocalContext.current
     val time by produceState(
-        initialValue = TimeHelper.formatTime(context, TimeHelper.getTimeByZone()),
+        initialValue = TimeHelper.formatTime(
+            context,
+            TimeHelper.getTimeByZone(),
+            showSeconds
+        ),
         producer = {
             while (isActive) {
-                value = TimeHelper.formatTime(context, TimeHelper.getTimeByZone())
+                value = TimeHelper.formatTime(
+                    context,
+                    TimeHelper.getTimeByZone(),
+                    showSeconds
+                )
                 delay(1000)
             }
         }

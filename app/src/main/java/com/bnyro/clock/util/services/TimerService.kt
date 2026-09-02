@@ -117,9 +117,6 @@ class TimerService : Service() {
         }
     }
 
-    private val incrementSeconds
-        get() = Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60)
-
     private val fullScreenAlertEnabled
         get() = Preferences.instance.getBoolean(Preferences.timerFullScreenAlertKey, true)
 
@@ -164,7 +161,7 @@ class TimerService : Service() {
                         obj.state.value = WatchState.RUNNING
                     }
 
-                    obj.currentPosition.value += incrementSeconds * 1000
+                    obj.currentPosition.value += obj.incrementSeconds * 1000
 
                     if (obj.state.value == WatchState.RUNNING) {
                         cancelAlarm(obj)
@@ -553,6 +550,7 @@ class TimerService : Service() {
             .putExtra(ID_EXTRA_KEY, timerObject.id)
             .putExtra(LABEL_EXTRA_KEY, timerObject.label.value)
             .putExtra(RINGING_SINCE_EXTRA_KEY, ringingSince)
+            .putExtra(INCREMENT_EXTRA_KEY, timerObject.incrementSeconds)
 
     private fun closeAlert(timerObject: TimerObject) {
         if (alertedTimerId == timerObject.id) alertedTimerId = null
@@ -628,7 +626,7 @@ class TimerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val snoozeAction = NotificationCompat.Action.Builder(
-            null, addTimeLabel(), snoozePendingIntent
+            null, addTimeLabel(timerObject.incrementSeconds), snoozePendingIntent
         ).build()
 
         val alertPendingIntent = PendingIntent.getActivity(
@@ -707,18 +705,16 @@ class TimerService : Service() {
     )
 
     private fun addTimeAction(timerObject: TimerObject) = getAction(
-        addTimeLabel(),
+        addTimeLabel(timerObject.incrementSeconds),
         ACTION_ADD_TIME,
         6,
         timerObject.id
     )
 
-    private fun addTimeLabel() = incrementSeconds.let { seconds ->
-        if (seconds == 60) {
-            getString(R.string.add_one_minute)
-        } else {
-            resources.getQuantityString(R.plurals.add_seconds, seconds, seconds)
-        }
+    private fun addTimeLabel(seconds: Int) = if (seconds == 60) {
+        getString(R.string.add_one_minute)
+    } else {
+        resources.getQuantityString(R.plurals.add_seconds, seconds, seconds)
     }
 
     fun updateTimer(id: Int, settings: TimerSettings) {
@@ -731,6 +727,7 @@ class TimerService : Service() {
             it.vibrate = settings.vibrate
             it.vibrationPattern = settings.vibrationPattern
             it.vibrationPatternName = settings.vibrationPatternName
+            it.incrementSeconds = settings.incrementSeconds
             updateNotification(it)
         }
     }
@@ -765,6 +762,7 @@ class TimerService : Service() {
         const val ACTION_ALERT_HIDDEN = "alert_hidden"
         const val LABEL_EXTRA_KEY = "label"
         const val RINGING_SINCE_EXTRA_KEY = "ringing_since"
+        const val INCREMENT_EXTRA_KEY = "increment"
         const val TIMER_TIMEOUT_MINUTES = 10
         const val TIMER_ALERT_CLOSE_ACTION = "com.bnyro.clock.TIMER_ALERT_CLOSE_ACTION"
 
