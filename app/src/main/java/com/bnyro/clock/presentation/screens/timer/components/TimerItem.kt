@@ -95,6 +95,7 @@ fun TimerItem(
                                 overflow = TextOverflow.Ellipsis,
                                 maxLines = 1
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                         }
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Label,
