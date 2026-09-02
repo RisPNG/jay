@@ -74,3 +74,13 @@ jobs:
             --title "$release_title" \
             --generate-notes \
             --latest
+
+      - name: Remove the prereleases this release settles
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 500 --json tagName,isPrerelease \
+            --jq '.[] | select(.isPrerelease) | .tagName' |
+            while read -r tag; do
+              gh release delete "$tag" --yes --cleanup-tag
+            done
