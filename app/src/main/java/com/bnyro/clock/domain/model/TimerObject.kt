@@ -2,6 +2,7 @@ package com.bnyro.clock.domain.model
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import com.bnyro.clock.util.Preferences
 import kotlin.math.ceil
 
 data class TimerObject(
@@ -16,10 +17,16 @@ data class TimerObject(
     var vibrate: Boolean = true,
     var vibrationPattern: List<Int> = listOf(0, 1000, 1000, 1000, 1000),
     var vibrationPatternName: String = "Default",
-    var incrementSeconds: Int = 60
+    var incrementSeconds: Int? = null
 ) {
     val secondsLeft: Int
         get() = ceil(currentPosition.value / 1000.0).toInt()
+
+    val effectiveIncrementSeconds: Int
+        get() = incrementSeconds ?: Preferences.instance.getInt(
+            Preferences.timerIncrementSecondsKey,
+            60
+        )
 
     val settings: TimerSettings
         get() = TimerSettings(

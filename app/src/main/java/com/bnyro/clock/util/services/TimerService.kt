@@ -161,7 +161,7 @@ class TimerService : Service() {
                         obj.state.value = WatchState.RUNNING
                     }
 
-                    obj.currentPosition.value += obj.incrementSeconds * 1000
+                    obj.currentPosition.value += obj.effectiveIncrementSeconds * 1000
 
                     if (obj.state.value == WatchState.RUNNING) {
                         cancelAlarm(obj)
@@ -550,7 +550,7 @@ class TimerService : Service() {
             .putExtra(ID_EXTRA_KEY, timerObject.id)
             .putExtra(LABEL_EXTRA_KEY, timerObject.label.value)
             .putExtra(RINGING_SINCE_EXTRA_KEY, ringingSince)
-            .putExtra(INCREMENT_EXTRA_KEY, timerObject.incrementSeconds)
+            .putExtra(INCREMENT_EXTRA_KEY, timerObject.effectiveIncrementSeconds)
 
     private fun closeAlert(timerObject: TimerObject) {
         if (alertedTimerId == timerObject.id) alertedTimerId = null
@@ -626,7 +626,7 @@ class TimerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val snoozeAction = NotificationCompat.Action.Builder(
-            null, addTimeLabel(timerObject.incrementSeconds), snoozePendingIntent
+            null, addTimeLabel(timerObject.effectiveIncrementSeconds), snoozePendingIntent
         ).build()
 
         val alertPendingIntent = PendingIntent.getActivity(
@@ -705,7 +705,7 @@ class TimerService : Service() {
     )
 
     private fun addTimeAction(timerObject: TimerObject) = getAction(
-        addTimeLabel(timerObject.incrementSeconds),
+        addTimeLabel(timerObject.effectiveIncrementSeconds),
         ACTION_ADD_TIME,
         6,
         timerObject.id

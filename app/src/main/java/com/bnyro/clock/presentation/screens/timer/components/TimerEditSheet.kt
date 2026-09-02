@@ -49,6 +49,7 @@ import com.bnyro.clock.presentation.components.ScrollPickerDialog
 import com.bnyro.clock.presentation.components.SwitchWithDivider
 import com.bnyro.clock.presentation.features.RingtonePickerDialog
 import com.bnyro.clock.presentation.features.VibrationPatternPickerDialog
+import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.TimeHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,7 +73,7 @@ fun TimerEditSheet(
     var vibrationEnabled by remember { mutableStateOf(currentTimer.vibrate) }
     var vibrationPattern by remember { mutableStateOf(currentTimer.vibrationPattern) }
     var vibrationPatternName by remember { mutableStateOf(currentTimer.vibrationPatternName) }
-    var incrementSeconds by remember { mutableIntStateOf(currentTimer.incrementSeconds) }
+    var incrementSeconds by remember { mutableStateOf(currentTimer.incrementSeconds) }
 
     val scrollState = rememberScrollState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -175,11 +176,9 @@ fun TimerEditSheet(
                                 style = MaterialTheme.typography.titleLarge
                             )
                             Text(
-                                text = pluralStringResource(
-                                    R.plurals.seconds_count,
-                                    incrementSeconds,
-                                    incrementSeconds
-                                ),
+                                text = incrementSeconds?.let {
+                                    pluralStringResource(R.plurals.seconds_count, it, it)
+                                } ?: stringResource(R.string.default_increment),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -251,16 +250,18 @@ fun TimerEditSheet(
         )
     }
     if (showIncrementDialog) {
+        val defaultLabel = stringResource(R.string.default_increment)
         ScrollPickerDialog(
             onDismissRequest = { showIncrementDialog = false },
             title = stringResource(R.string.select_timer_increment),
             unit = stringResource(R.string.seconds),
-            value = incrementSeconds,
-            maxValue = 60,
-            offset = 1,
-            label = { it.toString() },
+            value = incrementSeconds
+                ?: Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60),
+            maxValue = 61,
+            offset = 0,
+            label = { if (it == 0) defaultLabel else it.toString() },
             onValueSet = {
-                incrementSeconds = it
+                incrementSeconds = it.takeIf { seconds -> seconds > 0 }
                 showIncrementDialog = false
             }
         )

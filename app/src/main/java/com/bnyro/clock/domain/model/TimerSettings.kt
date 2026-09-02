@@ -28,10 +28,7 @@ data class TimerSettings(
     val vibrate: Boolean = true,
     val vibrationPattern: List<Int> = listOf(0, 1000, 1000, 1000, 1000),
     val vibrationPatternName: String = "Default",
-    val incrementSeconds: Int = Preferences.instance.getInt(
-        Preferences.timerIncrementSecondsKey,
-        60
-    )
+    val incrementSeconds: Int? = null
 ) : Parcelable {
     companion object {
         private val exampleTimers = listOf(
