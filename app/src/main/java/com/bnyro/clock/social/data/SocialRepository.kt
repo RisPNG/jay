@@ -9,6 +9,7 @@ import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.RepeatAnchor
 import com.bnyro.clock.domain.model.RepeatUnit
+import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.social.domain.AlarmActivityKind
@@ -643,6 +644,19 @@ class SocialRepository(
                         .putExtra(TimerService.SHARED_TIMER_INCREMENT_EXTRA_KEY, remote.incrementSeconds)
                         .putExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, expiresAt)
                         .putExtra(TimerService.SHARED_TIMER_CAN_EDIT_EXTRA_KEY, group.canEditAlarms)
+                        .putExtra(
+                            TimerService.SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY,
+                            remote.soundEnabled
+                        )
+                        .putExtra(TimerService.SHARED_TIMER_VIBRATE_EXTRA_KEY, remote.vibrate)
+                        .putExtra(
+                            TimerService.SHARED_TIMER_VIBRATION_PATTERN_EXTRA_KEY,
+                            remote.vibrationPattern.toIntArray()
+                        )
+                        .putExtra(
+                            TimerService.SHARED_TIMER_VIBRATION_PATTERN_NAME_EXTRA_KEY,
+                            remote.vibrationPatternName
+                        )
                 )
             }
         }
@@ -658,23 +672,31 @@ class SocialRepository(
         }
     }
 
-    suspend fun startSharedTimer(
-        groupId: String,
-        label: String?,
-        durationSeconds: Int,
-        incrementSeconds: Int
-    ) = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
-        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).startTimer(
-            groupId,
-            SharedTimerRequest(label, durationSeconds, incrementSeconds)
-        )
-        synchronize()
-    }
+    suspend fun startSharedTimer(groupId: String, label: String?, settings: TimerSettings) =
+        withContext(Dispatchers.IO) {
+            val serverUrl = Preferences.instance.getString(
+                SocialPreferences.serverUrlKey,
+                DEFAULT_SERVER_URL
+            ) ?: DEFAULT_SERVER_URL
+            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+            SocialApi(serverUrl, identity).startTimer(
+                groupId,
+                SharedTimerRequest(
+                    label = label,
+                    durationSeconds = settings.seconds,
+                    incrementSeconds = settings.incrementSeconds
+                        ?: Preferences.instance.getInt(
+                            Preferences.timerIncrementSecondsKey,
+                            60
+                        ),
+                    vibrate = settings.vibrate,
+                    soundEnabled = settings.soundEnabled,
+                    vibrationPattern = settings.vibrationPattern,
+                    vibrationPatternName = settings.vibrationPatternName
+                )
+            )
+            synchronize()
+        }
 
     suspend fun adjustSharedTimer(timerId: String, action: String) =
         withContext(Dispatchers.IO) {

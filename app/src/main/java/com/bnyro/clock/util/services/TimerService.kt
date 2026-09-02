@@ -470,6 +470,12 @@ class TimerService : Service() {
         val incrementSeconds = intent.getIntExtra(SHARED_TIMER_INCREMENT_EXTRA_KEY, 60)
         val expiresAt = intent.getLongExtra(SHARED_TIMER_EXPIRES_EXTRA_KEY, 0L)
         val canEdit = intent.getBooleanExtra(SHARED_TIMER_CAN_EDIT_EXTRA_KEY, false)
+        val soundEnabled = intent.getBooleanExtra(SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY, true)
+        val vibrate = intent.getBooleanExtra(SHARED_TIMER_VIBRATE_EXTRA_KEY, true)
+        val vibrationPattern = intent.getIntArrayExtra(SHARED_TIMER_VIBRATION_PATTERN_EXTRA_KEY)
+            ?.toList() ?: listOf(0, 1000, 1000, 1000, 1000)
+        val vibrationPatternName = intent.getStringExtra(SHARED_TIMER_VIBRATION_PATTERN_NAME_EXTRA_KEY)
+            ?: "Default"
         if (durationSeconds <= 0) return
 
         val existing = timerObjects.find { it.sharedTimerId == sharedId }
@@ -486,7 +492,11 @@ class TimerService : Service() {
                 incrementSeconds = incrementSeconds,
                 sharedTimerId = sharedId,
                 sharedGroupName = groupName,
-                sharedCanEdit = canEdit
+                sharedCanEdit = canEdit,
+                soundEnabled = soundEnabled,
+                vibrate = vibrate,
+                vibrationPattern = vibrationPattern,
+                vibrationPatternName = vibrationPatternName
             )
             if (remaining > 0) {
                 startForeground(obj.id, getNotification(obj))
@@ -505,6 +515,10 @@ class TimerService : Service() {
         existing.sharedGroupName = groupName
         existing.sharedCanEdit = canEdit
         existing.incrementSeconds = incrementSeconds
+        existing.soundEnabled = soundEnabled
+        existing.vibrate = vibrate
+        existing.vibrationPattern = vibrationPattern
+        existing.vibrationPatternName = vibrationPatternName
         existing.initialPosition.value = durationSeconds * 1000
         if (remaining > 0) {
             val drifted = abs(existing.currentPosition.value - remaining.toInt()) > 1000
@@ -886,6 +900,10 @@ class TimerService : Service() {
         const val SHARED_TIMER_INCREMENT_EXTRA_KEY = "shared_timer_increment"
         const val SHARED_TIMER_EXPIRES_EXTRA_KEY = "shared_timer_expires"
         const val SHARED_TIMER_CAN_EDIT_EXTRA_KEY = "shared_timer_can_edit"
+        const val SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY = "shared_timer_sound_enabled"
+        const val SHARED_TIMER_VIBRATE_EXTRA_KEY = "shared_timer_vibrate"
+        const val SHARED_TIMER_VIBRATION_PATTERN_EXTRA_KEY = "shared_timer_vibration_pattern"
+        const val SHARED_TIMER_VIBRATION_PATTERN_NAME_EXTRA_KEY = "shared_timer_vibration_pattern_name"
         const val ACTIVE_SHARED_TIMER_IDS_EXTRA_KEY = "active_shared_timer_ids"
         const val CAN_EDIT_EXTRA_KEY = "can_edit"
 

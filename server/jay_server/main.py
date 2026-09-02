@@ -1218,8 +1218,9 @@ def start_shared_timer(
             """
             INSERT INTO shared_timers (
                 id, group_id, label, duration_seconds, increment_seconds,
-                expires_at, started_by
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                expires_at, started_by, sound_enabled, vibrate,
+                vibration_pattern, vibration_pattern_name
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 timer_id,
@@ -1229,6 +1230,10 @@ def start_shared_timer(
                 timer.increment_seconds,
                 expires_at,
                 device["id"],
+                timer.sound_enabled,
+                timer.vibrate,
+                timer.vibration_pattern,
+                timer.vibration_pattern_name,
             ),
         )
         push_tokens = get_group_push_tokens(connection, group_id, device["id"])

@@ -11,6 +11,7 @@ import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.social.domain.MemberRole
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
+import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.social.domain.SocialChange
 import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.Preferences
@@ -81,16 +82,11 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun startGroupTimer(
-        groupId: String,
-        label: String?,
-        durationSeconds: Int,
-        incrementSeconds: Int
-    ) {
+    fun startGroupTimer(groupId: String, label: String?, settings: TimerSettings) {
         viewModelScope.launch {
             busy = true
             runCatching {
-                repository.startSharedTimer(groupId, label, durationSeconds, incrementSeconds)
+                repository.startSharedTimer(groupId, label, settings)
             }.onFailure { message = it.message ?: "Unable to start group timer" }
             busy = false
         }

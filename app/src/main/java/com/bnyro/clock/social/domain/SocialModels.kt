@@ -301,7 +301,11 @@ data class ActivityPageDto(
 data class SharedTimerRequest(
     val label: String? = null,
     @SerialName("duration_seconds") val durationSeconds: Int,
-    @SerialName("increment_seconds") val incrementSeconds: Int
+    @SerialName("increment_seconds") val incrementSeconds: Int,
+    val vibrate: Boolean = true,
+    @SerialName("sound_enabled") val soundEnabled: Boolean = true,
+    @SerialName("vibration_pattern") val vibrationPattern: List<Int>,
+    @SerialName("vibration_pattern_name") val vibrationPatternName: String
 )
 
 @Serializable
@@ -315,7 +319,11 @@ data class SharedTimerDto(
     @SerialName("duration_seconds") val durationSeconds: Int,
     @SerialName("increment_seconds") val incrementSeconds: Int,
     @SerialName("expires_at") val expiresAt: String,
-    @SerialName("started_by") val startedBy: String
+    @SerialName("started_by") val startedBy: String,
+    val vibrate: Boolean = true,
+    @SerialName("sound_enabled") val soundEnabled: Boolean = true,
+    @SerialName("vibration_pattern") val vibrationPattern: List<Int> = emptyList(),
+    @SerialName("vibration_pattern_name") val vibrationPatternName: String = "Default"
 )
 
 @Serializable

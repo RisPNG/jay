@@ -68,7 +68,6 @@ import com.bnyro.clock.social.presentation.SocialModel
 import com.bnyro.clock.ui.theme.ItemFade
 import com.bnyro.clock.ui.theme.ItemFadeDurationMillis
 import com.bnyro.clock.ui.theme.ItemSlide
-import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.extensions.KeepScreenOn
 import kotlinx.coroutines.delay
 
@@ -291,16 +290,7 @@ fun TimerScreen(
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 } else {
-                                    socialModel.startGroupTimer(
-                                        groupId,
-                                        timer.label,
-                                        timer.seconds,
-                                        timer.incrementSeconds
-                                            ?: Preferences.instance.getInt(
-                                                Preferences.timerIncrementSecondsKey,
-                                                60
-                                            )
-                                    )
+                                    socialModel.startGroupTimer(groupId, timer.label, timer)
                                 }
                             }
                         }
@@ -380,11 +370,7 @@ fun TimerScreen(
                         socialModel.startGroupTimer(
                             groupId,
                             null,
-                            timerModel.timePickerSeconds,
-                            Preferences.instance.getInt(
-                                Preferences.timerIncrementSecondsKey,
-                                60
-                            )
+                            TimerSettings(seconds = timerModel.timePickerSeconds)
                         )
                     }
                 }

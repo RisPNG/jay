@@ -155,6 +155,17 @@ class SharedTimerCreate(BaseModel):
     label: str | None = Field(default=None, max_length=120)
     duration_seconds: int = Field(ge=1, le=86_400)
     increment_seconds: int = Field(ge=1, le=3_600)
+    vibrate: bool = True
+    sound_enabled: bool = True
+    vibration_pattern: list[int]
+    vibration_pattern_name: str = Field(min_length=1, max_length=80)
+
+    @field_validator("vibration_pattern")
+    @classmethod
+    def validate_vibration_pattern(cls, pattern: list[int]) -> list[int]:
+        if not pattern or any(duration < 0 for duration in pattern):
+            raise ValueError("vibration_pattern must contain non-negative durations")
+        return pattern
 
 
 class SharedTimerAction(StrEnum):
