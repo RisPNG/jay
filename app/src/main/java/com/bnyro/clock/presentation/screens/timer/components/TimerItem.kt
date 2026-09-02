@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MoreTime
@@ -95,6 +96,12 @@ fun TimerItem(
                                 maxLines = 1
                             )
                         }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Label,
+                            contentDescription = null,
+                            tint = mutedContentColor
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = obj.label.value,
                             style = MaterialTheme.typography.bodyLarge,
