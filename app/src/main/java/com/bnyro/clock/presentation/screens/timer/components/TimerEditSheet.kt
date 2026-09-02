@@ -250,7 +250,6 @@ fun TimerEditSheet(
         )
     }
     if (showIncrementDialog) {
-        val defaultLabel = stringResource(R.string.default_increment)
         ScrollPickerDialog(
             onDismissRequest = { showIncrementDialog = false },
             title = stringResource(R.string.select_timer_increment),
@@ -259,7 +258,7 @@ fun TimerEditSheet(
                 ?: Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60),
             maxValue = 61,
             offset = 0,
-            label = { if (it == 0) defaultLabel else it.toString() },
+            label = { it.toString() },
             onValueSet = {
                 incrementSeconds = it.takeIf { seconds -> seconds > 0 }
                 showIncrementDialog = false
