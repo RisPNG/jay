@@ -33,6 +33,9 @@ import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.presentation.screens.ringing.RingingAlert
 import com.bnyro.clock.presentation.screens.ringing.RingingTitle
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 
 @Composable
 fun AlarmAlertScreen(
@@ -40,22 +43,29 @@ fun AlarmAlertScreen(
     onSnooze: (minutes: Int) -> Unit,
     label: String? = null,
     snoozeEnabled: Boolean,
-    snoozeTime: Int
+    snoozeTime: Int,
+    alarmTimeMillis: Long
 ) {
     RingingAlert(painterResource(id = R.drawable.ic_alarm)) {
-        AlarmControls(label, snoozeTime, snoozeEnabled, onSnooze, onDismiss)
+        AlarmControls(label, alarmTimeMillis, snoozeTime, snoozeEnabled, onSnooze, onDismiss)
     }
 }
 
 @Composable
 private fun AlarmControls(
     label: String?,
+    alarmTimeMillis: Long,
     snoozeTime: Int,
     snoozeEnabled: Boolean,
     onSnooze: (minutes: Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    RingingTitle(label)
+    RingingTitle(
+        label,
+        time = LocalDate.now()
+            .atTime(LocalTime.ofSecondOfDay(alarmTimeMillis / 1000))
+            .atZone(ZoneId.systemDefault())
+    )
     Column(
         Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -126,7 +136,7 @@ private fun AlarmControls(
 @Composable
 private fun DefaultPreview() {
     AlarmAlertScreen(onDismiss = {}, onSnooze = {}, snoozeTime = 10, label = "Test Alarm",
-        snoozeEnabled = true
+        snoozeEnabled = true, alarmTimeMillis = 7 * 60 * 60 * 1000L + 30 * 60 * 1000L
     )
 }
 
@@ -135,7 +145,7 @@ private fun DefaultPreview() {
 )
 @Composable
 private fun ControllerPreview() {
-    AlarmControls(label = "Alarm", snoozeTime = 10, snoozeEnabled = true, onSnooze = {}) {
+    AlarmControls(label = "Alarm", alarmTimeMillis = 7 * 60 * 60 * 1000L + 30 * 60 * 1000L, snoozeTime = 10, snoozeEnabled = true, onSnooze = {}) {
 
     }
 }

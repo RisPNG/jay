@@ -31,7 +31,8 @@ class AlarmActivity : RingingActivity() {
                 onSnooze = this@AlarmActivity::snooze,
                 label = alarm.label,
                 snoozeEnabled = alarm.snoozeEnabled,
-                snoozeTime = alarm.snoozeMinutes
+                snoozeTime = alarm.snoozeMinutes,
+                alarmTimeMillis = alarm.time
             )
         }
 

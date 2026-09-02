@@ -96,9 +96,8 @@ fun RingingAlert(icon: Painter, controls: @Composable ColumnScope.() -> Unit) {
 }
 
 /**
- * The time a ringing screen leads with, which is now for an alarm that is still ringing and the
- * moment a timer finished, over the name of whatever is ringing, which a reader woken by it
- * reads first.
+ * The time a ringing screen leads with, which is the time an alarm was set for and the moment a
+ * timer finished, over the name of whatever is ringing, which a reader woken by it reads first.
  */
 @Composable
 fun RingingTitle(label: String?, showSeconds: Boolean = false, time: ZonedDateTime? = null) {
