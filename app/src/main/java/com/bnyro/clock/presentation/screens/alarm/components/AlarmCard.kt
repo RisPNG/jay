@@ -70,42 +70,109 @@ fun AlarmCard(
             ) {
                 val millisRemaining = AlarmHelper.getAlarmTime(alarm)
                     ?.minus(System.currentTimeMillis())
-                if (groupName != null || alarm.label != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 5.dp, end = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        groupName?.let {
-                            Icon(Icons.Default.Groups, null)
-                            Spacer(modifier = Modifier.width(5.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    groupName?.let {
+                        Icon(Icons.Default.Groups, null)
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = it,
+                            modifier = Modifier.weight(1f, fill = false),
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1
+                        )
+                    }
+                    onActivity?.let {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = stringResource(R.string.alarm_logs),
+                            modifier = Modifier
+                                .padding(horizontal = 5.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = it)
+                        )
+                    }
+                    alarm.label?.let {
+                        Icon(Icons.AutoMirrored.Filled.Label, null)
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = it,
+                            modifier = Modifier.weight(1f, fill = false),
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    val repeatDuration = alarm.repeatDuration
+                    when {
+                        alarm.isOneTime -> {
+                            Text(text = stringResource(R.string.one_time))
+                        }
+
+                        repeatDuration != null -> {
                             Text(
-                                text = it,
-                                modifier = Modifier.weight(1f, fill = false),
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1
+                                text = stringResource(
+                                    R.string.repeats_for_every,
+                                    repeatDuration,
+                                    pluralStringResource(
+                                        id = alarm.repeatDurationUnit.value,
+                                        count = repeatDuration
+                                    ),
+                                    alarm.repeatInterval,
+                                    pluralStringResource(
+                                        id = alarm.repeatUnit.value,
+                                        count = alarm.repeatInterval
+                                    )
+                                )
                             )
                         }
-                        onActivity?.let {
-                            Icon(
-                                imageVector = Icons.Rounded.History,
-                                contentDescription = stringResource(R.string.alarm_logs),
-                                modifier = Modifier
-                                    .padding(horizontal = 5.dp)
-                                    .clip(CircleShape)
-                                    .clickable(onClick = it)
+
+                        alarm.repeatUnit != RepeatUnit.WEEK || alarm.repeatInterval > 1 -> {
+                            Text(
+                                text = pluralStringResource(
+                                    id = alarm.repeatUnit.summary,
+                                    count = alarm.repeatInterval,
+                                    alarm.repeatInterval
+                                )
                             )
                         }
-                        alarm.label?.let {
-                            Icon(Icons.AutoMirrored.Filled.Label, null)
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = it,
-                                modifier = Modifier.weight(1f, fill = false),
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1
-                            )
+
+                        alarm.isRepeatEveryday -> {
+                            Text(text = stringResource(R.string.every_day))
+                        }
+
+                        alarm.isWeekends -> {
+                            Text(text = stringResource(R.string.weekends))
+                        }
+
+                        alarm.isWeekdays -> {
+                            Text(text = stringResource(R.string.weekdays))
+                        }
+
+                        else -> {
+                            val daysOfWeek = remember {
+                                AlarmHelper.getDaysOfWeekForDisplay(context)
+                            }
+                            daysOfWeek.forEach { (day, index) ->
+                                val enabled = alarm.days.contains(index)
+                                Text(
+                                    modifier = Modifier.padding(horizontal = 2.dp),
+                                    text = day,
+                                    color = if (enabled) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface.copy(
+                                            alpha = 0.5f
+                                        )
+                                    },
+                                    fontWeight = FontWeight.Normal,
+                                    letterSpacing = 1.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -132,65 +199,11 @@ fun AlarmCard(
                     DialogButton(R.string.dismiss, DialogButtonStyle.SECONDARY, onDismiss)
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Row(Modifier.padding(horizontal = 8.dp)) {
-                        when {
-                            alarm.isOneTime -> {
-                                Text(text = stringResource(R.string.one_time))
-                            }
-
-                            alarm.repeatUnit != RepeatUnit.WEEK || alarm.repeatInterval > 1 -> {
-                                Text(
-                                    text = pluralStringResource(
-                                        id = alarm.repeatUnit.summary,
-                                        count = alarm.repeatInterval,
-                                        alarm.repeatInterval
-                                    )
-                                )
-                            }
-
-                            alarm.isRepeatEveryday -> {
-                                Text(text = stringResource(R.string.repeating))
-                            }
-
-                            alarm.isWeekends -> {
-                                Text(text = stringResource(R.string.weekends))
-                            }
-
-                            alarm.isWeekdays -> {
-                                Text(text = stringResource(R.string.weekdays))
-                            }
-
-                            else -> {
-                                val daysOfWeek = remember {
-                                    AlarmHelper.getDaysOfWeekByLocale(context)
-                                }
-                                daysOfWeek.forEach { (day, index) ->
-                                    val enabled = alarm.days.contains(index)
-                                    Text(
-                                        modifier = Modifier.padding(horizontal = 2.dp),
-                                        text = day,
-                                        color = if (enabled) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface.copy(
-                                                alpha = 0.5f
-                                            )
-                                        },
-                                        fontWeight = FontWeight.Normal,
-                                        letterSpacing = 1.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Switch(
-                        checked = isAlarmEnabled,
-                        onCheckedChange = onEnable,
-                        enabled = canEdit
-                    )
-                }
+                Switch(
+                    checked = isAlarmEnabled,
+                    onCheckedChange = onEnable,
+                    enabled = canEdit
+                )
             }
         }
     }

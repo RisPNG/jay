@@ -76,9 +76,7 @@ class MainActivity : ComponentActivity() {
             timerModel.onEnqueue = {
                 timerService.enqueueNew(it)
             }
-            timerModel.updateLabel = timerService::updateLabel
-            timerModel.updateRingtone = timerService::updateRingtone
-            timerModel.updateVibrate = timerService::updateVibrate
+            timerModel.updateTimer = timerService::updateTimer
 
             timerService.invokeChangeListener()
         }
@@ -86,9 +84,7 @@ class MainActivity : ComponentActivity() {
         override fun onServiceDisconnected(p0: ComponentName?) {
             timerService.onChangeTimers = {}
             timerModel.onEnqueue = null
-            timerModel.updateLabel = { _, _ -> }
-            timerModel.updateRingtone = { _, _ -> }
-            timerModel.updateVibrate = { _, _ -> }
+            timerModel.updateTimer = { _, _ -> }
         }
     }
 

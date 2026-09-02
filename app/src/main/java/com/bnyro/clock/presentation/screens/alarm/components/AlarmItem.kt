@@ -52,10 +52,11 @@ fun AlarmItem(
     onUpdateAlarm: (Alarm) -> Unit,
     onDeleteAlarm: (Alarm) -> Unit,
     onActivity: (() -> Unit)? = null,
-    onDismissAlarm: (Alarm) -> Unit
+    onDismissAlarm: (Alarm) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var showDeletionDialog by remember { mutableStateOf(false) }
-    var isAlarmEnabled by remember { mutableStateOf(alarm.enabled) }
+    var isAlarmEnabled by remember(alarm.id, alarm.enabled) { mutableStateOf(alarm.enabled) }
     val alarmTime = AlarmHelper.getAlarmTime(alarm)
     var canDismiss by remember(alarm.id, isAlarmEnabled, alarm.dismissedAt, alarmTime) {
         val timeUntilAlarm = alarmTime?.minus(System.currentTimeMillis())
@@ -86,6 +87,7 @@ fun AlarmItem(
     )
 
     SwipeToDismissBox(
+        modifier = modifier,
         state = dismissState,
         enableDismissFromStartToEnd = !isSelectionMode && canEdit,
         enableDismissFromEndToStart = false,

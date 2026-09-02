@@ -17,6 +17,8 @@ import com.bnyro.clock.App
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.PickerStyle
+import com.bnyro.clock.domain.model.TimerPickerBehaviour
+import com.bnyro.clock.domain.model.WeekStart
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.navigation.HomeRoutes
 import com.bnyro.clock.navigation.homeRoutes
@@ -31,6 +33,7 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.util.GregorianCalendar
 import com.bnyro.clock.domain.model.VolumeButtonAction
 
 class SettingsModel : ViewModel() {
@@ -60,6 +63,17 @@ class SettingsModel : ViewModel() {
             ) ?: PickerStyle.WHEEL.name
         )
     )
+    var timerPickerBehaviour by mutableStateOf(
+        TimerPickerBehaviour.valueOf(
+            Preferences.instance.getString(
+                Preferences.timerPickerBehaviourKey,
+                TimerPickerBehaviour.HIDE.name
+            ) ?: TimerPickerBehaviour.HIDE.name
+        )
+    )
+    var timerBigStartButton by mutableStateOf(
+        Preferences.instance.getBoolean(Preferences.timerBigStartButtonKey, false)
+    )
     var alarmPickerStyle by mutableStateOf(
         PickerStyle.valueOf(
             Preferences.instance.getString(
@@ -67,6 +81,13 @@ class SettingsModel : ViewModel() {
                 PickerStyle.WHEEL.name
             ) ?: PickerStyle.WHEEL.name
         )
+    )
+    var weekStart by mutableStateOf(
+        Preferences.instance.getString(Preferences.weekStartKey, null)
+            ?.let { WeekStart.valueOf(it) }
+            ?: WeekStart.entries.first {
+                it.dayOfWeek.value % 7 == GregorianCalendar().firstDayOfWeek - 1
+            }
     )
     var customColor by mutableStateOf(
         Preferences.instance.getInt(Preferences.customColorKey, catpucchinLatte.first())
@@ -99,6 +120,15 @@ class SettingsModel : ViewModel() {
         VolumeButtonAction.valueOf(
             Preferences.instance.getString(
                 Preferences.volumeButtonActionKey,
+                VolumeButtonAction.SNOOZE.name
+            ) ?: VolumeButtonAction.SNOOZE.name
+        )
+    )
+
+    var timerVolumeButtonAction by mutableStateOf(
+        VolumeButtonAction.valueOf(
+            Preferences.instance.getString(
+                Preferences.timerVolumeButtonActionKey,
                 VolumeButtonAction.SNOOZE.name
             ) ?: VolumeButtonAction.SNOOZE.name
         )
