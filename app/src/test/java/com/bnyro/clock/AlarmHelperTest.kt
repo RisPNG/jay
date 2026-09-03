@@ -11,6 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.util.Calendar
+import java.util.Locale
 
 class AlarmHelperTest {
     private fun recurringAlarm(
@@ -88,6 +89,23 @@ class AlarmHelperTest {
             listOf(LocalDate.of(2099, 1, 5), LocalDate.of(2099, 1, 7), LocalDate.of(2099, 1, 19)),
             occurrences(alarm, 3)
         )
+    }
+
+    @Test
+    fun weeklyAlarmAnchorsItsSevenDayRunsOnItsStartDateInEveryLocale() {
+        val locale = Locale.getDefault()
+        val alarm = recurringAlarm(LocalDate.of(2099, 1, 7), RepeatUnit.WEEK, repeatInterval = 2)
+            .apply { days = listOf(0) }
+        val expected = listOf(LocalDate.of(2099, 1, 11), LocalDate.of(2099, 1, 25))
+
+        try {
+            Locale.setDefault(Locale.US)
+            assertEquals(expected, occurrences(alarm, 2))
+            Locale.setDefault(Locale.UK)
+            assertEquals(expected, occurrences(alarm, 2))
+        } finally {
+            Locale.setDefault(locale)
+        }
     }
 
     @Test
