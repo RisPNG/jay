@@ -127,10 +127,10 @@ fun AlarmCard(
                             Text(text = stringResource(R.string.weekdays))
                         }
 
-                        else -> {
-                            val daysOfWeek = remember {
-                                AlarmHelper.getDaysOfWeekByLocale(context)
-                            }
+                            else -> {
+                                val daysOfWeek = remember {
+                                    AlarmHelper.getDaysOfWeekForDisplay(context)
+                                }
                             daysOfWeek.forEach { (day, index) ->
                                 val enabled = alarm.days.contains(index)
                                 Text(
