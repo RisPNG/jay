@@ -7,30 +7,33 @@ import androidx.annotation.RequiresApi
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.util.AlarmHelper
+import java.time.ZoneId
 
 class CreateUpdateDeleteAlarmUseCase(
     private val context: Context,
     private val alarmRepository: AlarmRepository
 ) {
     @RequiresApi(Build.VERSION_CODES.M)
-    suspend fun createAlarm(alarm: Alarm): Long {
-        // fixx maybe baby D:
-        alarm.dismissedAt = null
-        alarm.startDate = AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay() ?: alarm.startDate
-        if (AlarmHelper.hasRecurrenceEnded(alarm)) alarm.enabled = false
+    suspend fun createAlarm(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()): Long {
+        prepareForScheduling(alarm, timeZone)
         val newId = alarmRepository.addAlarm(alarm)
         val alarmWithId = alarm.copy(id = newId)
-        AlarmHelper.enqueue(context, alarmWithId)
+        AlarmHelper.enqueue(context, alarmWithId, timeZone = timeZone)
         return newId
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
-    suspend fun updateAlarm(alarm: Alarm) {
-        alarm.dismissedAt = null
-        alarm.startDate = AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay() ?: alarm.startDate
-        if (AlarmHelper.hasRecurrenceEnded(alarm)) alarm.enabled = false
+    suspend fun updateAlarm(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()) {
+        prepareForScheduling(alarm, timeZone)
         alarmRepository.updateAlarm(alarm)
-        AlarmHelper.enqueue(context, alarm)
+        AlarmHelper.enqueue(context, alarm, timeZone = timeZone)
+    }
+
+    fun prepareForScheduling(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()) {
+        alarm.dismissedAt = null
+        alarm.startDate = AlarmHelper.getNextRepetitionStart(alarm, timeZone)?.toEpochDay()
+            ?: alarm.startDate
+        if (AlarmHelper.hasRecurrenceEnded(alarm, timeZone)) alarm.enabled = false
     }
 
     @RequiresApi(Build.VERSION_CODES.M)

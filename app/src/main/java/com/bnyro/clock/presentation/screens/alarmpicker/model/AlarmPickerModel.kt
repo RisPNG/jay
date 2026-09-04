@@ -35,6 +35,8 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
         SharingStarted.WhileSubscribed(5_000),
         emptyList()
     )
+    val canUploadSharedSounds: Boolean
+        get() = socialRepository.canUploadSharedSounds
 
     var busy by mutableStateOf(false)
         private set

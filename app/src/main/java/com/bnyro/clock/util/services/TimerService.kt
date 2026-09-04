@@ -235,12 +235,41 @@ class TimerService : Service() {
             )
 
             mediaPlayer = MediaPlayer()
+            mediaPlayer!!.setOnErrorListener { player, _, _ ->
+                Log.e("Media Player", "Error occurred while playing audio.")
+                player.release()
+                mediaPlayer = null
+                if (timerObject.soundUri != null) {
+                    runCatching {
+                        mediaPlayer = MediaPlayer().apply {
+                            setDataSource(
+                                this@TimerService,
+                                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                            )
+                            startAlarm(this)
+                        }
+                    }
+                }
+                true
+            }
 
             try {
                 mediaPlayer!!.setDataSource(this, alert)
                 startAlarm(mediaPlayer!!)
             } catch (e: Exception) {
                 Log.e("failed to play ringtone", e.message, e)
+                if (timerObject.soundUri != null) {
+                    runCatching {
+                        mediaPlayer?.release()
+                        mediaPlayer = MediaPlayer().apply {
+                            setDataSource(
+                                this@TimerService,
+                                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                            )
+                            startAlarm(this)
+                        }
+                    }
+                }
             }
         }
         if (timerObject.vibrate) {
@@ -471,6 +500,8 @@ class TimerService : Service() {
         val expiresAt = intent.getLongExtra(SHARED_TIMER_EXPIRES_EXTRA_KEY, 0L)
         val canEdit = intent.getBooleanExtra(SHARED_TIMER_CAN_EDIT_EXTRA_KEY, false)
         val soundEnabled = intent.getBooleanExtra(SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY, true)
+        val soundName = intent.getStringExtra(SHARED_TIMER_SOUND_NAME_EXTRA_KEY)
+        val soundUri = intent.getStringExtra(SHARED_TIMER_SOUND_URI_EXTRA_KEY)
         val vibrate = intent.getBooleanExtra(SHARED_TIMER_VIBRATE_EXTRA_KEY, true)
         val vibrationPattern = intent.getIntArrayExtra(SHARED_TIMER_VIBRATION_PATTERN_EXTRA_KEY)
             ?.toList() ?: listOf(0, 1000, 1000, 1000, 1000)
@@ -494,6 +525,8 @@ class TimerService : Service() {
                 sharedGroupName = groupName,
                 sharedCanEdit = canEdit,
                 soundEnabled = soundEnabled,
+                soundName = soundName,
+                soundUri = soundUri,
                 vibrate = vibrate,
                 vibrationPattern = vibrationPattern,
                 vibrationPatternName = vibrationPatternName
@@ -516,6 +549,8 @@ class TimerService : Service() {
         existing.sharedCanEdit = canEdit
         existing.incrementSeconds = incrementSeconds
         existing.soundEnabled = soundEnabled
+        existing.soundName = soundName
+        existing.soundUri = soundUri
         existing.vibrate = vibrate
         existing.vibrationPattern = vibrationPattern
         existing.vibrationPatternName = vibrationPatternName
@@ -903,6 +938,8 @@ class TimerService : Service() {
         const val SHARED_TIMER_EXPIRES_EXTRA_KEY = "shared_timer_expires"
         const val SHARED_TIMER_CAN_EDIT_EXTRA_KEY = "shared_timer_can_edit"
         const val SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY = "shared_timer_sound_enabled"
+        const val SHARED_TIMER_SOUND_NAME_EXTRA_KEY = "shared_timer_sound_name"
+        const val SHARED_TIMER_SOUND_URI_EXTRA_KEY = "shared_timer_sound_uri"
         const val SHARED_TIMER_VIBRATE_EXTRA_KEY = "shared_timer_vibrate"
         const val SHARED_TIMER_VIBRATION_PATTERN_EXTRA_KEY = "shared_timer_vibration_pattern"
         const val SHARED_TIMER_VIBRATION_PATTERN_NAME_EXTRA_KEY = "shared_timer_vibration_pattern_name"

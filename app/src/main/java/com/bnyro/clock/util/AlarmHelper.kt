@@ -16,6 +16,7 @@ import com.bnyro.clock.domain.model.Permission
 import com.bnyro.clock.domain.model.RepeatUnit
 import com.bnyro.clock.domain.model.WeekStart
 import com.bnyro.clock.ui.MainActivity
+import com.bnyro.clock.social.data.SocialAlarmSchedule
 import com.bnyro.clock.util.receivers.AlarmReceiver
 import com.bnyro.clock.util.receivers.PreAlarmReceiver
 import java.time.Instant
@@ -23,7 +24,6 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.YearMonth
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.util.Calendar
@@ -56,19 +56,24 @@ object AlarmHelper {
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
-    fun enqueue(context: Context, alarm: Alarm, skipToday: Boolean = false) {
+    fun enqueue(
+        context: Context,
+        alarm: Alarm,
+        skipToday: Boolean = false,
+        timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
+    ) {
         if (!Permission.AlarmPermission.hasPermission(context)) return
         cancel(context, alarm)
         if (!alarm.enabled) {
             Log.d("AlarmHelper", "Alarm Is disabled")
             return
         }
-        if (hasRecurrenceEnded(alarm)) {
+        if (hasRecurrenceEnded(alarm, timeZone)) {
             Log.d("AlarmHelper", "Alarm has no occurrence left")
             return
         }
 
-        schedule(context, alarm, getAlarmTime(alarm, skipToday) ?: return)
+        schedule(context, alarm, getAlarmTime(alarm, skipToday, timeZone) ?: return)
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
@@ -151,11 +156,15 @@ object AlarmHelper {
      * Calculate the epoch time for scheduling an alarm
      */
 
-    fun getAlarmTime(alarm: Alarm, skipToday: Boolean = false): Long? {
+    fun getAlarmTime(
+        alarm: Alarm,
+        skipToday: Boolean = false,
+        timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
+    ): Long? {
         val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
-        return getNextOccurrence(alarm, skipToday)
+        return getNextOccurrence(alarm, skipToday, timeZone)
             ?.atTime(hours, minutes)
-            ?.atZone(ZoneId.systemDefault())
+            ?.atZone(timeZone)
             ?.toInstant()
             ?.toEpochMilli()
     }
@@ -164,9 +173,13 @@ object AlarmHelper {
      * @return the day the alarm rings next, skipping the occurrence the user dismissed upfront,
      * or null when its repetition never lets it ring.
      */
-    fun getNextOccurrence(alarm: Alarm, skipToday: Boolean = false): LocalDate? {
+    fun getNextOccurrence(
+        alarm: Alarm,
+        skipToday: Boolean = false,
+        timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
+    ): LocalDate? {
         val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
-        val now = LocalDateTime.now()
+        val now = LocalDateTime.now(timeZone)
         val hasEventPassed = now.toLocalTime()
             .truncatedTo(ChronoUnit.MINUTES) >= LocalTime.of(hours, minutes)
         val earliestDate = if (skipToday || hasEventPassed) {
@@ -179,7 +192,7 @@ object AlarmHelper {
             occurrenceOnOrAfter(alarm, maxOf(earliestDate, LocalDate.ofEpochDay(alarm.startDate)))
                 ?: return null
         val dismissedOccurrence = alarm.dismissedAt?.let {
-            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+            Instant.ofEpochMilli(it).atZone(timeZone).toLocalDate()
         }
         if (skipToday || occurrence != dismissedOccurrence) return occurrence
 
@@ -190,8 +203,11 @@ object AlarmHelper {
      * @return the day the repetition that rings next begins on. Arming an alarm anchors it here
      * rather than at the occurrence itself, which would shift every later repetition.
      */
-    fun getNextRepetitionStart(alarm: Alarm): LocalDate? =
-        getNextOccurrence(alarm)?.let { runStartsOnOrBefore(alarm, it).first() }
+    fun getNextRepetitionStart(
+        alarm: Alarm,
+        timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
+    ): LocalDate? = getNextOccurrence(alarm, timeZone = timeZone)
+        ?.let { runStartsOnOrBefore(alarm, it).first() }
 
     /**
      * @return the last day the repetition the alarm begins with rings on, or null when its
@@ -221,8 +237,11 @@ object AlarmHelper {
      * @return whether the alarm has rung all the occurrences its repetition allows for. An alarm
      * whose repetition never lets it ring has not ended, it simply stays silent.
      */
-    fun hasRecurrenceEnded(alarm: Alarm): Boolean {
-        val nextOccurrence = getNextOccurrence(alarm) ?: return false
+    fun hasRecurrenceEnded(
+        alarm: Alarm,
+        timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
+    ): Boolean {
+        val nextOccurrence = getNextOccurrence(alarm, timeZone = timeZone) ?: return false
         alarm.endDate?.let { if (nextOccurrence > LocalDate.ofEpochDay(it)) return true }
         alarm.endOccurrences?.let { count ->
             val last = lastOccurrence(alarm, count) ?: return false

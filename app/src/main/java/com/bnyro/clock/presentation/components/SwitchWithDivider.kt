@@ -33,12 +33,13 @@ fun SwitchWithDivider(
     icon: ImageVector? = null,
     isChecked: Boolean = true,
     enabled: Boolean = true,
+    selectionEnabled: Boolean = enabled,
     onClick: (() -> Unit) = {},
     onChecked: (Boolean) -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.clickable(
-            enabled = enabled,
+            enabled = selectionEnabled,
             onClick = onClick
         ),
         color = Color.Transparent,

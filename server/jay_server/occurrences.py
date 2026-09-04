@@ -11,7 +11,12 @@ from zoneinfo import ZoneInfo
 from psycopg import Connection
 
 from jay_server.database import transaction
-from jay_server.domain import get_group_push_tokens, record_group_change
+from jay_server.domain import (
+    get_group_push_tokens,
+    record_group_change,
+    sweep_shared_timers,
+)
+from jay_server.object_storage import delete_sound_object
 from jay_server.push import send_group_sync
 
 
@@ -161,7 +166,13 @@ def schedule_alarm_occurrences(
     after: datetime | None = None,
 ) -> None:
     alarm = connection.execute(
-        "SELECT * FROM shared_alarms WHERE id = %s", (alarm_id,)
+        """
+        SELECT alarm.*, groups.alarm_time_basis, groups.alarm_time_zone
+        FROM shared_alarms alarm
+        JOIN groups ON groups.id = alarm.group_id
+        WHERE alarm.id = %s
+        """,
+        (alarm_id,),
     ).fetchone()
     if alarm is None:
         return
@@ -204,9 +215,14 @@ def schedule_alarm_occurrences(
             (alarm_id, member["id"], alarm["revision"]),
         ).fetchone() is not None:
             continue
+        time_zone = (
+            alarm["alarm_time_zone"]
+            if alarm["alarm_time_basis"] == "group_time_zone"
+            else member["time_zone"]
+        )
         trigger_at = next_alarm_trigger(
             alarm,
-            member["time_zone"],
+            time_zone,
             after or datetime.now(UTC),
         )
         if trigger_at is None:
@@ -216,9 +232,17 @@ def schedule_alarm_occurrences(
             """
             INSERT INTO alarm_occurrences (
                 alarm_id, group_id, alarm_revision, device_id, occurrence_id,
-                trigger_at, deadline_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (alarm_id, device_id, occurrence_id) DO NOTHING
+                trigger_at, deadline_at, cycle_date
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (alarm_id, device_id, occurrence_id) DO UPDATE
+            SET group_id = EXCLUDED.group_id,
+                alarm_revision = EXCLUDED.alarm_revision,
+                trigger_at = EXCLUDED.trigger_at,
+                deadline_at = EXCLUDED.deadline_at,
+                cycle_date = EXCLUDED.cycle_date,
+                status = 'pending',
+                resolved_at = NULL
+            WHERE alarm_occurrences.status IN ('pending', 'canceled')
             """,
             (
                 alarm_id,
@@ -228,8 +252,157 @@ def schedule_alarm_occurrences(
                 occurrence_id,
                 trigger_at,
                 trigger_at + timedelta(minutes=10),
+                trigger_at.astimezone(ZoneInfo(time_zone)).date(),
             ),
         )
+
+
+def evaluate_alarm_cycle(
+    connection: Connection,
+    alarm_id: UUID,
+    alarm_revision: int,
+    cycle_date: date,
+) -> list[str]:
+    alarm = connection.execute(
+        "SELECT * FROM shared_alarms WHERE id = %s FOR UPDATE",
+        (alarm_id,),
+    ).fetchone()
+    if (
+        alarm is None
+        or alarm["deleted"]
+        or not alarm["enabled"]
+        or alarm["revision"] != alarm_revision
+        or (
+            alarm["last_evaluated_cycle_date"] is not None
+            and alarm["last_evaluated_cycle_date"] >= cycle_date
+        )
+    ):
+        return []
+    expected_members = connection.execute(
+        """
+        SELECT count(*) AS count
+        FROM group_members gm
+        JOIN devices d ON d.id = gm.device_id
+        WHERE gm.group_id = %s AND d.time_zone IS NOT NULL
+        """,
+        (alarm["group_id"],),
+    ).fetchone()["count"]
+    cycle = connection.execute(
+        """
+        SELECT count(*) AS count,
+            count(*) FILTER (WHERE status = 'pending') AS pending
+        FROM alarm_occurrences
+        WHERE alarm_id = %s AND alarm_revision = %s AND cycle_date = %s
+          AND status != 'canceled'
+        """,
+        (alarm_id, alarm_revision, cycle_date),
+    ).fetchone()
+    if cycle["count"] < expected_members or cycle["pending"] > 0:
+        return []
+    active = connection.execute(
+        """
+        SELECT 1
+        FROM alarm_activity activity
+        JOIN alarm_occurrences occurrence
+          ON occurrence.alarm_id = activity.alarm_id
+         AND occurrence.device_id = activity.device_id
+         AND occurrence.occurrence_id = activity.occurrence_id
+        WHERE activity.alarm_id = %s
+          AND activity.alarm_revision = %s
+          AND occurrence.cycle_date = %s
+          AND activity.kind IN ('snoozed', 'dismissed')
+        LIMIT 1
+        """,
+        (alarm_id, alarm_revision, cycle_date),
+    ).fetchone() is not None
+    streak = 0 if active else alarm["inactive_cycle_streak"] + 1
+    if streak < 3:
+        connection.execute(
+            """
+            UPDATE shared_alarms
+            SET inactive_cycle_streak = %s, last_evaluated_cycle_date = %s
+            WHERE id = %s
+            """,
+            (streak, cycle_date, alarm_id),
+        )
+        return []
+    connection.execute(
+        """
+        UPDATE shared_alarms
+        SET revision = revision + 1, deleted = true, inactive_cycle_streak = 3,
+            last_evaluated_cycle_date = %s, updated_at = now()
+        WHERE id = %s
+        """,
+        (cycle_date, alarm_id),
+    )
+    connection.execute(
+        """
+        UPDATE alarm_occurrences
+        SET status = 'canceled', resolved_at = now()
+        WHERE alarm_id = %s AND status = 'pending'
+        """,
+        (alarm_id,),
+    )
+    record_group_change(
+        connection,
+        alarm["group_id"],
+        "alarm",
+        str(alarm_id),
+        action="deleted",
+        entity_label=alarm["label"],
+        entity_time=alarm["time"],
+        details={"reason": "three_inactive_cycles", "cycle_date": cycle_date.isoformat()},
+    )
+    if alarm["sound_id"] is not None:
+        connection.execute(
+            """
+            DELETE FROM shared_sounds sound
+            WHERE id = %s
+              AND NOT EXISTS (
+                SELECT 1 FROM shared_alarms current_alarm
+                WHERE current_alarm.sound_id = sound.id AND NOT current_alarm.deleted
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM shared_timers timer WHERE timer.sound_id = sound.id
+              )
+            """,
+            (alarm["sound_id"],),
+        )
+    return get_group_push_tokens(connection, alarm["group_id"], "")
+
+
+def process_sound_deletions() -> None:
+    with transaction() as connection:
+        sweep_shared_timers(connection)
+        deletions = connection.execute(
+            """
+            SELECT object_key FROM sound_deletions
+            WHERE last_attempt_at IS NULL
+               OR last_attempt_at < now() - interval '5 minutes'
+            ORDER BY created_at
+            LIMIT 20
+            """
+        ).fetchall()
+    for deletion in deletions:
+        try:
+            delete_sound_object(deletion["object_key"])
+        except Exception:
+            logger.exception("Jay shared-sound deletion failed")
+            with transaction() as connection:
+                connection.execute(
+                    """
+                    UPDATE sound_deletions
+                    SET attempts = attempts + 1, last_attempt_at = now()
+                    WHERE object_key = %s
+                    """,
+                    (deletion["object_key"],),
+                )
+        else:
+            with transaction() as connection:
+                connection.execute(
+                    "DELETE FROM sound_deletions WHERE object_key = %s",
+                    (deletion["object_key"],),
+                )
 
 
 def process_due_alarm_occurrences() -> None:
@@ -254,6 +427,19 @@ def process_due_alarm_occurrences() -> None:
             """
         ).fetchall()
         for occurrence in due:
+            current_status = connection.execute(
+                """
+                SELECT status FROM alarm_occurrences
+                WHERE alarm_id = %s AND device_id = %s AND occurrence_id = %s
+                """,
+                (
+                    occurrence["alarm_id"],
+                    occurrence["device_id"],
+                    occurrence["occurrence_id"],
+                ),
+            ).fetchone()["status"]
+            if current_status != "pending":
+                continue
             if (
                 not occurrence["is_member"]
                 or not occurrence["enabled"]
@@ -334,6 +520,14 @@ def process_due_alarm_occurrences() -> None:
                 occurrence["device_id"],
                 occurrence["trigger_at"] + timedelta(milliseconds=1),
             )
+            push_tokens.update(
+                evaluate_alarm_cycle(
+                    connection,
+                    occurrence["alarm_id"],
+                    occurrence["alarm_revision"],
+                    occurrence["cycle_date"],
+                )
+            )
     send_group_sync(list(push_tokens))
 
 
@@ -355,6 +549,7 @@ class AlarmOccurrenceMonitor:
         while True:
             try:
                 await asyncio.to_thread(process_due_alarm_occurrences)
+                await asyncio.to_thread(process_sound_deletions)
             except asyncio.CancelledError:
                 raise
             except Exception:

@@ -423,6 +423,7 @@ fun TimerScreen(
             currentTimer = timerModel.savedTimers.first { it.id == id },
             pickerStyle = settingsModel.timerPickerStyle,
             groups = editableGroups,
+            canUploadSharedSounds = socialModel.canUploadSharedSounds,
             onSave = { settings ->
                 timerModel.updateSavedTimer(settings)
                 editedSavedTimerId = null

@@ -3,6 +3,7 @@ package com.bnyro.clock.social.data
 import android.content.Context
 import android.content.Intent
 import android.util.Base64
+import androidx.core.net.toUri
 import androidx.room.withTransaction
 import androidx.work.WorkManager
 import com.bnyro.clock.BuildConfig
@@ -16,6 +17,7 @@ import com.bnyro.clock.social.domain.AlarmActivityKind
 import com.bnyro.clock.social.domain.AlarmActivityRequest
 import com.bnyro.clock.social.domain.AlarmOccurrenceSchedule
 import com.bnyro.clock.social.domain.AlarmPermission
+import com.bnyro.clock.social.domain.AlarmTimeBasis
 import com.bnyro.clock.social.domain.SocialActivityPage
 import com.bnyro.clock.social.domain.GroupCreate
 import com.bnyro.clock.social.domain.GroupUpdate
@@ -23,6 +25,9 @@ import com.bnyro.clock.social.domain.MemberRole
 import com.bnyro.clock.social.domain.MemberNotificationUpdate
 import com.bnyro.clock.social.domain.SharedAlarmLink
 import com.bnyro.clock.social.domain.SharedAlarmRequest
+import com.bnyro.clock.social.domain.SharedSoundMode
+import com.bnyro.clock.social.domain.SharedSoundSelection
+import com.bnyro.clock.social.domain.SharedSoundUploadRequest
 import com.bnyro.clock.social.domain.SocialChange
 import com.bnyro.clock.social.domain.SharedTimerRequest
 import com.bnyro.clock.social.domain.SocialGroup
@@ -44,6 +49,7 @@ import com.google.android.play.core.integrity.StandardIntegrityManager
 import java.net.URI
 import java.security.MessageDigest
 import java.time.Instant
+import java.time.ZoneId
 
 data class SocialSyncResult(
     val changes: List<SocialChange>,
@@ -64,6 +70,20 @@ class SocialRepository(
     val members: Flow<List<SocialMember>> = socialDao.getMembersStream()
     val alarmGroupNames = socialDao.getAlarmGroupNamesStream()
 
+    val canUploadSharedSounds: Boolean
+        get() {
+            if (!Preferences.instance.getBoolean(
+                    SocialPreferences.entitlementSharedUploadKey,
+                    false
+                )
+            ) return false
+            val expiresAt = Preferences.instance.getString(
+                SocialPreferences.entitlementExpiresAtKey,
+                null
+            ) ?: return false
+            return runCatching { Instant.now().isBefore(Instant.parse(expiresAt)) }.getOrDefault(false)
+        }
+
     suspend fun synchronize(): SocialSyncResult = synchronizationMutex.withLock {
         withContext(Dispatchers.IO) {
             val serverUrl = Preferences.instance.getString(
@@ -76,6 +96,8 @@ class SocialRepository(
             val previousCursor = Preferences.instance.getLong(SocialPreferences.syncCursorKey, 0)
             val knownGroupIds = groups.first().map { it.id }.toSet()
             val response = api.synchronize(previousCursor)
+            val remoteGroups = response.groups.associateBy { it.id }
+            val soundStore = SharedSoundStore(context)
             val remoteGroupIds = response.groups.map { it.id }.toSet()
             val remoteAlarmIds = response.alarms.map { it.id }.toSet()
 
@@ -91,6 +113,7 @@ class SocialRepository(
                     alarmUseCase.deleteAlarm(it)
                 }
                 socialDao.deleteAlarmLink(link.remoteAlarmId)
+                SocialAlarmSchedule.setTimeZone(link.localAlarmId, null)
                 WorkManager.getInstance(context).cancelUniqueWork(
                     "jay_ignored_alarm_${link.localAlarmId}"
                 )
@@ -98,6 +121,13 @@ class SocialRepository(
 
             response.alarms.forEach { remote ->
                 val link = socialDao.getAlarmLinkByRemoteId(remote.id)
+                val soundMode = SharedSoundMode.valueOf(remote.soundMode.uppercase())
+                val soundFile = remote.soundId?.takeIf { soundMode == SharedSoundMode.SHARED }
+                    ?.let { runCatching { soundStore.cache(it, api) }.getOrNull() }
+                val soundUri = soundFile?.toURI()?.toString()
+                val timeZone = remoteGroups[remote.groupId]?.takeIf {
+                    it.alarmTimeBasis == "group_time_zone"
+                }?.alarmTimeZone
                 if (remote.deleted) {
                     link?.let {
                         alarmRepository.getAlarmById(it.localAlarmId)?.let { alarm ->
@@ -109,6 +139,7 @@ class SocialRepository(
                             alarmUseCase.deleteAlarm(alarm)
                         }
                         socialDao.deleteAlarmLink(remote.id)
+                        SocialAlarmSchedule.setTimeZone(it.localAlarmId, null)
                         WorkManager.getInstance(context).cancelUniqueWork(
                             "jay_ignored_alarm_${it.localAlarmId}"
                         )
@@ -132,19 +163,35 @@ class SocialRepository(
                             advanced = remote.advanced,
                             snoozeEnabled = remote.snoozeEnabled,
                             snoozeMinutes = remote.snoozeMinutes,
-                            soundEnabled = remote.soundEnabled,
+                            soundEnabled = soundMode != SharedSoundMode.OFF,
+                            soundName = remote.soundTitle,
+                            soundUri = soundUri,
                             vibrationPattern = remote.vibrationPattern,
                             vibrationPatternName = remote.vibrationPatternName
-                        )
+                        ),
+                        timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault()
                     )
                     socialDao.putAlarmLink(
-                        SharedAlarmLink(remote.id, localId, remote.groupId, remote.revision)
+                        SharedAlarmLink(
+                            remote.id,
+                            localId,
+                            remote.groupId,
+                            remote.revision,
+                            soundMode,
+                            remote.soundId,
+                            remote.soundTitle,
+                            timeZone
+                        )
                     )
+                    SocialAlarmSchedule.setTimeZone(localId, timeZone)
                     alarmRepository.getAlarmById(localId)?.let {
                         scheduleIgnoredOutcome(it, remote.id, remote.revision)
                     }
-                } else if (remote.revision > link.revision) {
+                } else if (remote.revision > link.revision ||
+                    alarmRepository.getAlarmById(link.localAlarmId)?.soundUri != soundUri
+                ) {
                     alarmRepository.getAlarmById(link.localAlarmId)?.let { local ->
+                        SocialAlarmSchedule.setTimeZone(local.id, timeZone)
                         context.sendBroadcast(
                             Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
                                 .setPackage(context.packageName)
@@ -168,13 +215,24 @@ class SocialRepository(
                                 advanced = remote.advanced,
                                 snoozeEnabled = remote.snoozeEnabled,
                                 snoozeMinutes = remote.snoozeMinutes,
-                                soundEnabled = remote.soundEnabled,
+                                soundEnabled = soundMode != SharedSoundMode.OFF,
+                                soundName = remote.soundTitle,
+                                soundUri = soundUri,
                                 vibrationPattern = remote.vibrationPattern,
                                 vibrationPatternName = remote.vibrationPatternName
-                            )
+                            ),
+                            timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault()
                         )
                     }
-                    socialDao.putAlarmLink(link.copy(revision = remote.revision))
+                    socialDao.putAlarmLink(
+                        link.copy(
+                            revision = remote.revision,
+                            soundMode = soundMode,
+                            soundId = remote.soundId,
+                            soundTitle = remote.soundTitle,
+                            timeZone = timeZone
+                        )
+                    )
                     alarmRepository.getAlarmById(link.localAlarmId)?.let {
                         scheduleIgnoredOutcome(it, remote.id, remote.revision)
                     }
@@ -192,7 +250,9 @@ class SocialRepository(
                     it.notifyIgnored,
                     it.notifyMembership,
                     it.notifyAdministrative,
-                    MemberRole.valueOf(it.role.uppercase())
+                    MemberRole.valueOf(it.role.uppercase()),
+                    AlarmTimeBasis.valueOf(it.alarmTimeBasis.uppercase()),
+                    it.alarmTimeZone
                 )
             }
             socialDatabase.withTransaction {
@@ -211,7 +271,11 @@ class SocialRepository(
 
             Preferences.edit { putLong(SocialPreferences.syncCursorKey, response.cursor) }
 
-            applySharedTimers(response.timers, synchronizedGroups)
+            applySharedTimers(response.timers, synchronizedGroups, api)
+            soundStore.prune(
+                response.alarms.mapNotNull { it.soundId }.toSet() +
+                    response.timers.mapNotNull { it.soundId }.toSet()
+            )
 
             SocialSyncResult(
                 if (previousCursor == 0L) emptyList() else response.changes.map {
@@ -282,7 +346,9 @@ class SocialRepository(
                     notifyAlarmChanges,
                     notifySnoozed,
                     notifyDismissed,
-                    notifyIgnored
+                    notifyIgnored,
+                    AlarmTimeBasis.MEMBER_LOCAL.name.lowercase(),
+                    ZoneId.systemDefault().id
                 )
             )
         }
@@ -305,7 +371,9 @@ class SocialRepository(
                         group.notifyAlarmChanges,
                         group.notifySnoozed,
                         group.notifyDismissed,
-                        group.notifyIgnored
+                        group.notifyIgnored,
+                        group.alarmTimeBasis.name.lowercase(),
+                        group.alarmTimeZone
                     )
                 )
             }
@@ -477,7 +545,25 @@ class SocialRepository(
                     DEFAULT_SERVER_URL
                 ) ?: DEFAULT_SERVER_URL
                 val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-                val response = SocialApi(serverUrl, identity).createAlarm(
+                val api = SocialApi(serverUrl, identity)
+                val timeZone = groups.first().firstOrNull { it.id == groupId }?.takeIf {
+                    it.alarmTimeBasis == AlarmTimeBasis.GROUP_TIME_ZONE
+                }?.alarmTimeZone
+                val schedulingTimeZone = timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault()
+                alarmUseCase.prepareForScheduling(alarm, schedulingTimeZone)
+                val soundMode = when {
+                    !alarm.soundEnabled -> SharedSoundMode.OFF
+                    alarm.soundUri != null && canUploadSharedSounds -> SharedSoundMode.SHARED
+                    else -> SharedSoundMode.MEMBER_DEFAULT
+                }
+                val soundId = if (soundMode == SharedSoundMode.SHARED) {
+                    uploadSharedSound(groupId, alarm.soundName, alarm.soundUri!!.toUri(), api)
+                } else null
+                if (soundMode != SharedSoundMode.SHARED) {
+                    alarm.soundName = null
+                    alarm.soundUri = null
+                }
+                val response = api.createAlarm(
                     SharedAlarmRequest(
                         groupId = groupId,
                         time = alarm.time,
@@ -498,13 +584,27 @@ class SocialRepository(
                         snoozeMinutes = alarm.snoozeMinutes,
                         soundEnabled = alarm.soundEnabled,
                         vibrationPattern = alarm.vibrationPattern,
-                        vibrationPatternName = alarm.vibrationPatternName
+                        vibrationPatternName = alarm.vibrationPatternName,
+                        soundChange = SharedSoundSelection(soundMode.name.lowercase(), soundId)
                     )
                 )
-                val localId = alarmUseCase.createAlarm(alarm)
-                socialDao.putAlarmLink(
-                    SharedAlarmLink(response.id, localId, groupId, response.revision ?: 1)
+                val localId = alarmUseCase.createAlarm(
+                    alarm,
+                    schedulingTimeZone
                 )
+                socialDao.putAlarmLink(
+                    SharedAlarmLink(
+                        response.id,
+                        localId,
+                        groupId,
+                        response.revision ?: 1,
+                        soundMode,
+                        soundId,
+                        alarm.soundName,
+                        timeZone
+                    )
+                )
+                SocialAlarmSchedule.setTimeZone(localId, timeZone)
                 alarmRepository.getAlarmById(localId)?.let {
                     scheduleIgnoredOutcome(it, response.id, response.revision ?: 1)
                 }
@@ -523,7 +623,41 @@ class SocialRepository(
                     DEFAULT_SERVER_URL
                 ) ?: DEFAULT_SERVER_URL
                 val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-                val response = SocialApi(serverUrl, identity).updateAlarm(
+                val api = SocialApi(serverUrl, identity)
+                val schedulingTimeZone = link.timeZone?.let(ZoneId::of)
+                    ?: ZoneId.systemDefault()
+                alarmUseCase.prepareForScheduling(alarm, schedulingTimeZone)
+                var soundId = link.soundId
+                val soundChange = when {
+                    !alarm.soundEnabled && link.soundMode != SharedSoundMode.OFF ->
+                        SharedSoundSelection(SharedSoundMode.OFF.name.lowercase())
+                    !alarm.soundEnabled -> null
+                    alarm.soundUri == null &&
+                        link.soundMode == SharedSoundMode.SHARED &&
+                        alarm.soundName == link.soundTitle -> null
+                    alarm.soundUri == null && link.soundMode != SharedSoundMode.MEMBER_DEFAULT ->
+                        SharedSoundSelection(SharedSoundMode.MEMBER_DEFAULT.name.lowercase())
+                    alarm.soundUri == null -> null
+                    link.soundMode == SharedSoundMode.SHARED &&
+                        alarm.soundUri == SharedSoundStore(context).cached(link.soundId.orEmpty())
+                            ?.toURI()?.toString() -> null
+                    !canUploadSharedSounds -> {
+                        alarm.soundName = null
+                        alarm.soundUri = null
+                        soundId = null
+                        SharedSoundSelection(SharedSoundMode.MEMBER_DEFAULT.name.lowercase())
+                    }
+                    else -> {
+                        soundId = uploadSharedSound(
+                            link.groupId,
+                            alarm.soundName,
+                            alarm.soundUri!!.toUri(),
+                            api
+                        )
+                        SharedSoundSelection(SharedSoundMode.SHARED.name.lowercase(), soundId)
+                    }
+                }
+                val response = api.updateAlarm(
                     link.remoteAlarmId,
                     SharedAlarmRequest(
                         time = alarm.time,
@@ -545,6 +679,7 @@ class SocialRepository(
                         soundEnabled = alarm.soundEnabled,
                         vibrationPattern = alarm.vibrationPattern,
                         vibrationPatternName = alarm.vibrationPatternName,
+                        soundChange = soundChange,
                         expectedRevision = link.revision
                     )
                 )
@@ -553,9 +688,21 @@ class SocialRepository(
                         .setPackage(context.packageName)
                         .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
                 )
-                alarmUseCase.updateAlarm(alarm)
+                SocialAlarmSchedule.setTimeZone(alarm.id, link.timeZone)
+                alarmUseCase.updateAlarm(alarm, schedulingTimeZone)
                 val revision = response.revision ?: link.revision + 1
-                socialDao.putAlarmLink(link.copy(revision = revision))
+                socialDao.putAlarmLink(
+                    link.copy(
+                        revision = revision,
+                        soundMode = soundChange?.mode?.let {
+                            SharedSoundMode.valueOf(it.uppercase())
+                        } ?: link.soundMode,
+                        soundId = if (soundChange == null) link.soundId else soundId,
+                        soundTitle = if (soundChange?.mode == "shared") alarm.soundName else {
+                            if (soundChange == null) link.soundTitle else null
+                        }
+                    )
+                )
                 scheduleIgnoredOutcome(alarm, link.remoteAlarmId, revision)
             }
         }
@@ -577,6 +724,7 @@ class SocialRepository(
                         .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
                 )
                 socialDao.deleteAlarmLink(link.remoteAlarmId)
+                SocialAlarmSchedule.setTimeZone(alarm.id, null)
                 WorkManager.getInstance(context).cancelUniqueWork("jay_ignored_alarm_${alarm.id}")
             }
             alarmUseCase.deleteAlarm(alarm)
@@ -619,7 +767,8 @@ class SocialRepository(
      */
     private suspend fun applySharedTimers(
         timers: List<com.bnyro.clock.social.domain.SharedTimerDto>,
-        groups: List<SocialGroup>
+        groups: List<SocialGroup>,
+        api: SocialApi
     ) {
         val now = System.currentTimeMillis()
         socialDao.clearDismissedTimers(now - SUPPRESSED_TIMER_LIFETIME_MILLIS)
@@ -632,6 +781,9 @@ class SocialRepository(
             if (expiresAt < now - SHARED_TIMER_LINGER_MILLIS) return@forEach
             if (remote.id in suppressedTimerIds) return@forEach
             val group = groups.firstOrNull { it.id == remote.groupId } ?: return@forEach
+            val soundMode = SharedSoundMode.valueOf(remote.soundMode.uppercase())
+            val soundFile = remote.soundId?.takeIf { soundMode == SharedSoundMode.SHARED }
+                ?.let { runCatching { SharedSoundStore(context).cache(it, api) }.getOrNull() }
             activeTimerIds += remote.id
             runCatching {
                 context.startService(
@@ -646,7 +798,16 @@ class SocialRepository(
                         .putExtra(TimerService.SHARED_TIMER_CAN_EDIT_EXTRA_KEY, group.canEditAlarms)
                         .putExtra(
                             TimerService.SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY,
-                            remote.soundEnabled
+                            soundMode != SharedSoundMode.OFF
+                        )
+                        .putExtra(
+                            TimerService.SHARED_TIMER_SOUND_NAME_EXTRA_KEY,
+                            remote.soundTitle
+                        )
+                        .putExtra(
+                            TimerService.SHARED_TIMER_SOUND_URI_EXTRA_KEY,
+                            soundFile?.takeIf { System.currentTimeMillis() < expiresAt }
+                                ?.toURI()?.toString()
                         )
                         .putExtra(TimerService.SHARED_TIMER_VIBRATE_EXTRA_KEY, remote.vibrate)
                         .putExtra(
@@ -679,7 +840,16 @@ class SocialRepository(
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            SocialApi(serverUrl, identity).startTimer(
+            val api = SocialApi(serverUrl, identity)
+            val soundMode = when {
+                !settings.soundEnabled -> SharedSoundMode.OFF
+                settings.soundUri != null && canUploadSharedSounds -> SharedSoundMode.SHARED
+                else -> SharedSoundMode.MEMBER_DEFAULT
+            }
+            val soundId = if (soundMode == SharedSoundMode.SHARED) {
+                uploadSharedSound(groupId, settings.soundName, settings.soundUri!!.toUri(), api)
+            } else null
+            api.startTimer(
                 groupId,
                 SharedTimerRequest(
                     label = label,
@@ -692,11 +862,38 @@ class SocialRepository(
                     vibrate = settings.vibrate,
                     soundEnabled = settings.soundEnabled,
                     vibrationPattern = settings.vibrationPattern,
-                    vibrationPatternName = settings.vibrationPatternName
+                    vibrationPatternName = settings.vibrationPatternName,
+                    sound = SharedSoundSelection(soundMode.name.lowercase(), soundId)
                 )
             )
             synchronize()
         }
+
+    private fun uploadSharedSound(
+        groupId: String,
+        title: String?,
+        source: android.net.Uri,
+        api: SocialApi
+    ): String {
+        val processed = SharedSoundStore(context).process(source)
+        try {
+            val upload = api.beginSoundUpload(
+                groupId,
+                SharedSoundUploadRequest(
+                    title?.takeIf(String::isNotBlank) ?: "Shared sound",
+                    processed.sha256,
+                    processed.file.length(),
+                    processed.durationMs
+                )
+            )
+            api.uploadSound(upload, processed.file)
+            api.completeSoundUpload(upload.id)
+            SharedSoundStore(context).keep(upload.id, processed.file)
+            return upload.id
+        } finally {
+            processed.file.delete()
+        }
+    }
 
     suspend fun adjustSharedTimer(timerId: String, action: String) =
         withContext(Dispatchers.IO) {
@@ -799,6 +996,7 @@ class SocialRepository(
                 alarmUseCase.deleteAlarm(it)
             }
             socialDao.deleteAlarmLink(link.remoteAlarmId)
+            SocialAlarmSchedule.setTimeZone(link.localAlarmId, null)
             WorkManager.getInstance(context).cancelUniqueWork(
                 "jay_ignored_alarm_${link.localAlarmId}"
             )
@@ -846,7 +1044,11 @@ class SocialRepository(
                         Preferences.alarmTimeoutMinutesKey,
                         AlarmService.ALARM_TIMEOUT_MINUTES
                     ) * 60_000L
-                ).toString()
+                ).toString(),
+                Instant.ofEpochMilli(triggerAt)
+                    .atZone(SocialAlarmSchedule.timeZone(alarm.id))
+                    .toLocalDate()
+                    .toString()
             )
         )
     }

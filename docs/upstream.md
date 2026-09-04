@@ -19,6 +19,7 @@ The intentional Clock You integration points are:
 - the alarm list's group labels, editing permissions, and source filter;
 - the alarm editor's group selector;
 - alarm create, edit, and delete dispatch;
+- shared-alarm time-zone resolution during scheduling;
 - ringing, snooze, and early-dismiss actions;
 - the timer's start dispatch, including the group a group timer is started for;
 - timer add-time, reset, and stop dispatch, and the ringing timer's answer actions;

@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AlarmPermission(StrEnum):
@@ -13,6 +13,17 @@ class AlarmPermission(StrEnum):
 class MemberRole(StrEnum):
     MEMBER = "member"
     LEADER = "leader"
+
+
+class AlarmTimeBasis(StrEnum):
+    MEMBER_LOCAL = "member_local"
+    GROUP_TIME_ZONE = "group_time_zone"
+
+
+class SharedSoundMode(StrEnum):
+    OFF = "off"
+    MEMBER_DEFAULT = "member_default"
+    SHARED = "shared"
 
 
 class RepeatUnit(StrEnum):
@@ -59,6 +70,8 @@ class GroupCreate(BaseModel):
     notify_snoozed: bool = True
     notify_dismissed: bool = True
     notify_ignored: bool = True
+    alarm_time_basis: AlarmTimeBasis = AlarmTimeBasis.MEMBER_LOCAL
+    alarm_time_zone: str = Field(default="UTC", min_length=1, max_length=100)
 
 
 class GroupUpdate(BaseModel):
@@ -68,6 +81,8 @@ class GroupUpdate(BaseModel):
     notify_snoozed: bool
     notify_dismissed: bool
     notify_ignored: bool
+    alarm_time_basis: AlarmTimeBasis = AlarmTimeBasis.MEMBER_LOCAL
+    alarm_time_zone: str = Field(default="UTC", min_length=1, max_length=100)
 
 
 class MemberNotificationUpdate(BaseModel):
@@ -85,6 +100,26 @@ class InviteJoin(BaseModel):
 
 class MemberUpdate(BaseModel):
     role: MemberRole
+
+
+class SharedSoundSelection(BaseModel):
+    mode: SharedSoundMode
+    sound_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def validate_sound_id(self):
+        if self.mode == SharedSoundMode.SHARED and self.sound_id is None:
+            raise ValueError("sound_id is required for shared sound mode")
+        if self.mode != SharedSoundMode.SHARED and self.sound_id is not None:
+            raise ValueError("sound_id is only valid for shared sound mode")
+        return self
+
+
+class SharedSoundUploadCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    byte_length: int = Field(gt=0)
+    duration_ms: int = Field(ge=1, le=300_000)
 
 
 class SharedAlarmPayload(BaseModel):
@@ -107,6 +142,7 @@ class SharedAlarmPayload(BaseModel):
     sound_enabled: bool
     vibration_pattern: list[int]
     vibration_pattern_name: str = Field(min_length=1, max_length=80)
+    sound_change: SharedSoundSelection | None = None
 
     @field_validator("days")
     @classmethod
@@ -149,6 +185,7 @@ class AlarmOccurrenceSchedule(BaseModel):
     occurrence_id: str = Field(min_length=1, max_length=200)
     trigger_at: datetime
     deadline_at: datetime
+    cycle_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
 class SharedTimerCreate(BaseModel):
@@ -159,6 +196,7 @@ class SharedTimerCreate(BaseModel):
     sound_enabled: bool = True
     vibration_pattern: list[int]
     vibration_pattern_name: str = Field(min_length=1, max_length=80)
+    sound: SharedSoundSelection | None = None
 
     @field_validator("vibration_pattern")
     @classmethod

@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -33,6 +34,76 @@ def require_alarm_editor(connection: Connection, group_id: UUID, device_id: str)
     if membership["alarm_permission"] == "leaders" and membership["role"] != "leader":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only group leaders may change alarms")
     return membership
+
+
+def require_shared_sound_upload(connection: Connection, device_id: str) -> None:
+    entitled = connection.execute(
+        """
+        SELECT 1 FROM devices
+        WHERE id = %s AND play_entitlement_expires_at > now()
+        """,
+        (device_id,),
+    ).fetchone()
+    if entitled is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "A current Play entitlement is required for shared sounds",
+        )
+
+
+def require_ready_shared_sound(
+    connection: Connection,
+    group_id: UUID,
+    sound_id: UUID,
+) -> dict:
+    sound = connection.execute(
+        """
+        SELECT * FROM shared_sounds
+        WHERE id = %s AND group_id = %s AND status = 'ready'
+        """,
+        (sound_id, group_id),
+    ).fetchone()
+    if sound is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Shared sound not found")
+    return sound
+
+
+def delete_unreferenced_shared_sounds(connection: Connection) -> None:
+    connection.execute(
+        """
+        DELETE FROM shared_sounds sound
+        WHERE NOT EXISTS (
+            SELECT 1 FROM shared_alarms alarm
+            WHERE alarm.sound_id = sound.id AND NOT alarm.deleted
+        ) AND NOT EXISTS (
+            SELECT 1 FROM shared_timers timer WHERE timer.sound_id = sound.id
+        ) AND sound.created_at < now() - interval '1 hour'
+        """
+    )
+
+
+def sweep_shared_timers(connection: Connection) -> None:
+    expired_sound_ids = connection.execute(
+        "DELETE FROM shared_timers WHERE expires_at < now() - %s RETURNING sound_id",
+        (timedelta(minutes=15),),
+    ).fetchall()
+    sound_ids = [row["sound_id"] for row in expired_sound_ids if row["sound_id"] is not None]
+    if sound_ids:
+        connection.execute(
+            """
+            DELETE FROM shared_sounds sound
+            WHERE id = ANY(%s)
+              AND NOT EXISTS (
+                SELECT 1 FROM shared_alarms alarm
+                WHERE alarm.sound_id = sound.id AND NOT alarm.deleted
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM shared_timers timer WHERE timer.sound_id = sound.id
+              )
+            """,
+            (sound_ids,),
+        )
+    delete_unreferenced_shared_sounds(connection)
 
 
 def record_group_change(

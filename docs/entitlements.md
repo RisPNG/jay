@@ -17,7 +17,7 @@ Production release builds enable Play entitlement refresh; debug and prerelease 
 
 A successful verdict stores a server-side entitlement for the authenticated device. Its default lifetime is 48 hours and is configurable through `PLAY_ENTITLEMENT_LIFETIME_HOURS`. Android refreshes it immediately and every 24 hours while networking is available. The API exposes the resulting capability as `shared_sound_upload`.
 
-The entitlement is intended to gate uploading and selecting group-distributed sounds only. GitHub and other free users must remain fully interoperable: they may participate in groups and receive and play shared sounds. Sound storage, upload, selection, and distribution are not implemented yet, so the current code establishes and refreshes the server-side capability but does not consume it in a sound-upload flow.
+The entitlement gates uploading and selecting group-distributed sounds only. GitHub and other free users remain fully interoperable: they may participate in groups, switch shared alarms and timers between their device default sound and silence, and receive and play sounds selected by an entitled editor. Saving an unrelated edit does not replace an existing distributed sound. Android normalizes a selected file or readable system ringtone to mono 48 kHz 16-bit FLAC, capped at five minutes, then uploads it directly to private B2 storage with a server-issued signed request. The server verifies the normalized object before it can be selected.
 
 ## Secrets
 

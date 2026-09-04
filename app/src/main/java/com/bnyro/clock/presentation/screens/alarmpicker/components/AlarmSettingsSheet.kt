@@ -73,6 +73,7 @@ fun AlarmPicker(
     groups: List<SocialGroup>,
     currentGroupId: String?,
     canSave: Boolean = true,
+    canUploadSharedSounds: Boolean = false,
     busy: Boolean = false,
     onSave: (Alarm, String?) -> Unit,
     onDelete: ((Alarm) -> Unit)? = null,
@@ -210,6 +211,10 @@ fun AlarmPicker(
                             text = { Text(group.name) },
                             onClick = {
                                 selectedGroupId = group.id
+                                if (!canUploadSharedSounds) {
+                                    soundName = null
+                                    soundUri = null
+                                }
                                 groupMenuExpanded = false
                             }
                         )
@@ -274,12 +279,18 @@ fun AlarmPicker(
                     description = soundName ?: stringResource(R.string.default_sound),
                     isChecked = soundEnabled,
                     enabled = canSave,
+                    selectionEnabled = canSave &&
+                        (selectedGroupId == null || canUploadSharedSounds),
                     icon = Icons.Rounded.Alarm,
                     onClick = {
                         showRingtoneDialog = true
                     },
                     onChecked = {
                         soundEnabled = it
+                        if (it && selectedGroupId != null && !canUploadSharedSounds) {
+                            soundName = null
+                            soundUri = null
+                        }
                     }
                 )
                 SwitchWithDivider(

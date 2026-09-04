@@ -1,14 +1,14 @@
 import asyncio
 import hashlib
-from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from datetime import UTC, date, datetime, timedelta
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 
 from jay_server.database import transaction
 from jay_server.live import LiveChangeBroker
 from jay_server.main import app
-from jay_server.occurrences import process_due_alarm_occurrences
+from jay_server.occurrences import evaluate_alarm_cycle, process_due_alarm_occurrences
 from jay_server.config import settings
 
 
@@ -576,3 +576,203 @@ def test_play_entitlement_is_bound_to_the_authenticated_device(monkeypatch) -> N
                 (device["X-Jay-Device-ID"],),
             ).fetchone()
         assert stored["play_entitlement_expires_at"] is None
+
+
+def test_three_whole_group_cycles_without_activity_delete_the_alarm() -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_deliveries, shared_alarms, "
+                "group_invites, group_members, groups, devices CASCADE"
+            )
+        leader = register_device(client, "Quiet Mango", "leader-secret-that-is-long-enough")
+        group_id = client.post(
+            "/v1/groups",
+            headers=leader,
+            json={"name": "Sleepers", "alarm_permission": "everyone"},
+        ).json()["id"]
+        alarm_id = client.post(
+            "/v1/alarms",
+            headers=leader,
+            json=alarm_payload(group_id),
+        ).json()["id"]
+        with transaction() as connection:
+            connection.execute("DELETE FROM alarm_occurrences WHERE alarm_id = %s", (alarm_id,))
+            for cycle_number, cycle_date in enumerate(
+                (date(2026, 9, 1), date(2026, 9, 3), date(2027, 9, 1)),
+                start=1,
+            ):
+                trigger_at = datetime.combine(cycle_date, datetime.min.time(), UTC)
+                connection.execute(
+                    """
+                    INSERT INTO alarm_occurrences (
+                        alarm_id, group_id, alarm_revision, device_id, occurrence_id,
+                        trigger_at, deadline_at, cycle_date, status, resolved_at
+                    ) VALUES (%s, %s, 1, %s, %s, %s, %s, %s, 'ignored', %s)
+                    """,
+                    (
+                        alarm_id,
+                        group_id,
+                        leader["X-Jay-Device-ID"],
+                        str(cycle_number),
+                        trigger_at,
+                        trigger_at + timedelta(minutes=10),
+                        cycle_date,
+                        trigger_at + timedelta(minutes=10),
+                    ),
+                )
+                evaluate_alarm_cycle(connection, UUID(alarm_id), 1, cycle_date)
+                alarm = connection.execute(
+                    "SELECT deleted, inactive_cycle_streak FROM shared_alarms WHERE id = %s",
+                    (alarm_id,),
+                ).fetchone()
+                assert alarm["deleted"] is (cycle_number == 3)
+                assert alarm["inactive_cycle_streak"] == cycle_number
+            deletion = connection.execute(
+                """
+                SELECT details FROM changes
+                WHERE entity_id = %s AND action = 'deleted'
+                ORDER BY sequence DESC LIMIT 1
+                """,
+                (alarm_id,),
+            ).fetchone()
+            assert deletion["details"]["reason"] == "three_inactive_cycles"
+
+
+def test_group_time_zone_schedules_one_moment_for_every_member() -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_deliveries, shared_alarms, "
+                "group_invites, group_members, groups, devices CASCADE"
+            )
+        leader = register_device(client, "Quiet Mango", "leader-secret-that-is-long-enough")
+        member = register_device(client, "Cozy Otter", "member-secret-that-is-long-enough")
+        group_id = client.post(
+            "/v1/groups",
+            headers=leader,
+            json={
+                "name": "Travellers",
+                "alarm_permission": "everyone",
+                "alarm_time_basis": "group_time_zone",
+                "alarm_time_zone": "Asia/Kuala_Lumpur",
+            },
+        ).json()["id"]
+        invitation = client.post(f"/v1/groups/{group_id}/invites", headers=leader, json={})
+        client.post(
+            "/v1/groups/join",
+            headers=member,
+            json={"token": invitation.json()["token"]},
+        )
+        with transaction() as connection:
+            connection.execute(
+                "UPDATE devices SET time_zone = 'America/New_York' WHERE id = %s",
+                (member["X-Jay-Device-ID"],),
+            )
+        alarm_id = client.post(
+            "/v1/alarms",
+            headers=leader,
+            json=alarm_payload(group_id),
+        ).json()["id"]
+        with transaction() as connection:
+            occurrences = connection.execute(
+                """
+                SELECT trigger_at, cycle_date FROM alarm_occurrences
+                WHERE alarm_id = %s ORDER BY device_id
+                """,
+                (alarm_id,),
+            ).fetchall()
+        assert len(occurrences) == 2
+        assert occurrences[0]["trigger_at"] == occurrences[1]["trigger_at"]
+        assert occurrences[0]["cycle_date"] == occurrences[1]["cycle_date"]
+
+
+def test_shared_sound_upload_requires_entitlement_and_unrelated_edits_preserve_it(
+    monkeypatch,
+) -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_deliveries, shared_alarms, "
+                "group_invites, group_members, groups, devices CASCADE"
+            )
+        leader = register_device(client, "Quiet Mango", "leader-secret-that-is-long-enough")
+        group_id = client.post(
+            "/v1/groups",
+            headers=leader,
+            json={"name": "Sounds", "alarm_permission": "everyone"},
+        ).json()["id"]
+        upload_body = {
+            "title": "Morning",
+            "sha256": "a" * 64,
+            "byte_length": 1234,
+            "duration_ms": 1000,
+        }
+        refused = client.post(
+            f"/v1/groups/{group_id}/sounds/uploads",
+            headers=leader,
+            json=upload_body,
+        )
+        assert refused.status_code == 403
+        with transaction() as connection:
+            connection.execute(
+                "UPDATE devices SET play_entitlement_expires_at = now() + interval '1 day' WHERE id = %s",
+                (leader["X-Jay-Device-ID"],),
+            )
+        monkeypatch.setattr(
+            "jay_server.main.create_sound_upload",
+            lambda *_: {"url": "https://upload.invalid", "headers": {}},
+        )
+        upload = client.post(
+            f"/v1/groups/{group_id}/sounds/uploads",
+            headers=leader,
+            json=upload_body,
+        )
+        assert upload.status_code == 201
+        sound_id = upload.json()["id"]
+        monkeypatch.setattr("jay_server.main.validate_sound_upload", lambda *_: None)
+        assert client.post(f"/v1/sounds/{sound_id}/complete", headers=leader).status_code == 200
+        payload = alarm_payload(group_id) | {
+            "sound_change": {"mode": "shared", "sound_id": sound_id}
+        }
+        alarm = client.post("/v1/alarms", headers=leader, json=payload)
+        assert alarm.status_code == 201
+        alarm_id = alarm.json()["id"]
+        with transaction() as connection:
+            connection.execute(
+                "UPDATE devices SET play_entitlement_expires_at = NULL WHERE id = %s",
+                (leader["X-Jay-Device-ID"],),
+            )
+        update = payload | {"label": "Still shared", "expected_revision": 1}
+        update.pop("group_id")
+        update.pop("sound_change")
+        saved = client.put(f"/v1/alarms/{alarm_id}", headers=leader, json=update)
+        assert saved.status_code == 200
+        synchronized = client.get("/v1/sync", headers=leader).json()["alarms"][0]
+        assert synchronized["sound_mode"] == "shared"
+        assert synchronized["sound_id"] == sound_id
+        forbidden_selection = update | {
+            "expected_revision": 2,
+            "sound_change": {"mode": "shared", "sound_id": sound_id},
+        }
+        assert client.put(
+            f"/v1/alarms/{alarm_id}",
+            headers=leader,
+            json=forbidden_selection,
+        ).status_code == 403
+        deleted = client.request(
+            "DELETE",
+            f"/v1/alarms/{alarm_id}",
+            headers=leader,
+            json={"expected_revision": 2},
+        )
+        assert deleted.status_code == 200
+        with transaction() as connection:
+            assert connection.execute(
+                "SELECT 1 FROM shared_sounds WHERE id = %s",
+                (sound_id,),
+            ).fetchone() is None
+            assert connection.execute(
+                "SELECT 1 FROM sound_deletions WHERE object_key LIKE %s",
+                (f"%/{sound_id}.flac",),
+            ).fetchone() is not None

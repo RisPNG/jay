@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     google_play_credentials_json: str | None = None
     play_entitlement_lifetime_hours: int = 48
     alarm_occurrence_monitor_enabled: bool = True
+    b2_s3_endpoint: str | None = None
+    b2_bucket_name: str | None = None
+    b2_application_key_id: str | None = None
+    b2_application_key: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -9,6 +9,7 @@ description = "Synchronization server for Jay social alarms"
 requires-python = ">=3.11"
 dependencies = [
     "alembic==1.19.1",
+    "boto3==1.40.20",
     "fastapi==0.141.1",
     "firebase-admin==7.5.0",
     "google-auth==2.56.3",

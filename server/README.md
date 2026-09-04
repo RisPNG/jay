@@ -38,12 +38,16 @@ The Android emulator can reach this local API at `http://10.0.2.2:8000`. Clearte
 | `FIREBASE_CREDENTIALS_JSON` | Optional Firebase service-account JSON for immediate synchronization pushes |
 | `GOOGLE_PLAY_CREDENTIALS_JSON` | Optional Play Integrity service-account JSON for paid-app entitlement verification |
 | `PLAY_ENTITLEMENT_LIFETIME_HOURS` | Lifetime of a verified Play entitlement, defaulting to 48 hours |
+| `B2_S3_ENDPOINT` | Backblaze B2 S3-compatible endpoint |
+| `B2_BUCKET_NAME` | Private B2 bucket that stores normalized shared sounds |
+| `B2_APPLICATION_KEY_ID` | B2 application key ID scoped to the sound bucket |
+| `B2_APPLICATION_KEY` | B2 application key secret scoped to the sound bucket |
 
 If Firebase is not configured, synchronization still occurs when Jay launches, when the user requests it, after local group operations, and periodically in the background.
 
 ## Render
 
-The repository-root `render.yaml` provisions the Python service and PostgreSQL database. Set `PUBLIC_URL` to the deployed HTTPS URL. To enable immediate delivery, store the Firebase service-account JSON in the secret `FIREBASE_CREDENTIALS_JSON` environment variable. To verify paid Play installations, store the service-account JSON from the linked Play Integrity Cloud project in `GOOGLE_PLAY_CREDENTIALS_JSON`.
+The repository-root `render.yaml` provisions the Python service and PostgreSQL database. Set `PUBLIC_URL` to the deployed HTTPS URL. To enable immediate delivery, store the Firebase service-account JSON in the secret `FIREBASE_CREDENTIALS_JSON` environment variable. To verify paid Play installations, store the service-account JSON from the linked Play Integrity Cloud project in `GOOGLE_PLAY_CREDENTIALS_JSON`. Configure the four B2 variables as Render secrets; the application key must stay server-side.
 
 ## Tests
 

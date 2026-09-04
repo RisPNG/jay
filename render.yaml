@@ -18,6 +18,14 @@ services:
         sync: false
       - key: GOOGLE_PLAY_CREDENTIALS_JSON
         sync: false
+      - key: B2_S3_ENDPOINT
+        sync: false
+      - key: B2_BUCKET_NAME
+        sync: false
+      - key: B2_APPLICATION_KEY_ID
+        sync: false
+      - key: B2_APPLICATION_KEY
+        sync: false
 
 databases:
   - name: jay-postgres

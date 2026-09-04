@@ -332,5 +332,9 @@
     <string name="edit_widget">Edit</string>
     <string name="widget_time_zone">Time zone: %1$s</string>
     <string name="widget_system_time_zone">System time zone</string>
+    <string name="group_time_zone_enabled">Use one group time zone</string>
+    <string name="group_time_zone_value">Group time zone: %1$s</string>
+    <string name="alarm_log_deleted_inactive">Alarm deleted after three occurrences without member activity</string>
+    <string name="group_log_time_zone_updated">%1$s changed the group alarm time zone</string>
     <string name="widget_clock_face">Clock face: %1$s</string>
 </resources>

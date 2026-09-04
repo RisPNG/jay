@@ -23,6 +23,9 @@ import kotlinx.coroutines.launch
 class SocialModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as App).container.socialRepository
 
+    val canUploadSharedSounds: Boolean
+        get() = repository.canUploadSharedSounds
+
     val groups: StateFlow<List<SocialGroup>> = repository.groups.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),

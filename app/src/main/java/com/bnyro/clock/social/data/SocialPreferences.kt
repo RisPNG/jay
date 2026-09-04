@@ -7,4 +7,7 @@ object SocialPreferences {
     const val syncCursorKey = "jaySyncCursor"
     const val pendingInvitationKey = "jayPendingInvitation"
     const val alarmOccurrencePrefix = "jayAlarmOccurrence:"
+    const val alarmTimeZonePrefix = "jayAlarmTimeZone:"
+    const val entitlementSharedUploadKey = "jayPlayEntitlementSharedUpload"
+    const val entitlementExpiresAtKey = "jayPlayEntitlementExpiresAt"
 }

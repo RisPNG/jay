@@ -19,6 +19,9 @@ import com.bnyro.clock.social.domain.SharedAlarmDelete
 import com.bnyro.clock.social.domain.SharedAlarmRequest
 import com.bnyro.clock.social.domain.SharedTimerActionRequest
 import com.bnyro.clock.social.domain.SharedTimerRequest
+import com.bnyro.clock.social.domain.SharedSoundDownloadResponse
+import com.bnyro.clock.social.domain.SharedSoundUploadRequest
+import com.bnyro.clock.social.domain.SharedSoundUploadResponse
 import com.bnyro.clock.social.domain.SyncResponse
 import com.bnyro.clock.social.domain.PushTokenUpdate
 import kotlinx.serialization.encodeToString
@@ -32,6 +35,7 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URI
 import java.time.ZoneId
+import java.io.File
 
 class SocialApi(
     serverUrl: String,
@@ -123,6 +127,54 @@ class SocialApi(
 
     fun removeMember(groupId: String, deviceId: String) {
         request("/v1/groups/$groupId/members/$deviceId", "DELETE")
+    }
+
+    fun beginSoundUpload(
+        groupId: String,
+        upload: SharedSoundUploadRequest
+    ): SharedSoundUploadResponse = json.decodeFromString(
+        request(
+            "/v1/groups/$groupId/sounds/uploads",
+            "POST",
+            json.encodeToString(upload)
+        )
+    )
+
+    fun uploadSound(upload: SharedSoundUploadResponse, file: File) {
+        val connection = URI(upload.url).toURL().openConnection() as HttpURLConnection
+        connection.requestMethod = "PUT"
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 120_000
+        connection.doOutput = true
+        connection.setFixedLengthStreamingMode(file.length())
+        upload.headers.forEach(connection::setRequestProperty)
+        connection.outputStream.use { output -> file.inputStream().use { it.copyTo(output) } }
+        val status = connection.responseCode
+        val response = (if (status in 200..299) connection.inputStream else connection.errorStream)
+            ?.bufferedReader()?.use { it.readText() }.orEmpty()
+        connection.disconnect()
+        if (status !in 200..299) throw SocialApiException(status, response)
+    }
+
+    fun completeSoundUpload(soundId: String) {
+        request("/v1/sounds/$soundId/complete", "POST")
+    }
+
+    fun getSoundDownload(soundId: String): SharedSoundDownloadResponse =
+        json.decodeFromString(request("/v1/sounds/$soundId/download"))
+
+    fun downloadSound(download: SharedSoundDownloadResponse, file: File) {
+        val connection = URI(download.url).toURL().openConnection() as HttpURLConnection
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 120_000
+        val status = connection.responseCode
+        if (status !in 200..299) {
+            val response = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            connection.disconnect()
+            throw SocialApiException(status, response)
+        }
+        connection.inputStream.use { input -> file.outputStream().use { input.copyTo(it) } }
+        connection.disconnect()
     }
 
     fun createAlarm(alarm: SharedAlarmRequest): IdResponse = json.decodeFromString(

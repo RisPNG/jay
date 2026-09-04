@@ -64,7 +64,8 @@ fun TimerEditSheet(
     onSave: (TimerSettings) -> Unit,
     onDelete: (() -> Unit)? = null,
     onDismiss: () -> Unit,
-    groups: List<SocialGroup>? = null
+    groups: List<SocialGroup>? = null,
+    canUploadSharedSounds: Boolean = false
 ) {
     var showRingtoneDialog by remember { mutableStateOf(false) }
     var showVibrationDialog by remember { mutableStateOf(false) }
@@ -142,6 +143,10 @@ fun TimerEditSheet(
                                         text = { Text(group.name) },
                                         onClick = {
                                             selectedGroupId = group.id
+                                            if (!canUploadSharedSounds) {
+                                                soundName = null
+                                                soundUri = null
+                                            }
                                             groupMenuExpanded = false
                                         }
                                     )
@@ -183,12 +188,17 @@ fun TimerEditSheet(
                         title = stringResource(R.string.sound),
                         description = soundName ?: stringResource(R.string.default_sound),
                         isChecked = soundEnabled,
+                        selectionEnabled = selectedGroupId == null || canUploadSharedSounds,
                         icon = Icons.Rounded.Alarm,
                         onClick = {
                             showRingtoneDialog = true
                         },
                         onChecked = {
                             soundEnabled = it
+                            if (it && selectedGroupId != null && !canUploadSharedSounds) {
+                                soundName = null
+                                soundUri = null
+                            }
                         }
                     )
                     SwitchWithDivider(

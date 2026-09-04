@@ -16,6 +16,17 @@ enum class MemberRole {
     LEADER
 }
 
+enum class AlarmTimeBasis {
+    MEMBER_LOCAL,
+    GROUP_TIME_ZONE
+}
+
+enum class SharedSoundMode {
+    OFF,
+    MEMBER_DEFAULT,
+    SHARED
+}
+
 enum class AlarmActivityKind {
     SNOOZED,
     DISMISSED,
@@ -35,7 +46,9 @@ data class SocialGroup(
     val notifyIgnored: Boolean,
     val notifyMembership: Boolean,
     val notifyAdministrative: Boolean,
-    val role: MemberRole
+    val role: MemberRole,
+    val alarmTimeBasis: AlarmTimeBasis = AlarmTimeBasis.MEMBER_LOCAL,
+    val alarmTimeZone: String = "UTC"
 )
 
 val SocialGroup.canEditAlarms: Boolean
@@ -57,7 +70,11 @@ data class SharedAlarmLink(
     @androidx.room.PrimaryKey val remoteAlarmId: String,
     val localAlarmId: Long,
     val groupId: String,
-    val revision: Int
+    val revision: Int,
+    val soundMode: SharedSoundMode,
+    val soundId: String?,
+    val soundTitle: String?,
+    val timeZone: String?
 )
 
 data class AlarmGroupName(
@@ -134,7 +151,9 @@ data class GroupCreate(
     @SerialName("notify_alarm_changes") val notifyAlarmChanges: Boolean,
     @SerialName("notify_snoozed") val notifySnoozed: Boolean,
     @SerialName("notify_dismissed") val notifyDismissed: Boolean,
-    @SerialName("notify_ignored") val notifyIgnored: Boolean
+    @SerialName("notify_ignored") val notifyIgnored: Boolean,
+    @SerialName("alarm_time_basis") val alarmTimeBasis: String = "member_local",
+    @SerialName("alarm_time_zone") val alarmTimeZone: String = "UTC"
 )
 
 @Serializable
@@ -144,7 +163,15 @@ data class GroupUpdate(
     @SerialName("notify_alarm_changes") val notifyAlarmChanges: Boolean,
     @SerialName("notify_snoozed") val notifySnoozed: Boolean,
     @SerialName("notify_dismissed") val notifyDismissed: Boolean,
-    @SerialName("notify_ignored") val notifyIgnored: Boolean
+    @SerialName("notify_ignored") val notifyIgnored: Boolean,
+    @SerialName("alarm_time_basis") val alarmTimeBasis: String,
+    @SerialName("alarm_time_zone") val alarmTimeZone: String
+)
+
+@Serializable
+data class SharedSoundSelection(
+    val mode: String,
+    @SerialName("sound_id") val soundId: String? = null
 )
 
 @Serializable
@@ -184,6 +211,7 @@ data class SharedAlarmRequest(
     @SerialName("sound_enabled") val soundEnabled: Boolean,
     @SerialName("vibration_pattern") val vibrationPattern: List<Int>,
     @SerialName("vibration_pattern_name") val vibrationPatternName: String,
+    @SerialName("sound_change") val soundChange: SharedSoundSelection? = null,
     @SerialName("expected_revision") val expectedRevision: Int? = null
 )
 
@@ -205,7 +233,30 @@ data class AlarmOccurrenceSchedule(
     @SerialName("alarm_revision") val alarmRevision: Int,
     @SerialName("occurrence_id") val occurrenceId: String,
     @SerialName("trigger_at") val triggerAt: String,
-    @SerialName("deadline_at") val deadlineAt: String
+    @SerialName("deadline_at") val deadlineAt: String,
+    @SerialName("cycle_date") val cycleDate: String
+)
+
+@Serializable
+data class SharedSoundUploadRequest(
+    val title: String,
+    val sha256: String,
+    @SerialName("byte_length") val byteLength: Long,
+    @SerialName("duration_ms") val durationMs: Int
+)
+
+@Serializable
+data class SharedSoundUploadResponse(
+    val id: String,
+    val url: String,
+    val headers: Map<String, String>
+)
+
+@Serializable
+data class SharedSoundDownloadResponse(
+    val url: String,
+    val sha256: String,
+    @SerialName("byte_length") val byteLength: Long
 )
 
 @Serializable
@@ -234,7 +285,9 @@ data class SocialGroupDto(
     @SerialName("notify_ignored") val notifyIgnored: Boolean,
     @SerialName("notify_membership") val notifyMembership: Boolean,
     @SerialName("notify_administrative") val notifyAdministrative: Boolean,
-    val role: String
+    val role: String,
+    @SerialName("alarm_time_basis") val alarmTimeBasis: String = "member_local",
+    @SerialName("alarm_time_zone") val alarmTimeZone: String = "UTC"
 )
 
 @Serializable
@@ -269,6 +322,9 @@ data class SharedAlarmDto(
     @SerialName("sound_enabled") val soundEnabled: Boolean,
     @SerialName("vibration_pattern") val vibrationPattern: List<Int>,
     @SerialName("vibration_pattern_name") val vibrationPatternName: String,
+    @SerialName("sound_mode") val soundMode: String = "member_default",
+    @SerialName("sound_id") val soundId: String? = null,
+    @SerialName("sound_title") val soundTitle: String? = null,
     val deleted: Boolean
 )
 
@@ -305,7 +361,8 @@ data class SharedTimerRequest(
     val vibrate: Boolean = true,
     @SerialName("sound_enabled") val soundEnabled: Boolean = true,
     @SerialName("vibration_pattern") val vibrationPattern: List<Int>,
-    @SerialName("vibration_pattern_name") val vibrationPatternName: String
+    @SerialName("vibration_pattern_name") val vibrationPatternName: String,
+    val sound: SharedSoundSelection
 )
 
 @Serializable
@@ -323,7 +380,10 @@ data class SharedTimerDto(
     val vibrate: Boolean = true,
     @SerialName("sound_enabled") val soundEnabled: Boolean = true,
     @SerialName("vibration_pattern") val vibrationPattern: List<Int> = emptyList(),
-    @SerialName("vibration_pattern_name") val vibrationPatternName: String = "Default"
+    @SerialName("vibration_pattern_name") val vibrationPatternName: String = "Default",
+    @SerialName("sound_mode") val soundMode: String = "member_default",
+    @SerialName("sound_id") val soundId: String? = null,
+    @SerialName("sound_title") val soundTitle: String? = null
 )
 
 @Serializable

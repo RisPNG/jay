@@ -19,6 +19,9 @@ from jay_server.domain import (
     require_alarm_editor,
     require_group_leader,
     require_group_member,
+    require_ready_shared_sound,
+    require_shared_sound_upload,
+    sweep_shared_timers,
 )
 from jay_server.schemas import (
     AlarmActivityCreate,
@@ -38,12 +41,23 @@ from jay_server.schemas import (
     SharedTimerAction,
     SharedTimerCreate,
     SharedTimerUpdate,
+    SharedSoundMode,
+    SharedSoundUploadCreate,
     PushTokenUpdate,
 )
 from jay_server.push import send_group_sync
 from jay_server.live import live_changes
 from jay_server.play_integrity import verify_play_entitlement
-from jay_server.occurrences import alarm_occurrence_monitor, schedule_alarm_occurrences
+from jay_server.occurrences import (
+    alarm_occurrence_monitor,
+    evaluate_alarm_cycle,
+    schedule_alarm_occurrences,
+)
+from jay_server.object_storage import (
+    create_sound_download,
+    create_sound_upload,
+    validate_sound_upload,
+)
 
 
 @asynccontextmanager
@@ -62,16 +76,6 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Jay Server", version="1", lifespan=lifespan)
-
-SHARED_TIMER_LINGER = timedelta(minutes=15)
-
-
-def sweep_shared_timers(connection) -> None:
-    connection.execute(
-        "DELETE FROM shared_timers WHERE expires_at < now() - %s",
-        (SHARED_TIMER_LINGER,),
-    )
-
 
 @app.get("/health")
 def health() -> dict:
@@ -122,13 +126,24 @@ def register_device(registration: DeviceRegistration) -> dict:
         ):
             for alarm in connection.execute(
                 """
-                SELECT alarm.id
+                SELECT alarm.id, groups.alarm_time_basis
                 FROM shared_alarms alarm
                 JOIN group_members gm ON gm.group_id = alarm.group_id
+                JOIN groups ON groups.id = alarm.group_id
                 WHERE gm.device_id = %s AND alarm.enabled AND NOT alarm.deleted
                 """,
                 (registration.id,),
             ).fetchall():
+                if alarm["alarm_time_basis"] != "member_local":
+                    continue
+                connection.execute(
+                    """
+                    UPDATE shared_alarms
+                    SET inactive_cycle_streak = 0, last_evaluated_cycle_date = NULL
+                    WHERE id = %s
+                    """,
+                    (alarm["id"],),
+                )
                 connection.execute(
                     """
                     UPDATE alarm_occurrences
@@ -220,16 +235,104 @@ def update_play_entitlement(
     }
 
 
+@app.post("/v1/groups/{group_id}/sounds/uploads", status_code=status.HTTP_201_CREATED)
+def begin_shared_sound_upload(
+    group_id: UUID,
+    upload: SharedSoundUploadCreate,
+    device: dict = Depends(authenticated_device),
+) -> dict:
+    sound_id = uuid4()
+    object_key = f"sounds/{group_id}/{sound_id}.flac"
+    with transaction() as connection:
+        require_alarm_editor(connection, group_id, device["id"])
+        require_shared_sound_upload(connection, device["id"])
+        connection.execute(
+            """
+            INSERT INTO shared_sounds (
+                id, group_id, object_key, uploaded_by, title, sha256,
+                byte_length, duration_ms
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                sound_id,
+                group_id,
+                object_key,
+                device["id"],
+                upload.title,
+                upload.sha256,
+                upload.byte_length,
+                upload.duration_ms,
+            ),
+        )
+    signed = create_sound_upload(object_key, upload.sha256, upload.byte_length)
+    return {"id": sound_id, **signed}
+
+
+@app.post("/v1/sounds/{sound_id}/complete")
+def complete_shared_sound_upload(
+    sound_id: UUID,
+    device: dict = Depends(authenticated_device),
+) -> dict:
+    with transaction() as connection:
+        sound = connection.execute(
+            "SELECT * FROM shared_sounds WHERE id = %s FOR UPDATE",
+            (sound_id,),
+        ).fetchone()
+        if sound is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Shared sound not found")
+        require_alarm_editor(connection, sound["group_id"], device["id"])
+        require_shared_sound_upload(connection, device["id"])
+        if sound["uploaded_by"] != device["id"]:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the uploader may finish this upload")
+        if sound["status"] != "ready":
+            validate_sound_upload(
+                sound["object_key"],
+                sound["sha256"],
+                sound["byte_length"],
+                sound["duration_ms"],
+            )
+            connection.execute(
+                "UPDATE shared_sounds SET status = 'ready', ready_at = now() WHERE id = %s",
+                (sound_id,),
+            )
+    return {"id": sound_id}
+
+
+@app.get("/v1/sounds/{sound_id}/download")
+def get_shared_sound_download(
+    sound_id: UUID,
+    device: dict = Depends(authenticated_device),
+) -> dict:
+    with transaction() as connection:
+        sound = connection.execute(
+            "SELECT * FROM shared_sounds WHERE id = %s AND status = 'ready'",
+            (sound_id,),
+        ).fetchone()
+        if sound is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Shared sound not found")
+        require_group_member(connection, sound["group_id"], device["id"])
+    return {
+        "url": create_sound_download(sound["object_key"]),
+        "sha256": sound["sha256"],
+        "byte_length": sound["byte_length"],
+    }
+
+
 @app.post("/v1/groups", status_code=status.HTTP_201_CREATED)
 def create_group(group: GroupCreate, device: dict = Depends(authenticated_device)) -> dict:
+    try:
+        ZoneInfo(group.alarm_time_zone)
+    except ZoneInfoNotFoundError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unknown time zone")
     group_id = uuid4()
     with transaction() as connection:
         connection.execute(
             """
             INSERT INTO groups (
                 id, name, alarm_permission, notify_alarm_changes, notify_snoozed,
-                notify_dismissed, notify_ignored, created_by
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                notify_dismissed, notify_ignored, alarm_time_basis,
+                alarm_time_zone, created_by
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 group_id,
@@ -239,6 +342,8 @@ def create_group(group: GroupCreate, device: dict = Depends(authenticated_device
                 group.notify_snoozed,
                 group.notify_dismissed,
                 group.notify_ignored,
+                group.alarm_time_basis.value,
+                group.alarm_time_zone,
                 device["id"],
             ),
         )
@@ -264,13 +369,28 @@ def update_group(
     update: GroupUpdate,
     device: dict = Depends(authenticated_device),
 ) -> dict:
+    try:
+        ZoneInfo(update.alarm_time_zone)
+    except ZoneInfoNotFoundError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unknown time zone")
     with transaction() as connection:
         previous = require_group_leader(connection, group_id, device["id"])
+        alarm_time_basis = (
+            update.alarm_time_basis.value
+            if "alarm_time_basis" in update.model_fields_set
+            else previous["alarm_time_basis"]
+        )
+        alarm_time_zone = (
+            update.alarm_time_zone
+            if "alarm_time_zone" in update.model_fields_set
+            else previous["alarm_time_zone"]
+        )
         connection.execute(
             """
             UPDATE groups
             SET name = %s, alarm_permission = %s, notify_alarm_changes = %s,
                 notify_snoozed = %s, notify_dismissed = %s, notify_ignored = %s,
+                alarm_time_basis = %s, alarm_time_zone = %s,
                 updated_at = now()
             WHERE id = %s
             """,
@@ -281,9 +401,29 @@ def update_group(
                 update.notify_snoozed,
                 update.notify_dismissed,
                 update.notify_ignored,
+                alarm_time_basis,
+                alarm_time_zone,
                 group_id,
             ),
         )
+        timing_changed = (
+            previous["alarm_time_basis"] != alarm_time_basis
+            or previous["alarm_time_zone"] != alarm_time_zone
+        )
+        if timing_changed:
+            alarms = connection.execute(
+                """
+                UPDATE shared_alarms
+                SET revision = revision + 1, inactive_cycle_streak = 0,
+                    last_evaluated_cycle_date = NULL, updated_by = %s,
+                    updated_at = now()
+                WHERE group_id = %s AND NOT deleted
+                RETURNING id
+                """,
+                (device["id"], group_id),
+            ).fetchall()
+            for alarm in alarms:
+                schedule_alarm_occurrences(connection, alarm["id"])
         record_group_change(
             connection,
             group_id,
@@ -305,6 +445,10 @@ def update_group(
                 "notify_dismissed": update.notify_dismissed,
                 "previous_notify_ignored": previous["notify_ignored"],
                 "notify_ignored": update.notify_ignored,
+                "previous_alarm_time_basis": previous["alarm_time_basis"],
+                "alarm_time_basis": alarm_time_basis,
+                "previous_alarm_time_zone": previous["alarm_time_zone"],
+                "alarm_time_zone": alarm_time_zone,
             },
         )
         push_tokens = get_group_push_tokens(
@@ -347,6 +491,14 @@ def leave_group(group_id: UUID, device: dict = Depends(authenticated_device)) ->
         connection.execute(
             "DELETE FROM group_members WHERE group_id = %s AND device_id = %s",
             (group_id, device["id"]),
+        )
+        connection.execute(
+            """
+            UPDATE shared_alarms
+            SET inactive_cycle_streak = 0, last_evaluated_cycle_date = NULL
+            WHERE group_id = %s AND NOT deleted
+            """,
+            (group_id,),
         )
         connection.execute(
             """
@@ -452,6 +604,14 @@ def join_group(join: InviteJoin, device: dict = Depends(authenticated_device)) -
         if joined is None:
             push_tokens = []
         else:
+            connection.execute(
+                """
+                UPDATE shared_alarms
+                SET inactive_cycle_streak = 0, last_evaluated_cycle_date = NULL
+                WHERE group_id = %s AND NOT deleted
+                """,
+                (invite["group_id"],),
+            )
             record_group_change(
                 connection,
                 invite["group_id"],
@@ -607,6 +767,14 @@ def remove_member(
             """,
             (group_id, member_id),
         )
+        connection.execute(
+            """
+            UPDATE shared_alarms
+            SET inactive_cycle_streak = 0, last_evaluated_cycle_date = NULL
+            WHERE group_id = %s AND NOT deleted
+            """,
+            (group_id,),
+        )
         push_tokens = get_group_push_tokens(
             connection, group_id, device["id"], "membership"
         )
@@ -622,15 +790,24 @@ def create_shared_alarm(
     alarm_id = uuid4()
     with transaction() as connection:
         group = require_alarm_editor(connection, alarm.group_id, device["id"])
+        sound_mode = (
+            alarm.sound_change.mode.value
+            if alarm.sound_change is not None
+            else ("member_default" if alarm.sound_enabled else "off")
+        )
+        sound_id = alarm.sound_change.sound_id if alarm.sound_change is not None else None
+        if sound_mode == SharedSoundMode.SHARED:
+            require_shared_sound_upload(connection, device["id"])
+            require_ready_shared_sound(connection, alarm.group_id, sound_id)
         connection.execute(
             """
             INSERT INTO shared_alarms (
                 id, group_id, time, label, enabled, days, vibrate,
                 start_date, repeat_interval, repeat_unit, repeat_anchor, repeat_duration, repeat_duration_unit, end_date, end_occurrences, advanced,
                 snooze_enabled, snooze_minutes, sound_enabled, vibration_pattern,
-                vibration_pattern_name, created_by, updated_by
+                vibration_pattern_name, sound_mode, sound_id, created_by, updated_by
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                      %s, %s, %s, %s, %s, %s, %s, %s)
+                      %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 alarm_id,
@@ -651,9 +828,11 @@ def create_shared_alarm(
                 alarm.advanced,
                 alarm.snooze_enabled,
                 alarm.snooze_minutes,
-                alarm.sound_enabled,
+                sound_mode != "off",
                 alarm.vibration_pattern,
                 alarm.vibration_pattern_name,
+                sound_mode,
+                sound_id,
                 device["id"],
                 device["id"],
             ),
@@ -675,7 +854,7 @@ def create_shared_alarm(
                 "repeat_interval": alarm.repeat_interval,
                 "snooze_enabled": alarm.snooze_enabled,
                 "snooze_minutes": alarm.snooze_minutes,
-                "sound_enabled": alarm.sound_enabled,
+                "sound_mode": sound_mode,
                 "vibration_pattern": alarm.vibration_pattern,
                 "vibration_pattern_name": alarm.vibration_pattern_name,
             },
@@ -704,6 +883,15 @@ def update_shared_alarm(
         if alarm is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Shared alarm not found")
         group = require_alarm_editor(connection, alarm["group_id"], device["id"])
+        if update.sound_change is None:
+            sound_mode = alarm["sound_mode"]
+            sound_id = alarm["sound_id"]
+        else:
+            sound_mode = update.sound_change.mode.value
+            sound_id = update.sound_change.sound_id
+            if sound_mode == SharedSoundMode.SHARED:
+                require_shared_sound_upload(connection, device["id"])
+                require_ready_shared_sound(connection, alarm["group_id"], sound_id)
         changed = connection.execute(
             """
             UPDATE shared_alarms
@@ -712,8 +900,10 @@ def update_shared_alarm(
                 repeat_unit = %s, repeat_anchor = %s, repeat_duration = %s,
                 repeat_duration_unit = %s, end_date = %s, end_occurrences = %s,
                 advanced = %s, snooze_enabled = %s,
-                snooze_minutes = %s, sound_enabled = %s, vibration_pattern = %s,
-                vibration_pattern_name = %s, updated_by = %s, updated_at = now()
+                snooze_minutes = %s, sound_enabled = %s, sound_mode = %s,
+                sound_id = %s, vibration_pattern = %s,
+                vibration_pattern_name = %s, inactive_cycle_streak = 0,
+                last_evaluated_cycle_date = NULL, updated_by = %s, updated_at = now()
             WHERE id = %s AND revision = %s AND deleted = false
             RETURNING revision
             """,
@@ -734,7 +924,9 @@ def update_shared_alarm(
                 update.advanced,
                 update.snooze_enabled,
                 update.snooze_minutes,
-                update.sound_enabled,
+                sound_mode != "off",
+                sound_mode,
+                sound_id,
                 update.vibration_pattern,
                 update.vibration_pattern_name,
                 device["id"],
@@ -779,8 +971,8 @@ def update_shared_alarm(
                 "snooze_enabled": update.snooze_enabled,
                 "previous_snooze_minutes": alarm["snooze_minutes"],
                 "snooze_minutes": update.snooze_minutes,
-                "previous_sound_enabled": alarm["sound_enabled"],
-                "sound_enabled": update.sound_enabled,
+                "previous_sound_mode": alarm["sound_mode"],
+                "sound_mode": sound_mode,
                 "previous_vibration_pattern": alarm["vibration_pattern"],
                 "vibration_pattern": update.vibration_pattern,
                 "previous_vibration_pattern_name": alarm["vibration_pattern_name"],
@@ -788,6 +980,21 @@ def update_shared_alarm(
             },
         )
         schedule_alarm_occurrences(connection, alarm_id)
+        if alarm["sound_id"] is not None and alarm["sound_id"] != sound_id:
+            connection.execute(
+                """
+                DELETE FROM shared_sounds sound
+                WHERE id = %s
+                  AND NOT EXISTS (
+                    SELECT 1 FROM shared_alarms current_alarm
+                    WHERE current_alarm.sound_id = sound.id AND NOT current_alarm.deleted
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM shared_timers timer WHERE timer.sound_id = sound.id
+                  )
+                """,
+                (alarm["sound_id"],),
+            )
         push_tokens = (
             get_group_push_tokens(connection, alarm["group_id"], device["id"])
             if group["notify_alarm_changes"]
@@ -805,7 +1012,7 @@ def delete_shared_alarm(
 ) -> dict:
     with transaction() as connection:
         alarm = connection.execute(
-            "SELECT group_id, label, time FROM shared_alarms WHERE id = %s AND deleted = false",
+            "SELECT group_id, label, time, sound_id FROM shared_alarms WHERE id = %s AND deleted = false",
             (alarm_id,),
         ).fetchone()
         if alarm is None:
@@ -834,6 +1041,21 @@ def delete_shared_alarm(
             details={"alarm_revision": changed["revision"]},
         )
         schedule_alarm_occurrences(connection, alarm_id)
+        if alarm["sound_id"] is not None:
+            connection.execute(
+                """
+                DELETE FROM shared_sounds sound
+                WHERE id = %s
+                  AND NOT EXISTS (
+                    SELECT 1 FROM shared_alarms current_alarm
+                    WHERE current_alarm.sound_id = sound.id AND NOT current_alarm.deleted
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM shared_timers timer WHERE timer.sound_id = sound.id
+                  )
+                """,
+                (alarm["sound_id"],),
+            )
         push_tokens = (
             get_group_push_tokens(connection, alarm["group_id"], device["id"])
             if group["notify_alarm_changes"]
@@ -857,16 +1079,31 @@ def register_alarm_occurrence(
     with transaction() as connection:
         alarm = connection.execute(
             """
-            SELECT group_id, revision, enabled, deleted, end_occurrences
-            FROM shared_alarms WHERE id = %s
+            SELECT alarm.group_id, alarm.revision, alarm.enabled, alarm.deleted,
+                alarm.end_occurrences, groups.alarm_time_basis,
+                groups.alarm_time_zone, devices.time_zone AS device_time_zone
+            FROM shared_alarms alarm
+            JOIN groups ON groups.id = alarm.group_id
+            JOIN devices ON devices.id = %s
+            WHERE alarm.id = %s
             """,
-            (alarm_id,),
+            (device["id"], alarm_id),
         ).fetchone()
         if alarm is None or alarm["deleted"]:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Shared alarm not found")
         require_group_member(connection, alarm["group_id"], device["id"])
         if alarm["revision"] != occurrence.alarm_revision or not alarm["enabled"]:
             raise HTTPException(status.HTTP_409_CONFLICT, "Alarm occurrence is no longer current")
+        time_zone = (
+            alarm["alarm_time_zone"]
+            if alarm["alarm_time_basis"] == "group_time_zone"
+            else alarm["device_time_zone"]
+        )
+        if time_zone is None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Occurrence cycle date is invalid")
+        cycle_date = occurrence.trigger_at.astimezone(ZoneInfo(time_zone)).date()
+        if occurrence.cycle_date is not None and cycle_date.isoformat() != occurrence.cycle_date:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Occurrence cycle date is invalid")
         if alarm["end_occurrences"] == 1 and connection.execute(
             """
             SELECT 1 FROM alarm_occurrences
@@ -906,13 +1143,16 @@ def register_alarm_occurrence(
             """
             INSERT INTO alarm_occurrences (
                 alarm_id, group_id, alarm_revision, device_id, occurrence_id,
-                trigger_at, deadline_at
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                trigger_at, deadline_at, cycle_date
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (alarm_id, device_id, occurrence_id) DO UPDATE
             SET alarm_revision = EXCLUDED.alarm_revision,
                 trigger_at = EXCLUDED.trigger_at,
-                deadline_at = EXCLUDED.deadline_at
-            WHERE alarm_occurrences.status = 'pending'
+                deadline_at = EXCLUDED.deadline_at,
+                cycle_date = EXCLUDED.cycle_date,
+                status = 'pending',
+                resolved_at = NULL
+            WHERE alarm_occurrences.status IN ('pending', 'canceled')
             """,
             (
                 alarm_id,
@@ -922,6 +1162,7 @@ def register_alarm_occurrence(
                 occurrence.occurrence_id,
                 occurrence.trigger_at,
                 occurrence.deadline_at,
+                cycle_date,
             ),
         )
     return {"occurrence_id": occurrence.occurrence_id}
@@ -1063,7 +1304,7 @@ def record_alarm_activity(
         if activity.occurrence_id is not None:
             resolved_occurrence = connection.execute(
                 """
-                SELECT trigger_at FROM alarm_occurrences
+                SELECT trigger_at, cycle_date FROM alarm_occurrences
                 WHERE alarm_id = %s AND device_id = %s AND occurrence_id = %s
                 """,
                 (alarm_id, device["id"], activity.occurrence_id),
@@ -1122,6 +1363,18 @@ def record_alarm_activity(
         push_tokens = get_group_push_tokens(
             connection, alarm["group_id"], device["id"]
         ) if should_notify else []
+        if activity.occurrence_id is not None and resolved_occurrence is not None:
+            push_tokens = list(
+                set(push_tokens)
+                | set(
+                    evaluate_alarm_cycle(
+                        connection,
+                        alarm_id,
+                        activity.alarm_revision,
+                        resolved_occurrence["cycle_date"],
+                    )
+                )
+            )
     send_group_sync(push_tokens)
     return {"id": activity_id}
 
@@ -1213,14 +1466,23 @@ def start_shared_timer(
     with transaction() as connection:
         require_alarm_editor(connection, group_id, device["id"])
         sweep_shared_timers(connection)
+        sound_mode = (
+            timer.sound.mode.value
+            if timer.sound is not None
+            else ("member_default" if timer.sound_enabled else "off")
+        )
+        sound_id = timer.sound.sound_id if timer.sound is not None else None
+        if sound_mode == SharedSoundMode.SHARED:
+            require_shared_sound_upload(connection, device["id"])
+            require_ready_shared_sound(connection, group_id, sound_id)
         expires_at = datetime.now(UTC) + timedelta(seconds=timer.duration_seconds)
         connection.execute(
             """
             INSERT INTO shared_timers (
                 id, group_id, label, duration_seconds, increment_seconds,
                 expires_at, started_by, sound_enabled, vibrate,
-                vibration_pattern, vibration_pattern_name
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                vibration_pattern, vibration_pattern_name, sound_mode, sound_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 timer_id,
@@ -1230,10 +1492,12 @@ def start_shared_timer(
                 timer.increment_seconds,
                 expires_at,
                 device["id"],
-                timer.sound_enabled,
+                sound_mode != "off",
                 timer.vibrate,
                 timer.vibration_pattern,
                 timer.vibration_pattern_name,
+                sound_mode,
+                sound_id,
             ),
         )
         push_tokens = get_group_push_tokens(connection, group_id, device["id"])
@@ -1283,12 +1547,28 @@ def cancel_shared_timer(
 ) -> None:
     with transaction() as connection:
         timer = connection.execute(
-            "SELECT group_id FROM shared_timers WHERE id = %s", (timer_id,)
+            "SELECT group_id, sound_id FROM shared_timers WHERE id = %s", (timer_id,)
         ).fetchone()
         if timer is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Shared timer not found")
         require_alarm_editor(connection, timer["group_id"], device["id"])
         connection.execute("DELETE FROM shared_timers WHERE id = %s", (timer_id,))
+        if timer["sound_id"] is not None:
+            connection.execute(
+                """
+                DELETE FROM shared_sounds sound
+                WHERE id = %s
+                  AND NOT EXISTS (
+                    SELECT 1 FROM shared_alarms alarm
+                    WHERE alarm.sound_id = sound.id AND NOT alarm.deleted
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM shared_timers current_timer
+                    WHERE current_timer.sound_id = sound.id
+                  )
+                """,
+                (timer["sound_id"],),
+            )
         push_tokens = get_group_push_tokens(connection, timer["group_id"], device["id"])
     send_group_sync(push_tokens)
 
@@ -1329,11 +1609,22 @@ def synchronize(
             (group_ids,),
         ).fetchall()
         alarms = connection.execute(
-            "SELECT * FROM shared_alarms WHERE group_id = ANY(%s)", (group_ids,)
+            """
+            SELECT alarm.*, sound.title AS sound_title
+            FROM shared_alarms alarm
+            LEFT JOIN shared_sounds sound ON sound.id = alarm.sound_id
+            WHERE alarm.group_id = ANY(%s)
+            """,
+            (group_ids,),
         ).fetchall()
         sweep_shared_timers(connection)
         timers = connection.execute(
-            "SELECT * FROM shared_timers WHERE group_id = ANY(%s) ORDER BY created_at",
+            """
+            SELECT timer.*, sound.title AS sound_title
+            FROM shared_timers timer
+            LEFT JOIN shared_sounds sound ON sound.id = timer.sound_id
+            WHERE timer.group_id = ANY(%s) ORDER BY timer.created_at
+            """,
             (group_ids,),
         ).fetchall()
         changes = connection.execute(

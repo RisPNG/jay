@@ -48,11 +48,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bnyro.clock.R
 import com.bnyro.clock.navigation.TopBarScaffold
 import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.presentation.screens.settings.components.SettingsCategory
+import com.bnyro.clock.presentation.screens.clock.components.TimeZonePickerDialog
+import com.bnyro.clock.presentation.screens.clock.model.ClockModel
+import com.bnyro.clock.social.domain.AlarmTimeBasis
 import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.social.domain.MemberRole
 import com.bnyro.clock.social.domain.SocialGroup
@@ -65,6 +69,7 @@ fun GroupsScreen(
     socialModel: SocialModel
 ) {
     val context = LocalContext.current
+    val clockModel: ClockModel = viewModel()
     val shareInvitationTitle = stringResource(R.string.share_group_invitation)
     val groups by socialModel.groups.collectAsState()
     val members by socialModel.members.collectAsState()
@@ -270,6 +275,13 @@ fun GroupsScreen(
         var notifyAdministrative by remember(group.id, group.notifyAdministrative) {
             mutableStateOf(group.notifyAdministrative)
         }
+        var alarmTimeBasis by remember(group.id, group.alarmTimeBasis) {
+            mutableStateOf(group.alarmTimeBasis)
+        }
+        var alarmTimeZone by remember(group.id, group.alarmTimeZone) {
+            mutableStateOf(group.alarmTimeZone)
+        }
+        var showTimeZonePicker by remember(group.id) { mutableStateOf(false) }
         AlertDialog(
             modifier = Modifier
                 .widthIn(max = 560.dp)
@@ -308,6 +320,27 @@ fun GroupsScreen(
                             permission == AlarmPermission.LEADERS
                         ) {
                             permission = if (it) AlarmPermission.LEADERS else AlarmPermission.EVERYONE
+                        }
+                        GroupSwitch(
+                            stringResource(R.string.group_time_zone_enabled),
+                            alarmTimeBasis == AlarmTimeBasis.GROUP_TIME_ZONE
+                        ) {
+                            alarmTimeBasis = if (it) {
+                                AlarmTimeBasis.GROUP_TIME_ZONE
+                            } else {
+                                AlarmTimeBasis.MEMBER_LOCAL
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = { showTimeZonePicker = true },
+                            enabled = alarmTimeBasis == AlarmTimeBasis.GROUP_TIME_ZONE
+                        ) {
+                            Text(
+                                stringResource(
+                                    R.string.group_time_zone_value,
+                                    alarmTimeZone
+                                )
+                            )
                         }
                         HorizontalDivider(
                             modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
@@ -430,7 +463,9 @@ fun GroupsScreen(
                                     notifyDismissed = notifyDismissed,
                                     notifyIgnored = notifyIgnored,
                                     notifyMembership = notifyMembership,
-                                    notifyAdministrative = notifyAdministrative
+                                    notifyAdministrative = notifyAdministrative,
+                                    alarmTimeBasis = alarmTimeBasis,
+                                    alarmTimeZone = alarmTimeZone
                                 )
                             )
                             selectedGroup = null
@@ -467,6 +502,15 @@ fun GroupsScreen(
                     }
                 }
             )
+        }
+        if (showTimeZonePicker) {
+            TimeZonePickerDialog(
+                clockModel = clockModel,
+                onDismissRequest = { showTimeZonePicker = false }
+            ) {
+                alarmTimeZone = it.zoneId
+                showTimeZonePicker = false
+            }
         }
     }
 

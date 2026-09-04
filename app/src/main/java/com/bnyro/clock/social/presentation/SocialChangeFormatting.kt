@@ -112,6 +112,9 @@ fun SocialChange.groupLogTitle(context: Context): String {
                 (details?.get("previous_name") as? JsonPrimitive)?.contentOrNull ?: groupName,
                 (details?.get("name") as? JsonPrimitive)?.contentOrNull ?: groupName
             )
+            details?.get("previous_alarm_time_basis") != details?.get("alarm_time_basis") ||
+                details?.get("previous_alarm_time_zone") != details?.get("alarm_time_zone") ->
+                context.getString(R.string.group_log_time_zone_updated, actor)
             else -> context.getString(R.string.group_log_notifications_updated, actor)
         }
         "invitation_created" -> context.getString(R.string.group_log_invitation_created, actor)
@@ -127,7 +130,14 @@ fun SocialChange.alarmLogTitle(context: Context): String {
         "edited" -> context.getString(R.string.alarm_log_edited, actor)
         "enabled" -> context.getString(R.string.alarm_log_enabled, actor)
         "disabled" -> context.getString(R.string.alarm_log_disabled, actor)
-        "deleted" -> context.getString(R.string.alarm_log_deleted, actor)
+        "deleted" -> if (
+            (details?.get("reason") as? JsonPrimitive)?.contentOrNull ==
+            "three_inactive_cycles"
+        ) {
+            context.getString(R.string.alarm_log_deleted_inactive)
+        } else {
+            context.getString(R.string.alarm_log_deleted, actor)
+        }
         "snoozed" -> context.getString(R.string.alarm_log_snoozed, actor)
         "dismissed" -> context.getString(R.string.alarm_log_dismissed, actor)
         "ignored" -> context.getString(R.string.alarm_log_ignored, actor)
