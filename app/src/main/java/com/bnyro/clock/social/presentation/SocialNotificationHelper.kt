@@ -163,5 +163,5 @@ object SocialNotificationHelper {
     const val EXTRA_SOCIAL_ENTITY_TYPE = "com.rispng.jay.SOCIAL_ENTITY_TYPE"
     const val SYNC_FAILURE_NOTIFICATION_ID = 190_001
     const val ENTITLEMENT_NOTIFICATION_ID = 190_002
-    private const val SOCIAL_CHANNEL = "social"
+    const val SOCIAL_CHANNEL = "social"
 }

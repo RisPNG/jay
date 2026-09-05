@@ -8,6 +8,7 @@ import androidx.annotation.StringRes
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationManagerCompat
 import com.bnyro.clock.R
+import com.bnyro.clock.social.presentation.SocialNotificationHelper
 import com.bnyro.clock.util.receivers.DeleteNotificationChannelReceiver
 import com.bnyro.clock.util.receivers.PreAlarmReceiver
 
@@ -98,6 +99,8 @@ object NotificationHelper {
         )
 
         nManager.createNotificationChannelsCompat(channels)
-        nManager.deleteUnlistedNotificationChannels(channels.map { it.id } + PreAlarmReceiver.CHANNEL_ID)
+        nManager.deleteUnlistedNotificationChannels(
+            channels.map { it.id } + PreAlarmReceiver.CHANNEL_ID + SocialNotificationHelper.SOCIAL_CHANNEL
+        )
     }
 }
