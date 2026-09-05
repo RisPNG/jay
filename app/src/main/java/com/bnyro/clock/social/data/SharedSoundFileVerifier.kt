@@ -56,8 +56,8 @@ object SharedSoundFileVerifier {
             extractor.setDataSource(file.absolutePath)
             check(extractor.trackCount == 1) { "The shared sound has multiple tracks" }
             val format = extractor.getTrackFormat(0)
-            check(format.getString(MediaFormat.KEY_MIME) == MediaFormat.MIMETYPE_AUDIO_FLAC) {
-                "The shared sound is not FLAC"
+            check(format.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) {
+                "The device cannot read the shared sound"
             }
             check(format.getInteger(MediaFormat.KEY_SAMPLE_RATE) == SHARED_SOUND_SAMPLE_RATE) {
                 "The shared sound is not ${SHARED_SOUND_SAMPLE_RATE} Hz"

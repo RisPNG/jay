@@ -8,11 +8,12 @@ import com.bnyro.clock.social.domain.SHARED_SOUND_SAMPLE_RATE
 import java.io.Closeable
 import java.io.File
 import java.io.FileOutputStream
+import java.io.RandomAccessFile
 import java.nio.ByteOrder
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-class FlacStreamEncoder(outputFile: File) : Closeable {
+class FlacStreamEncoder(private val outputFile: File) : Closeable {
     private val codec: MediaCodec
     private val output: FileOutputStream
     private var closed = false
@@ -95,6 +96,22 @@ class FlacStreamEncoder(outputFile: File) : Closeable {
                 error("The device audio encoder stalled")
             }
         }
+        writeTotalSamples()
+    }
+
+    private fun writeTotalSamples() {
+        RandomAccessFile(outputFile, "rw").use { file ->
+            val streamInfo = ByteArray(8)
+            file.seek(STREAM_INFO_OFFSET)
+            file.readFully(streamInfo)
+            var value = 0L
+            streamInfo.forEach { value = value shl 8 or (it.toLong() and 0xFF) }
+            value = (value ushr 36 shl 36) or queuedFrames
+            file.seek(STREAM_INFO_OFFSET)
+            for (index in 0 until 8) {
+                file.write(((value shr ((7 - index) * 8)) and 0xFF).toInt())
+            }
+        }
     }
 
     override fun close() {
@@ -133,6 +150,7 @@ class FlacStreamEncoder(outputFile: File) : Closeable {
         private const val CODEC_TIMEOUT_US = 10_000L
         private const val MAX_CODEC_STALLS = 1_000
         private const val COMPRESSION_LEVEL = 5
+        private const val STREAM_INFO_OFFSET = 18L
 
         fun isSupported(): Boolean = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.any {
             it.isEncoder && it.supportedTypes.contains(MediaFormat.MIMETYPE_AUDIO_FLAC)
