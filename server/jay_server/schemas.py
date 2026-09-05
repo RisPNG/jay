@@ -139,7 +139,6 @@ class SharedAlarmPayload(BaseModel):
     advanced: bool = False
     snooze_enabled: bool
     snooze_minutes: int = Field(gt=0, le=1440)
-    sound_enabled: bool
     vibration_pattern: list[int]
     vibration_pattern_name: str = Field(min_length=1, max_length=80)
     sound_change: SharedSoundSelection | None = None
@@ -193,7 +192,6 @@ class SharedTimerCreate(BaseModel):
     duration_seconds: int = Field(ge=1, le=86_400)
     increment_seconds: int = Field(ge=1, le=3_600)
     vibrate: bool = True
-    sound_enabled: bool = True
     vibration_pattern: list[int]
     vibration_pattern_name: str = Field(min_length=1, max_length=80)
     sound: SharedSoundSelection | None = None

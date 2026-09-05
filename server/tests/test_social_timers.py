@@ -52,7 +52,6 @@ def timer_payload() -> dict:
         "duration_seconds": 600,
         "increment_seconds": 60,
         "vibrate": False,
-        "sound_enabled": True,
         "vibration_pattern": [0, 500, 200, 500],
         "vibration_pattern_name": "Heartbeat",
     }
@@ -92,7 +91,7 @@ def test_shared_timer_lifecycle() -> None:
         assert timer["increment_seconds"] == 60
         assert timer["started_by"] == leader["X-Jay-Device-ID"]
         assert timer["vibrate"] is False
-        assert timer["sound_enabled"] is True
+        assert timer["sound_mode"] == "member_default"
         assert timer["vibration_pattern"] == [0, 500, 200, 500]
         assert timer["vibration_pattern_name"] == "Heartbeat"
         expires_at = datetime.fromisoformat(timer["expires_at"])
@@ -190,10 +189,10 @@ def test_shared_timer_lingering_after_expiry_is_swept() -> None:
                 """
                 INSERT INTO shared_timers (
                     id, group_id, label, duration_seconds, increment_seconds,
-                    expires_at, started_by, sound_enabled, vibrate,
+                    expires_at, started_by, vibrate,
                     vibration_pattern, vibration_pattern_name
                 ) VALUES (%s, %s, 'Stale', 60, 60, now() - interval '30 minutes', %s,
-                          true, true, ARRAY[0, 1000], 'Default')
+                          true, ARRAY[0, 1000], 'Default')
                 """,
                 (stale_id, group_id, leader["X-Jay-Device-ID"]),
             )

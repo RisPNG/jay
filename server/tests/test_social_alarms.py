@@ -46,7 +46,6 @@ def alarm_payload(group_id: str) -> dict:
         "end_occurrences": None,
         "snooze_enabled": True,
         "snooze_minutes": 10,
-        "sound_enabled": True,
         "vibration_pattern": [1000, 1000],
         "vibration_pattern_name": "Default",
     }

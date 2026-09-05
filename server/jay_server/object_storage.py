@@ -68,55 +68,51 @@ def validate_sound_upload(
     duration_ms: int,
 ) -> None:
     try:
-        stored = object_storage_client().head_object(
+        response = object_storage_client().get_object(
             Bucket=settings.b2_bucket_name,
             Key=object_key,
         )
     except ClientError as exception:
         raise HTTPException(status.HTTP_409_CONFLICT, "Shared sound upload is incomplete") from exception
-    if (
-        stored.get("ContentLength") != byte_length
-        or stored.get("ContentType") != "audio/flac"
-        or stored.get("Metadata", {}).get("sha256") != sha256
-    ):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Shared sound upload does not match")
-    response = object_storage_client().get_object(
-        Bucket=settings.b2_bucket_name,
-        Key=object_key,
-    )
     digest = hashlib.sha256()
     header = bytearray()
     try:
+        if (
+            response.get("ContentLength") != byte_length
+            or response.get("ContentType") != "audio/flac"
+            or response.get("Metadata", {}).get("sha256") != sha256
+        ):
+            raise HTTPException(status.HTTP_409_CONFLICT, "Shared sound upload does not match")
         for chunk in response["Body"].iter_chunks(chunk_size=1024 * 1024):
             digest.update(chunk)
             if len(header) < 42:
                 header.extend(chunk[: 42 - len(header)])
+        if digest.hexdigest() != sha256:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Shared sound upload does not match")
+        if (
+            len(header) < 42
+            or header[:4] != b"fLaC"
+            or header[4] & 0x7F != 0
+            or int.from_bytes(header[5:8]) != 34
+        ):
+            raise HTTPException(status.HTTP_409_CONFLICT, "Shared sound is not a valid FLAC file")
+        stream_info = int.from_bytes(header[18:26])
+        sample_rate = (stream_info >> 44) & 0xFFFFF
+        channel_count = ((stream_info >> 41) & 0x7) + 1
+        bits_per_sample = ((stream_info >> 36) & 0x1F) + 1
+        total_samples = stream_info & ((1 << 36) - 1)
+        actual_duration_ms = total_samples * 1000 // sample_rate if sample_rate else 0
+        if (
+            sample_rate != 48_000
+            or channel_count != 1
+            or bits_per_sample != 16
+            or total_samples == 0
+            or actual_duration_ms > 300_000
+            or abs(actual_duration_ms - duration_ms) > 1
+        ):
+            raise HTTPException(status.HTTP_409_CONFLICT, "Shared sound format does not match")
     finally:
         response["Body"].close()
-    if digest.hexdigest() != sha256:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Shared sound upload does not match")
-    if (
-        len(header) < 42
-        or header[:4] != b"fLaC"
-        or header[4] & 0x7F != 0
-        or int.from_bytes(header[5:8]) != 34
-    ):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Shared sound is not a valid FLAC file")
-    stream_info = int.from_bytes(header[18:26])
-    sample_rate = (stream_info >> 44) & 0xFFFFF
-    channel_count = ((stream_info >> 41) & 0x7) + 1
-    bits_per_sample = ((stream_info >> 36) & 0x1F) + 1
-    total_samples = stream_info & ((1 << 36) - 1)
-    actual_duration_ms = total_samples * 1000 // sample_rate if sample_rate else 0
-    if (
-        sample_rate != 48_000
-        or channel_count != 1
-        or bits_per_sample != 16
-        or total_samples == 0
-        or actual_duration_ms > 300_000
-        or abs(actual_duration_ms - duration_ms) > 1
-    ):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Shared sound format does not match")
 
 
 def create_sound_download(object_key: str) -> str:

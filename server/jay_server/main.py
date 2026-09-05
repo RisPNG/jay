@@ -275,7 +275,7 @@ def complete_shared_sound_upload(
 ) -> dict:
     with transaction() as connection:
         sound = connection.execute(
-            "SELECT * FROM shared_sounds WHERE id = %s FOR UPDATE",
+            "SELECT * FROM shared_sounds WHERE id = %s",
             (sound_id,),
         ).fetchone()
         if sound is None:
@@ -284,17 +284,33 @@ def complete_shared_sound_upload(
         require_shared_sound_upload(connection, device["id"])
         if sound["uploaded_by"] != device["id"]:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the uploader may finish this upload")
-        if sound["status"] != "ready":
-            validate_sound_upload(
-                sound["object_key"],
-                sound["sha256"],
-                sound["byte_length"],
-                sound["duration_ms"],
-            )
-            connection.execute(
-                "UPDATE shared_sounds SET status = 'ready', ready_at = now() WHERE id = %s",
+    if sound["status"] != "ready":
+        validate_sound_upload(
+            sound["object_key"],
+            sound["sha256"],
+            sound["byte_length"],
+            sound["duration_ms"],
+        )
+        with transaction() as connection:
+            completed = connection.execute(
+                """
+                UPDATE shared_sounds
+                SET status = 'ready', ready_at = now()
+                WHERE id = %s AND status = 'pending'
+                RETURNING id
+                """,
                 (sound_id,),
-            )
+            ).fetchone()
+            if completed is None:
+                current = connection.execute(
+                    "SELECT status FROM shared_sounds WHERE id = %s",
+                    (sound_id,),
+                ).fetchone()
+                if current is None or current["status"] != "ready":
+                    raise HTTPException(
+                        status.HTTP_409_CONFLICT,
+                        "Shared sound upload is no longer pending",
+                    )
     return {"id": sound_id}
 
 
@@ -793,7 +809,7 @@ def create_shared_alarm(
         sound_mode = (
             alarm.sound_change.mode.value
             if alarm.sound_change is not None
-            else ("member_default" if alarm.sound_enabled else "off")
+            else "member_default"
         )
         sound_id = alarm.sound_change.sound_id if alarm.sound_change is not None else None
         if sound_mode == SharedSoundMode.SHARED:
@@ -804,10 +820,10 @@ def create_shared_alarm(
             INSERT INTO shared_alarms (
                 id, group_id, time, label, enabled, days, vibrate,
                 start_date, repeat_interval, repeat_unit, repeat_anchor, repeat_duration, repeat_duration_unit, end_date, end_occurrences, advanced,
-                snooze_enabled, snooze_minutes, sound_enabled, vibration_pattern,
+                snooze_enabled, snooze_minutes, vibration_pattern,
                 vibration_pattern_name, sound_mode, sound_id, created_by, updated_by
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                      %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                      %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 alarm_id,
@@ -828,7 +844,6 @@ def create_shared_alarm(
                 alarm.advanced,
                 alarm.snooze_enabled,
                 alarm.snooze_minutes,
-                sound_mode != "off",
                 alarm.vibration_pattern,
                 alarm.vibration_pattern_name,
                 sound_mode,
@@ -900,7 +915,7 @@ def update_shared_alarm(
                 repeat_unit = %s, repeat_anchor = %s, repeat_duration = %s,
                 repeat_duration_unit = %s, end_date = %s, end_occurrences = %s,
                 advanced = %s, snooze_enabled = %s,
-                snooze_minutes = %s, sound_enabled = %s, sound_mode = %s,
+                snooze_minutes = %s, sound_mode = %s,
                 sound_id = %s, vibration_pattern = %s,
                 vibration_pattern_name = %s, inactive_cycle_streak = 0,
                 last_evaluated_cycle_date = NULL, updated_by = %s, updated_at = now()
@@ -924,7 +939,6 @@ def update_shared_alarm(
                 update.advanced,
                 update.snooze_enabled,
                 update.snooze_minutes,
-                sound_mode != "off",
                 sound_mode,
                 sound_id,
                 update.vibration_pattern,
@@ -1469,7 +1483,7 @@ def start_shared_timer(
         sound_mode = (
             timer.sound.mode.value
             if timer.sound is not None
-            else ("member_default" if timer.sound_enabled else "off")
+            else "member_default"
         )
         sound_id = timer.sound.sound_id if timer.sound is not None else None
         if sound_mode == SharedSoundMode.SHARED:
@@ -1480,9 +1494,9 @@ def start_shared_timer(
             """
             INSERT INTO shared_timers (
                 id, group_id, label, duration_seconds, increment_seconds,
-                expires_at, started_by, sound_enabled, vibrate,
+                expires_at, started_by, vibrate,
                 vibration_pattern, vibration_pattern_name, sound_mode, sound_id
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 timer_id,
@@ -1492,7 +1506,6 @@ def start_shared_timer(
                 timer.increment_seconds,
                 expires_at,
                 device["id"],
-                sound_mode != "off",
                 timer.vibrate,
                 timer.vibration_pattern,
                 timer.vibration_pattern_name,

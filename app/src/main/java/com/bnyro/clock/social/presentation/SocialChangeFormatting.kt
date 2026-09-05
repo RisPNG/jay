@@ -209,7 +209,7 @@ fun SocialChange.logDetails(context: Context): String? {
                 if (details?.get("previous_snooze_minutes") != details?.get("snooze_minutes")) {
                     add(context.getString(R.string.alarm_log_snooze_duration))
                 }
-                if (details?.get("previous_sound_enabled") != details?.get("sound_enabled")) {
+                if (details?.get("previous_sound_mode") != details?.get("sound_mode")) {
                     add(context.getString(R.string.sound))
                 }
                 if (details?.get("previous_vibrate") != details?.get("vibrate")) {

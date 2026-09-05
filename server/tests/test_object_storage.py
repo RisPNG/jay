@@ -22,15 +22,13 @@ class StoredObject:
         self.content = content
         self.sha256 = sha256
 
-    def head_object(self, **_):
+    def get_object(self, **_):
         return {
+            "Body": StoredBody(self.content),
             "ContentLength": len(self.content),
             "ContentType": "audio/flac",
             "Metadata": {"sha256": self.sha256},
         }
-
-    def get_object(self, **_):
-        return {"Body": StoredBody(self.content)}
 
 
 def flac_header(sample_rate: int = 48_000) -> bytes:

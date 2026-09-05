@@ -582,7 +582,6 @@ class SocialRepository(
                         advanced = alarm.advanced,
                         snoozeEnabled = alarm.snoozeEnabled,
                         snoozeMinutes = alarm.snoozeMinutes,
-                        soundEnabled = alarm.soundEnabled,
                         vibrationPattern = alarm.vibrationPattern,
                         vibrationPatternName = alarm.vibrationPatternName,
                         soundChange = SharedSoundSelection(soundMode.name.lowercase(), soundId)
@@ -676,7 +675,6 @@ class SocialRepository(
                         advanced = alarm.advanced,
                         snoozeEnabled = alarm.snoozeEnabled,
                         snoozeMinutes = alarm.snoozeMinutes,
-                        soundEnabled = alarm.soundEnabled,
                         vibrationPattern = alarm.vibrationPattern,
                         vibrationPatternName = alarm.vibrationPatternName,
                         soundChange = soundChange,
@@ -860,7 +858,6 @@ class SocialRepository(
                             60
                         ),
                     vibrate = settings.vibrate,
-                    soundEnabled = settings.soundEnabled,
                     vibrationPattern = settings.vibrationPattern,
                     vibrationPatternName = settings.vibrationPatternName,
                     sound = SharedSoundSelection(soundMode.name.lowercase(), soundId)
