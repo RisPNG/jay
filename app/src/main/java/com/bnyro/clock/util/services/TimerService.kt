@@ -20,6 +20,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.os.Vibrator
 import android.provider.AlarmClock
 import android.text.format.DateUtils
@@ -55,7 +56,7 @@ class TimerService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var isPlaying = false
-    private var oldnow = System.currentTimeMillis()
+    private var oldnow = SystemClock.elapsedRealtime()
     private val vibrator: Vibrator by lazy {
         getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
     }
@@ -157,7 +158,7 @@ class TimerService : Service() {
                     val finished = obj.currentPosition.value == 0
                     if (finished) {
                         endRinging(obj)
-                        oldnow = System.currentTimeMillis()
+                        oldnow = SystemClock.elapsedRealtime()
                         obj.state.value = WatchState.RUNNING
                     }
 
@@ -182,7 +183,7 @@ class TimerService : Service() {
                 TIMER_RESTART -> {
                     endRinging(obj)
 
-                    oldnow = System.currentTimeMillis()
+                    oldnow = SystemClock.elapsedRealtime()
 
                     // a finished timer has no run left to return to, so it starts a new one
                     if (obj.currentPosition.value == 0) obj.state.value = WatchState.RUNNING
@@ -387,7 +388,7 @@ class TimerService : Service() {
     }
 
     private fun updateState() {
-        val now = System.currentTimeMillis()
+        val now = SystemClock.elapsedRealtime()
         val delta = now - oldnow
         oldnow = now
 
@@ -719,8 +720,13 @@ class TimerService : Service() {
 
     fun updateTimer(id: Int, settings: TimerSettings) {
         timerObjects.firstOrNull { it.id == id }?.let {
+            val duration = settings.seconds * 1000
+            val running = it.state.value == WatchState.RUNNING
+            it.currentPosition.value =
+                (it.currentPosition.value.toLong() * duration / it.initialPosition.value).toInt()
+            if (running) cancelAlarm(it)
             it.label.value = settings.label
-            it.initialPosition.value = settings.seconds * 1000
+            it.initialPosition.value = duration
             it.soundName = settings.soundName
             it.soundUri = settings.soundUri
             it.soundEnabled = settings.soundEnabled
@@ -728,6 +734,7 @@ class TimerService : Service() {
             it.vibrationPattern = settings.vibrationPattern
             it.vibrationPatternName = settings.vibrationPatternName
             it.incrementSeconds = settings.incrementSeconds
+            if (running) scheduleAlarm(it)
             updateNotification(it)
         }
     }
@@ -757,7 +764,7 @@ class TimerService : Service() {
         private const val UPDATE_DELAY = 100
         const val TIMER_RESTART = "timer_restart"
         const val ACTION_ADD_TIME = "add_time"
-        const val UPDATE_STATE_SCHEME = "jaytimer"
+        const val UPDATE_STATE_SCHEME = "timer"
         const val ACTION_ALERT_SHOWN = "alert_shown"
         const val ACTION_ALERT_HIDDEN = "alert_hidden"
         const val LABEL_EXTRA_KEY = "label"
