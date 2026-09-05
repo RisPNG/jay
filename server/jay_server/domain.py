@@ -1,10 +1,12 @@
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
 from psycopg import Connection
 from psycopg.types.json import Jsonb
+
+from jay_server.config import settings
 
 
 def require_group_member(connection: Connection, group_id: UUID, device_id: str) -> dict:
@@ -36,15 +38,26 @@ def require_alarm_editor(connection: Connection, group_id: UUID, device_id: str)
     return membership
 
 
-def require_shared_sound_upload(connection: Connection, device_id: str) -> None:
-    entitled = connection.execute(
-        """
-        SELECT 1 FROM devices
-        WHERE id = %s AND play_entitlement_expires_at > now()
-        """,
+def device_capabilities(connection: Connection, device_id: str) -> dict:
+    if settings.shared_sound_access == "everyone":
+        return {
+            "shared_sound_upload": True,
+            "requires_play_entitlement": False,
+            "expires_at": None,
+        }
+    expires_at = connection.execute(
+        "SELECT play_entitlement_expires_at FROM devices WHERE id = %s",
         (device_id,),
-    ).fetchone()
-    if entitled is None:
+    ).fetchone()["play_entitlement_expires_at"]
+    return {
+        "shared_sound_upload": expires_at is not None and expires_at > datetime.now(UTC),
+        "requires_play_entitlement": True,
+        "expires_at": expires_at,
+    }
+
+
+def require_shared_sound_upload(connection: Connection, device_id: str) -> None:
+    if not device_capabilities(connection, device_id)["shared_sound_upload"]:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             "A current Play entitlement is required for shared sounds",

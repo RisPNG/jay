@@ -4,6 +4,8 @@ from datetime import UTC, date, datetime, timedelta
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from jay_server.database import transaction
@@ -785,6 +787,7 @@ def test_play_entitlement_is_bound_to_the_authenticated_device(monkeypatch) -> N
         assert unlicensed.status_code == 200
         assert unlicensed.json() == {
             "shared_sound_upload": False,
+            "requires_play_entitlement": True,
             "expires_at": None,
         }
         with transaction() as connection:
@@ -904,8 +907,9 @@ def test_group_time_zone_schedules_one_moment_for_every_member() -> None:
         assert occurrences[0]["cycle_date"] == occurrences[1]["cycle_date"]
 
 
+@pytest.mark.parametrize("access", ["play", "everyone"])
 def test_shared_sound_upload_requires_entitlement_and_unrelated_edits_preserve_it(
-    monkeypatch,
+    monkeypatch, access,
 ) -> None:
     with TestClient(app) as client:
         with transaction() as connection:
@@ -931,11 +935,14 @@ def test_shared_sound_upload_requires_entitlement_and_unrelated_edits_preserve_i
             json=upload_body,
         )
         assert refused.status_code == 403
-        with transaction() as connection:
-            connection.execute(
-                "UPDATE devices SET play_entitlement_expires_at = now() + interval '1 day' WHERE id = %s",
-                (leader["X-Jay-Device-ID"],),
-            )
+        monkeypatch.setattr(settings, "shared_sound_access", access)
+        if access == "play":
+            with transaction() as connection:
+                connection.execute(
+                    "UPDATE devices SET play_entitlement_expires_at = now() + interval '1 day' WHERE id = %s",
+                    (leader["X-Jay-Device-ID"],),
+                )
+        assert client.get("/v1/sync", headers=leader).json()["capabilities"]["shared_sound_upload"] is True
         monkeypatch.setattr(
             "jay_server.main.create_sound_upload",
             lambda *_: {"url": "https://upload.invalid", "headers": {}},
@@ -955,11 +962,21 @@ def test_shared_sound_upload_requires_entitlement_and_unrelated_edits_preserve_i
         alarm = client.post("/v1/alarms", headers=leader, json=payload)
         assert alarm.status_code == 201
         alarm_id = alarm.json()["id"]
+        timer_body = {
+            "duration_seconds": 60, "increment_seconds": 30,
+            "vibration_pattern": [0, 1000], "vibration_pattern_name": "Default",
+            "sound": {"mode": "shared", "sound_id": sound_id},
+        }
+        timer = client.post(f"/v1/groups/{group_id}/timers", headers=leader, json=timer_body)
+        assert timer.status_code == 201
+        assert client.delete(f"/v1/timers/{timer.json()['id']}", headers=leader).status_code == 204
         with transaction() as connection:
             connection.execute(
                 "UPDATE devices SET play_entitlement_expires_at = NULL WHERE id = %s",
                 (leader["X-Jay-Device-ID"],),
             )
+        monkeypatch.setattr(settings, "shared_sound_access", "play")
+        assert client.post(f"/v1/groups/{group_id}/timers", headers=leader, json=timer_body).status_code == 403
         update = payload | {"label": "Still shared", "expected_revision": 1}
         update.pop("group_id")
         update.pop("sound_change")
@@ -1373,3 +1390,69 @@ def test_a_device_holds_one_push_token_per_installation() -> None:
                 "SELECT token FROM device_push_tokens"
             ).fetchall()
         assert remaining == []
+
+
+def test_shared_sound_policy_controls_capabilities_without_play_verification(monkeypatch) -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute("TRUNCATE devices CASCADE")
+        device = register_device(client, "Policy Finch", "policy-device-secret-long-enough")
+        denied = {
+            "shared_sound_upload": False,
+            "requires_play_entitlement": True,
+            "expires_at": None,
+        }
+        assert client.get("/v1/device/capabilities", headers=device).json() == denied
+        assert client.get("/v1/sync", headers=device).json()["capabilities"] == denied
+        with transaction() as connection:
+            connection.execute(
+                "UPDATE devices SET play_entitlement_expires_at = now() - interval '1 day' WHERE id = %s",
+                (device["X-Jay-Device-ID"],),
+            )
+        assert client.get("/v1/device/capabilities", headers=device).json()["shared_sound_upload"] is False
+        monkeypatch.setattr(settings, "shared_sound_access", "everyone")
+        monkeypatch.setattr("jay_server.main.verify_play_entitlement", None)
+        allowed = {
+            "shared_sound_upload": True,
+            "requires_play_entitlement": False,
+            "expires_at": None,
+        }
+        assert client.get("/v1/device/capabilities", headers=device).json() == allowed
+        assert client.get("/v1/sync", headers=device).json()["capabilities"] == allowed
+        assert client.post(
+            "/v1/device/play-entitlement", headers=device,
+            json={"integrity_token": "unused-token"},
+        ).json() == allowed
+        assert client.get("/v1/device/capabilities").status_code != 200
+        monkeypatch.setattr(settings, "shared_sound_access", "play")
+        assert client.get("/v1/device/capabilities", headers=device).json()["shared_sound_upload"] is False
+
+
+def test_shared_sound_policy_keeps_group_edit_permissions(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "shared_sound_access", "everyone")
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute("TRUNCATE devices CASCADE")
+        leader = register_device(client, "Sound Leader", "sound-leader-secret-that-is-long-enough")
+        member = register_device(client, "Sound Member", "sound-member-secret-that-is-long-enough")
+        group_id = client.post(
+            "/v1/groups", headers=leader,
+            json={"name": "Leaders only", "alarm_permission": "leaders"},
+        ).json()["id"]
+        invite = client.post(f"/v1/groups/{group_id}/invites", headers=leader, json={}).json()
+        assert client.post("/v1/groups/join", headers=member, json={"token": invite["token"]}).status_code == 200
+        assert client.post(
+            f"/v1/groups/{group_id}/sounds/uploads", headers=member,
+            json={"title": "Morning", "sha256": "a" * 64, "byte_length": 1234, "duration_ms": 1000},
+        ).status_code == 403
+
+
+def test_shared_sound_access_environment_is_validated(monkeypatch) -> None:
+    from pydantic import ValidationError
+    from jay_server.config import Settings
+
+    monkeypatch.setenv("SHARED_SOUND_ACCESS", "everyone")
+    assert Settings(_env_file=None).shared_sound_access == "everyone"
+    monkeypatch.setenv("SHARED_SOUND_ACCESS", "invalid")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

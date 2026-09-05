@@ -8,12 +8,15 @@ import androidx.core.net.toUri
 import androidx.room.withTransaction
 import androidx.work.WorkManager
 import com.bnyro.clock.BuildConfig
+import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.RepeatAnchor
 import com.bnyro.clock.domain.model.RepeatUnit
 import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
+import com.bnyro.clock.social.domain.DeviceCapabilities
+import com.bnyro.clock.social.presentation.SocialNotificationHelper
 import com.bnyro.clock.social.domain.AlarmActivityKind
 import com.bnyro.clock.social.domain.AlarmActivityRequest
 import com.bnyro.clock.social.domain.AlarmOccurrenceSchedule
@@ -41,6 +44,8 @@ import com.bnyro.clock.util.services.AlarmService
 import com.bnyro.clock.util.services.TimerService
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -74,19 +79,54 @@ class SocialRepository(
     val members: Flow<List<SocialMember>> = socialDao.getMembersStream()
     val alarmGroupNames = socialDao.getAlarmGroupNamesStream()
 
-    val canUploadSharedSounds: Boolean
+    val deviceCapabilities: DeviceCapabilities
         get() {
-            if (!Preferences.instance.getBoolean(
-                    SocialPreferences.entitlementSharedUploadKey,
-                    false
-                )
-            ) return false
-            val expiresAt = Preferences.instance.getString(
-                SocialPreferences.entitlementExpiresAtKey,
-                null
-            ) ?: return false
-            return runCatching { Instant.now().isBefore(Instant.parse(expiresAt)) }.getOrDefault(false)
+            val serverUrl = Preferences.instance.getString(
+                SocialPreferences.serverUrlKey,
+                DEFAULT_SERVER_URL
+            ) ?: DEFAULT_SERVER_URL
+            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+            if (Preferences.instance.getString(SocialPreferences.capabilitiesServerKey, null) != serverUrl ||
+                Preferences.instance.getString(SocialPreferences.capabilitiesDeviceKey, null) != identity.id
+            ) return DeviceCapabilities()
+            return Preferences.instance.getString(SocialPreferences.capabilitiesKey, null)
+                ?.let { Json.decodeFromString<DeviceCapabilities>(it) } ?: DeviceCapabilities()
         }
+
+    val canUploadSharedSounds: Boolean
+        get() = deviceCapabilities.canUploadSharedSounds()
+
+    private fun applyDeviceCapabilities(
+        capabilities: DeviceCapabilities,
+        serverUrl: String,
+        deviceId: String
+    ) {
+        val currentServer = Preferences.instance.getString(
+            SocialPreferences.serverUrlKey,
+            DEFAULT_SERVER_URL
+        ) ?: DEFAULT_SERVER_URL
+        if (currentServer != serverUrl ||
+            DeviceIdentityStore.loadOrCreate(context, currentServer).id != deviceId
+        ) return
+        val previous = deviceCapabilities
+        Preferences.edit {
+            putString(SocialPreferences.capabilitiesKey, Json.encodeToString(capabilities))
+            putString(SocialPreferences.capabilitiesServerKey, serverUrl)
+            putString(SocialPreferences.capabilitiesDeviceKey, deviceId)
+        }
+        if (capabilities.canUploadSharedSounds()) {
+            androidx.core.app.NotificationManagerCompat.from(context).cancel(
+                SocialNotificationHelper.ENTITLEMENT_NOTIFICATION_ID
+            )
+        } else if (previous.requiresPlayEntitlement && previous.sharedSoundUpload) {
+            SocialNotificationHelper.notifyDeviceIssue(
+                context,
+                SocialNotificationHelper.ENTITLEMENT_NOTIFICATION_ID,
+                context.getString(R.string.play_entitlement_lost_title),
+                context.getString(R.string.play_entitlement_lost_message)
+            )
+        }
+    }
 
     suspend fun synchronize(): SocialSyncResult = synchronizationMutex.withLock {
         withContext(Dispatchers.IO) {
@@ -108,6 +148,7 @@ class SocialRepository(
             val previousCursor = Preferences.instance.getLong(SocialPreferences.syncCursorKey, 0)
             val knownGroupIds = groups.first().map { it.id }.toSet()
             val response = api.synchronize(previousCursor)
+            applyDeviceCapabilities(response.capabilities, serverUrl, identity.id)
             val remoteGroups = response.groups.associateBy { it.id }
             val soundStore = SharedSoundStore(context)
             val remoteGroupIds = response.groups.map { it.id }.toSet()
@@ -1028,36 +1069,40 @@ class SocialRepository(
         }
     }
 
-    suspend fun refreshPlayEntitlement() = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
-        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        val requestHash = Base64.encodeToString(
-            MessageDigest.getInstance("SHA-256").digest(
-                "jay-play-entitlement:${identity.id}".toByteArray()
-            ),
-            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
-        )
-        val integrityManager = IntegrityManagerFactory.createStandard(context)
-        val tokenProvider = Tasks.await(
-            integrityManager.prepareIntegrityToken(
-                StandardIntegrityManager.PrepareIntegrityTokenRequest.builder()
-                    .setCloudProjectNumber(BuildConfig.JAY_PLAY_CLOUD_PROJECT_NUMBER)
-                    .build()
+    suspend fun refreshPlayEntitlement() = synchronizationMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val serverUrl = Preferences.instance.getString(
+                SocialPreferences.serverUrlKey,
+                DEFAULT_SERVER_URL
+            ) ?: DEFAULT_SERVER_URL
+            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+            val api = SocialApi(serverUrl, identity)
+            api.register()
+            val capabilities = api.deviceCapabilities()
+            applyDeviceCapabilities(capabilities, serverUrl, identity.id)
+            if (!capabilities.requiresPlayEntitlement) return@withContext
+            val requestHash = Base64.encodeToString(
+                MessageDigest.getInstance("SHA-256").digest(
+                    "jay-play-entitlement:${identity.id}".toByteArray()
+                ),
+                Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
             )
-        )
-        val integrityToken = Tasks.await(
-            tokenProvider.request(
-                StandardIntegrityManager.StandardIntegrityTokenRequest.builder()
-                    .setRequestHash(requestHash)
-                    .build()
+            val integrityManager = IntegrityManagerFactory.createStandard(context)
+            val tokenProvider = Tasks.await(
+                integrityManager.prepareIntegrityToken(
+                    StandardIntegrityManager.PrepareIntegrityTokenRequest.builder()
+                        .setCloudProjectNumber(BuildConfig.JAY_PLAY_CLOUD_PROJECT_NUMBER)
+                        .build()
+                )
             )
-        ).token()
-        SocialApi(serverUrl, identity).run {
-            register()
-            updatePlayEntitlement(integrityToken)
+            val integrityToken = Tasks.await(
+                tokenProvider.request(
+                    StandardIntegrityManager.StandardIntegrityTokenRequest.builder()
+                        .setRequestHash(requestHash)
+                        .build()
+                )
+            ).token()
+            applyDeviceCapabilities(api.updatePlayEntitlement(integrityToken), serverUrl, identity.id)
         }
     }
 
@@ -1141,8 +1186,9 @@ class SocialRepository(
             putLong(SocialPreferences.syncCursorKey, 0)
             remove(SocialPreferences.pendingInvitationKey)
             remove(SocialPreferences.pendingProfileKey)
-            remove(SocialPreferences.entitlementSharedUploadKey)
-            remove(SocialPreferences.entitlementExpiresAtKey)
+            remove(SocialPreferences.capabilitiesKey)
+            remove(SocialPreferences.capabilitiesServerKey)
+            remove(SocialPreferences.capabilitiesDeviceKey)
         }
         Preferences.instance.all.keys.filter {
             it.startsWith(SocialPreferences.alarmOccurrencePrefix) ||
@@ -1183,6 +1229,9 @@ class SocialRepository(
         Preferences.edit {
             putString(SocialPreferences.serverUrlKey, serverUrl.trimEnd('/'))
             putLong(SocialPreferences.syncCursorKey, 0)
+            remove(SocialPreferences.capabilitiesKey)
+            remove(SocialPreferences.capabilitiesServerKey)
+            remove(SocialPreferences.capabilitiesDeviceKey)
         }
     }
 

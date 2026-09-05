@@ -152,10 +152,15 @@ data class PlayEntitlementVerification(
 )
 
 @Serializable
-data class PlayEntitlementStatus(
-    @SerialName("shared_sound_upload") val sharedSoundUpload: Boolean,
+data class DeviceCapabilities(
+    @SerialName("shared_sound_upload") val sharedSoundUpload: Boolean = false,
+    @SerialName("requires_play_entitlement") val requiresPlayEntitlement: Boolean = true,
     @SerialName("expires_at") val expiresAt: String? = null
-)
+) {
+    fun canUploadSharedSounds(now: java.time.Instant = java.time.Instant.now()): Boolean =
+        sharedSoundUpload && (!requiresPlayEntitlement ||
+            expiresAt?.let { now.isBefore(java.time.Instant.parse(it)) } == true)
+}
 
 @Serializable
 data class GroupCreate(
@@ -407,6 +412,7 @@ data class SocialOccurrenceDto(
 @Serializable
 data class SyncResponse(
     val cursor: Long,
+    val capabilities: DeviceCapabilities,
     val groups: List<SocialGroupDto>,
     val members: List<SocialMemberDto>,
     val alarms: List<SharedAlarmDto>,

@@ -15,6 +15,7 @@ from jay_server.auth import authenticated_device
 from jay_server.config import settings
 from jay_server.database import close_database_pool, open_database_pool, transaction
 from jay_server.domain import (
+    device_capabilities,
     record_group_change,
     get_group_push_tokens,
     remove_device,
@@ -247,11 +248,20 @@ def update_push_token(
         )
 
 
+@app.get("/v1/device/capabilities")
+def get_device_capabilities(device: dict = Depends(authenticated_device)) -> dict:
+    with transaction() as connection:
+        return device_capabilities(connection, device["id"])
+
+
 @app.post("/v1/device/play-entitlement")
 def update_play_entitlement(
     verification: PlayEntitlementVerification,
     device: dict = Depends(authenticated_device),
 ) -> dict:
+    if settings.shared_sound_access == "everyone":
+        with transaction() as connection:
+            return device_capabilities(connection, device["id"])
     entitled = verify_play_entitlement(verification.integrity_token, device["id"])
     verified_at = datetime.now(UTC)
     expires_at = verified_at + timedelta(hours=settings.play_entitlement_lifetime_hours)
@@ -266,10 +276,7 @@ def update_play_entitlement(
             """,
             (verified_at, expires_at if entitled else None, device["id"]),
         )
-    return {
-        "shared_sound_upload": entitled,
-        "expires_at": expires_at if entitled else None,
-    }
+        return device_capabilities(connection, device["id"])
 
 
 @app.delete("/v1/device", status_code=status.HTTP_204_NO_CONTENT)
@@ -1681,6 +1688,7 @@ def synchronize(
     device: dict = Depends(authenticated_device),
 ) -> dict:
     with transaction() as connection:
+        capabilities = device_capabilities(connection, device["id"])
         groups = connection.execute(
             """
             SELECT g.*, gm.role, gm.notify_membership, gm.notify_administrative
@@ -1785,6 +1793,7 @@ def synchronize(
                     )
     return {
         "cursor": cursor,
+        "capabilities": capabilities,
         "groups": groups,
         "members": members,
         "alarms": alarms,

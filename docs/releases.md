@@ -1,10 +1,10 @@
 # Releases
 
-This document records the release behavior implemented by the build and GitHub Actions workflows. Do not put credentials or signing material in this repository.
+Releases come from `jay`. The head commit message decides whether a push publishes a prerelease or a stable release, so check that message before pushing.
 
-## Version ownership
+## Which version to change
 
-Jay's release version is stored in `gradle.properties` as `jayVersionName` and `jayVersionCode`. Increase both for a Google Play release. Clock You's displayed version remains separately recorded as `clockYouVersionName` and `clockYouVersionCode`.
+Jay and Clock You keep separate version numbers in `gradle.properties`. Change `jayVersionName` and `jayVersionCode` for Jay, increasing both for a Google Play release. `clockYouVersionName` and `clockYouVersionCode` record the Clock You base shown in the app.
 
 The production application ID is `com.rispng.jay`. Debug and prerelease builds add the `.debug` suffix and use `com.rispng.jay.debug`.
 
@@ -12,7 +12,7 @@ The production application ID is `com.rispng.jay`. Debug and prerelease builds a
 
 Every push to `jay` whose head commit message does not begin exactly with `Release ` runs `.github/workflows/prerelease.yml`. No other branch publishes a prerelease.
 
-The workflow derives:
+The workflow puts the build information together like this:
 
 - version code: `100000 + GITHUB_RUN_NUMBER`;
 - version name: `<jayVersionName>-pre.r<five-digit-run-number>.g<seven-character-sha>`;
@@ -20,7 +20,7 @@ The workflow derives:
 - tag: `v<prerelease-version-name>`;
 - artifact: `jay-<prerelease-version-name>.apk`.
 
-The `r` makes the zero-padded run component an alphanumeric SemVer identifier, while its fixed width keeps GitHub's tag-version ordering chronological through run 99,999. For example, run 18 produces `0.4.0-pre.r00018.g<sha>` and sorts after run 17's `0.4.0-pre.r00017.g<sha>`.
+The run number is padded so GitHub keeps the tags in chronological order through run 99,999. For example, `0.4.0-pre.r00018.g<sha>` sorts after `0.4.0-pre.r00017.g<sha>`. The `r` also makes this an alphanumeric SemVer identifier, where the leading zeroes are allowed.
 
 The prerelease contains only the debug APK, signed with the prerelease key, and is marked as a GitHub prerelease. Bleeding Edge or `BE` builds no longer exist. Older unpadded prereleases may remain out of order; they can be removed without affecting the new sequence.
 
@@ -34,14 +34,16 @@ The stable tag is `v<jayVersionName>`. Artifact names use `jayVersionName` from 
 - `jay-<version>.aab`: minified production AAB signed with the production key;
 - `jay-<version>-debug.apk`: debug APK signed with the prerelease key for debugging.
 
-The production APK and AAB use the same `com.rispng.jay` application ID and runtime entitlement behavior. Paid access is not baked into a separate artifact.
+The production APK and AAB both use `com.rispng.jay` and the same access checks at runtime. Shared-sound access comes from the server's policy and the device's entitlement, rather than a separate paid APK. See [Shared sounds and Play access](entitlements.md).
 
-HTTPS invitation and profile links require the deployed server's `ANDROID_APP_LINKS` setting to include the distributed build's package name and SHA-256 signing certificate fingerprint. Include the Google Play app signing certificate for Play installations and the production APK certificate for direct downloads if they differ. Prereleases require a separate `com.rispng.jay.debug` entry. See `server/README.md` for deployment and device verification. The Google Play fallback works for recipients once the listing is available to them; after installation, they tap the original link again.
+For invitation and profile links to open in Jay, the server's `ANDROID_APP_LINKS` setting needs the installed app's package name and SHA-256 signing certificate fingerprint. Use the Google Play app signing certificate for Play installations. If direct-download APKs use a different certificate, include that one too. Prereleases need their own `com.rispng.jay.debug` entry.
 
-Publishing a stable release removes every prerelease that came before it, along with its tag, so the list of releases keeps one entry per stable release.
+The [server guide](../server/README.md#shared-links) covers setup and device checks. The Play Store fallback only works once the listing is available to the recipient. After installing, they need to tap the original link again.
+
+Publishing a stable release removes the prereleases before it and their tags. This keeps older testing builds from crowding the release list.
 
 `main`, `main-canary`, and feature branches do not publish releases.
 
-## Secrets
+## Signing material
 
-Signing stores and passwords belong only in local secure configuration or GitHub Actions secrets. Never add them to source control, logs, fixtures, screenshots, or generated artifacts.
+Keep signing stores and passwords in local secure configuration or GitHub Actions secrets. They must not appear in source control, logs, fixtures, screenshots, or generated artifacts.

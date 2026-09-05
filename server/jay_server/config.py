@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -10,6 +12,7 @@ class Settings(BaseSettings):
     firebase_credentials_json: str | None = None
     google_play_credentials_json: str | None = None
     play_entitlement_lifetime_hours: int = 48
+    shared_sound_access: Literal["play", "everyone"] = "play"
     alarm_occurrence_monitor_enabled: bool = True
     device_inactivity_timeout_days: int = 120
     b2_s3_endpoint: str | None = None

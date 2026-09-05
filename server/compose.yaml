@@ -23,6 +23,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://jay:jay@postgres:5432/jay
       PUBLIC_URL: http://127.0.0.1:8000
+      SHARED_SOUND_ACCESS: ${SHARED_SOUND_ACCESS:-play}
 
 volumes:
   jay_postgres:

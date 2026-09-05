@@ -13,7 +13,7 @@ import com.bnyro.clock.social.domain.InviteResponse
 import com.bnyro.clock.social.domain.MemberUpdate
 import com.bnyro.clock.social.domain.MemberNotificationUpdate
 import com.bnyro.clock.social.domain.ActivityPageDto
-import com.bnyro.clock.social.domain.PlayEntitlementStatus
+import com.bnyro.clock.social.domain.DeviceCapabilities
 import com.bnyro.clock.social.domain.PlayEntitlementVerification
 import com.bnyro.clock.social.domain.SharedAlarmDelete
 import com.bnyro.clock.social.domain.SharedAlarmRequest
@@ -74,7 +74,11 @@ class SocialApi(
         )
     }
 
-    fun updatePlayEntitlement(integrityToken: String): PlayEntitlementStatus =
+    fun deviceCapabilities(): DeviceCapabilities = json.decodeFromString(
+        request("/v1/device/capabilities")
+    )
+
+    fun updatePlayEntitlement(integrityToken: String): DeviceCapabilities =
         json.decodeFromString(
             request(
                 "/v1/device/play-entitlement",
