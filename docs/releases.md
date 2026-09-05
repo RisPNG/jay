@@ -36,6 +36,8 @@ The stable tag is `v<jayVersionName>`. Artifact names use `jayVersionName` from 
 
 The production APK and AAB use the same `com.rispng.jay` application ID and runtime entitlement behavior. Paid access is not baked into a separate artifact.
 
+HTTPS invitation and profile links require the deployed server's `ANDROID_APP_LINKS` setting to include the distributed build's package name and SHA-256 signing certificate fingerprint. Include the Google Play app signing certificate for Play installations and the production APK certificate for direct downloads if they differ. Prereleases require a separate `com.rispng.jay.debug` entry. See `server/README.md` for deployment and device verification. The Google Play fallback works for recipients once the listing is available to them; after installation, they tap the original link again.
+
 Publishing a stable release removes every prerelease that came before it, along with its tag, so the list of releases keeps one entry per stable release.
 
 `main`, `main-canary`, and feature branches do not publish releases.

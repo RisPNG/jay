@@ -78,6 +78,16 @@ fun GroupsScreen(
     var selectedGroup by remember { mutableStateOf<SocialGroup?>(null) }
     var activityGroup by remember { mutableStateOf<SocialGroup?>(null) }
 
+    var pendingProfile by remember {
+        mutableStateOf(Preferences.instance.getString(SocialPreferences.pendingProfileKey, null))
+    }
+    pendingProfile?.let { profile ->
+        ProfileImportDialog(socialModel = socialModel, initialProfile = profile) {
+            Preferences.edit { remove(SocialPreferences.pendingProfileKey) }
+            pendingProfile = null
+        }
+    }
+
     LaunchedEffect(Unit) {
         Preferences.instance.getString(SocialPreferences.pendingInvitationKey, null)?.let {
             Preferences.edit { remove(SocialPreferences.pendingInvitationKey) }

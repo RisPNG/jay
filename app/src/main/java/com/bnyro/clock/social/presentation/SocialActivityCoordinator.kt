@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import com.bnyro.clock.App
 import com.bnyro.clock.navigation.HomeRoutes
+import com.bnyro.clock.social.data.SocialLink
 import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.Preferences
 import kotlinx.coroutines.Job
@@ -15,11 +16,17 @@ import kotlinx.coroutines.launch
 class SocialActivityCoordinator(private val activity: ComponentActivity) {
     private var liveSyncJob: Job? = null
 
-    fun receiveInvitation(intent: Intent?): Boolean {
-        val invitation = intent?.dataString?.takeIf {
-            intent.action == Intent.ACTION_VIEW && it.startsWith("jay://join?")
-        } ?: return false
-        Preferences.edit { putString(SocialPreferences.pendingInvitationKey, invitation) }
+    fun receiveLink(intent: Intent?): Boolean {
+        if (intent?.action != Intent.ACTION_VIEW) return false
+        val value = intent.dataString ?: return false
+        val link = SocialLink.parse(value) ?: return false
+        val key = when (link.destination) {
+            "join" -> SocialPreferences.pendingInvitationKey
+            "profile" -> SocialPreferences.pendingProfileKey
+            else -> return false
+        }
+        Preferences.edit { putString(key, value) }
+        intent.data = null
         return true
     }
 

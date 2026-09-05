@@ -50,8 +50,11 @@ fun HomeNavContainer(
     val orientation = LocalConfiguration.current.orientation
     val coroutineScope = rememberCoroutineScope()
 
-    val filteredRoutes = remember(settingsModel.enabledTabs) {
-        homeRoutes.filter { it.route in settingsModel.enabledTabs }
+    val filteredRoutes = remember(settingsModel.enabledTabs, initialTab) {
+        homeRoutes.filter {
+            it.route in settingsModel.enabledTabs ||
+                it == HomeRoutes.Groups && initialTab == HomeRoutes.Groups
+        }
     }
 
 

@@ -29,6 +29,7 @@ import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.presentation.screens.stopwatch.model.StopwatchModel
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import com.bnyro.clock.social.presentation.SocialActivityCoordinator
+import com.bnyro.clock.social.data.SocialLink
 import com.bnyro.clock.ui.theme.ClockYouTheme
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.ThemeUtil
@@ -89,8 +90,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        socialActivityCoordinator.receiveInvitation(intent)
+        val receivedSocialLink = socialActivityCoordinator.receiveLink(intent)
+        super.onCreate(if (receivedSocialLink) null else savedInstanceState)
 
         val allPermissions = PermissionModel.allPermissions
         val requiredPermissions = allPermissions.any {
@@ -160,7 +161,9 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (socialActivityCoordinator.receiveInvitation(intent)) recreate()
+        if (intent.action == Intent.ACTION_VIEW && SocialLink.parse(intent.dataString.orEmpty()) != null) {
+            recreate()
+        }
     }
 
     override fun onStop() {

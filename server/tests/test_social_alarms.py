@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 from datetime import UTC, date, datetime, timedelta
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
@@ -97,6 +98,14 @@ def test_group_alarm_lifecycle() -> None:
             f"/v1/groups/{group_id}/invites", headers=leader, json={}
         )
         assert invitation.status_code == 201
+        invitation_url = urlsplit(invitation.json()["url"])
+        assert (invitation_url.scheme, invitation_url.netloc, invitation_url.path) == (
+            "https", "jay.poppybit.com", "/join"
+        )
+        assert parse_qs(invitation_url.query) == {
+            "server": [settings.public_url.rstrip("/")],
+            "token": [invitation.json()["token"]],
+        }
         expires_at = datetime.fromisoformat(invitation.json()["expires_at"])
         assert (
             timedelta(hours=23, minutes=59)

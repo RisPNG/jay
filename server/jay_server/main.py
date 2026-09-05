@@ -3,12 +3,13 @@ import json
 import secrets
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlencode
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from psycopg.errors import UniqueViolation
-from starlette.responses import StreamingResponse
+from starlette.responses import RedirectResponse, StreamingResponse
 
 from jay_server.auth import authenticated_device
 from jay_server.config import settings
@@ -77,6 +78,33 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Jay Server", version="1", lifespan=lifespan)
+
+
+@app.get("/.well-known/assetlinks.json")
+def android_app_links() -> list[dict]:
+    return [
+        {
+            "relation": ["delegate_permission/common.handle_all_urls"],
+            "target": {
+                "namespace": "android_app",
+                "package_name": package,
+                "sha256_cert_fingerprints": fingerprints,
+            },
+        }
+        for package, fingerprints in settings.android_app_links.items()
+        if fingerprints
+    ]
+
+
+@app.get("/join")
+@app.get("/profile")
+def install_jay() -> RedirectResponse:
+    return RedirectResponse(
+        "https://play.google.com/store/apps/details?id=com.rispng.jay#",
+        status_code=status.HTTP_302_FOUND,
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+    )
+
 
 @app.get("/health")
 def health() -> dict:
@@ -611,7 +639,8 @@ def create_invite(
         "id": invite_id,
         "token": token,
         "expires_at": expires_at,
-        "url": f"{settings.public_url.rstrip('/')}/join/{token}",
+        "url": "https://jay.poppybit.com/join?"
+        + urlencode({"server": settings.public_url.rstrip("/"), "token": token}),
     }
 
 

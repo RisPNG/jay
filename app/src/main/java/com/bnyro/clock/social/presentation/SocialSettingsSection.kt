@@ -1,8 +1,6 @@
 package com.bnyro.clock.social.presentation
 
 import android.content.Intent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Badge
@@ -165,39 +163,9 @@ fun SocialSettingsSection() {
         )
     }
     if (showImportDialog) {
-        var profile by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showImportDialog = false },
-            title = { Text(stringResource(R.string.import_profile)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = profile,
-                        onValueChange = { profile = it },
-                        label = { Text(stringResource(R.string.import_profile_link)) }
-                    )
-                    Text(stringResource(R.string.import_profile_confirmation))
-                }
-            },
-            confirmButton = {
-                DialogButton(
-                    label = R.string.import_profile_confirm,
-                    style = DialogButtonStyle.PRIMARY
-                ) {
-                    socialModel.importProfile(profile.trim())
-                    showImportDialog = false
-                }
-            },
-            dismissButton = {
-                DialogButton(
-                    label = R.string.cancel,
-                    style = DialogButtonStyle.SECONDARY
-                ) {
-                    showImportDialog = false
-                }
-            }
-        )
+        ProfileImportDialog(socialModel = socialModel) { showImportDialog = false }
     }
+
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },

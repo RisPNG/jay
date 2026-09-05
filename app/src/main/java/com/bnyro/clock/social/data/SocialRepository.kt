@@ -452,24 +452,23 @@ class SocialRepository(
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
         val invitation = SocialApi(serverUrl, identity).createInvite(groupId)
-        "jay://join?server=${java.net.URLEncoder.encode(serverUrl, Charsets.UTF_8.name())}" +
+        "${SocialLink.BASE_URL}/join?server=${java.net.URLEncoder.encode(serverUrl, Charsets.UTF_8.name())}" +
                 "&token=${java.net.URLEncoder.encode(invitation.token, Charsets.UTF_8.name())}"
     }
 
     suspend fun joinGroup(invitation: String) = withContext(Dispatchers.IO) {
-        val uri = URI(invitation)
-        val parameters = uri.rawQuery.orEmpty().split('&').mapNotNull {
-            val parts = it.split('=', limit = 2)
-            if (parts.size == 2) parts[0] to java.net.URLDecoder.decode(
-                parts[1],
-                Charsets.UTF_8.name()
-            ) else null
-        }.toMap()
+        val link = SocialLink.parse(invitation)
+        require(link?.destination == "join" || !invitation.contains(":") && !invitation.contains("/")) {
+            "Not a Jay invitation link"
+        }
+        val parameters = link?.parameters.orEmpty()
         val serverUrl = parameters["server"] ?: Preferences.instance.getString(
             SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
-        val token = parameters["token"] ?: invitation
+        val token = if (link == null) invitation.trim() else requireNotNull(parameters["token"]) {
+            "The invitation link is incomplete"
+        }
         val configuredServer = Preferences.instance.getString(
             SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
@@ -1068,7 +1067,7 @@ class SocialRepository(
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        "jay://profile?name=${java.net.URLEncoder.encode(identity.name, Charsets.UTF_8.name())}" +
+        "${SocialLink.BASE_URL}/profile#name=${java.net.URLEncoder.encode(identity.name, Charsets.UTF_8.name())}" +
                 "&key=${java.net.URLEncoder.encode(identity.secret, Charsets.UTF_8.name())}"
     }
 
@@ -1078,15 +1077,9 @@ class SocialRepository(
      * alarms, and answers.
      */
     suspend fun importIdentity(profile: String): SocialSyncResult = withContext(Dispatchers.IO) {
-        val uri = URI(profile.trim())
-        require(uri.scheme == "jay" && uri.host == "profile") { "Not a Jay profile link" }
-        val parameters = uri.rawQuery.orEmpty().split('&').mapNotNull {
-            val parts = it.split('=', limit = 2)
-            if (parts.size == 2) parts[0] to java.net.URLDecoder.decode(
-                parts[1],
-                Charsets.UTF_8.name()
-            ) else null
-        }.toMap()
+        val link = SocialLink.parse(profile)
+        require(link?.destination == "profile") { "Not a Jay profile link" }
+        val parameters = link.parameters
         val name = parameters["name"]?.takeIf { it.isNotBlank() }
             ?: throw IllegalArgumentException("The profile link is incomplete")
         val secret = parameters["key"]
@@ -1147,6 +1140,7 @@ class SocialRepository(
         Preferences.edit {
             putLong(SocialPreferences.syncCursorKey, 0)
             remove(SocialPreferences.pendingInvitationKey)
+            remove(SocialPreferences.pendingProfileKey)
             remove(SocialPreferences.entitlementSharedUploadKey)
             remove(SocialPreferences.entitlementExpiresAtKey)
         }
