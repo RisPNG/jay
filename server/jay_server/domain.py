@@ -106,6 +106,68 @@ def sweep_shared_timers(connection: Connection) -> None:
     delete_unreferenced_shared_sounds(connection)
 
 
+def remove_device(
+    connection: Connection, device_id: str, change_reason: str | None = None
+) -> list[str]:
+    """Removes a device identity as if it had never existed: groups it solely leads are
+    deleted with everything they own, its remaining memberships go away, and the id is
+    retired so it can never register again. When change_reason is given, the surviving
+    groups record a membership change explaining the departure."""
+    device = connection.execute(
+        "SELECT name FROM devices WHERE id = %s FOR UPDATE", (device_id,)
+    ).fetchone()
+    if device is None:
+        return []
+    push_tokens: set[str] = set()
+    for group in connection.execute(
+        """
+        SELECT groups.id
+        FROM groups
+        JOIN group_members leader
+          ON leader.group_id = groups.id AND leader.device_id = %s AND leader.role = 'leader'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM group_members other
+            WHERE other.group_id = groups.id
+              AND other.device_id != %s
+              AND other.role = 'leader'
+        )
+        """,
+        (device_id, device_id),
+    ).fetchall():
+        push_tokens.update(get_group_push_tokens(connection, group["id"], device_id))
+        connection.execute("DELETE FROM groups WHERE id = %s", (group["id"],))
+    for group in connection.execute(
+        "SELECT group_id FROM group_members WHERE device_id = %s",
+        (device_id,),
+    ).fetchall():
+        connection.execute(
+            """
+            UPDATE shared_alarms
+            SET inactive_cycle_streak = 0, last_evaluated_cycle_date = NULL
+            WHERE group_id = %s AND NOT deleted
+            """,
+            (group["group_id"],),
+        )
+        if change_reason is not None:
+            record_group_change(
+                connection,
+                group["group_id"],
+                "membership",
+                device_id,
+                device_id,
+                "left",
+                device["name"],
+                subject_device_id=device_id,
+                details={"reason": change_reason},
+            )
+        push_tokens.update(
+            get_group_push_tokens(connection, group["group_id"], device_id, "membership")
+        )
+    connection.execute("DELETE FROM devices WHERE id = %s", (device_id,))
+    connection.execute("INSERT INTO retired_devices (id) VALUES (%s)", (device_id,))
+    return list(push_tokens)
+
+
 def record_group_change(
     connection: Connection,
     group_id: UUID,

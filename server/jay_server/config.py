@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     google_play_credentials_json: str | None = None
     play_entitlement_lifetime_hours: int = 48
     alarm_occurrence_monitor_enabled: bool = True
+    device_inactivity_timeout_days: int = 120
     b2_s3_endpoint: str | None = None
     b2_bucket_name: str | None = None
     b2_application_key_id: str | None = None

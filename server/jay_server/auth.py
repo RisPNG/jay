@@ -19,9 +19,16 @@ def authenticated_device(
             (x_jay_device_id,),
         ).fetchone()
 
-    if device is None or not hmac.compare_digest(
-        device["token_hash"], hashlib.sha256(token.encode()).digest()
-    ):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid device credentials")
+        if device is None or not hmac.compare_digest(
+            device["token_hash"], hashlib.sha256(token.encode()).digest()
+        ):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid device credentials")
+        connection.execute(
+            """
+            UPDATE devices SET last_seen_at = now()
+            WHERE id = %s AND last_seen_at < now() - interval '1 hour'
+            """,
+            (device["id"],),
+        )
     return {"id": device["id"], "name": device["name"]}
 

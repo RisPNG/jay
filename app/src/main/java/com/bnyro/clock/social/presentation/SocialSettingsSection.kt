@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -22,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.R
+import com.bnyro.clock.presentation.components.DialogButton
+import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.presentation.screens.settings.components.IconPreference
 import com.bnyro.clock.presentation.screens.settings.components.SettingsCategory
 
@@ -30,6 +33,7 @@ fun SocialSettingsSection() {
     val socialModel: SocialModel = viewModel()
     var showDeviceNameDialog by remember { mutableStateOf(false) }
     var showServerDialog by remember { mutableStateOf(false) }
+    var showResetDialog by remember { mutableStateOf(false) }
 
     SettingsCategory(stringResource(R.string.jay_social))
     IconPreference(
@@ -45,6 +49,13 @@ fun SocialSettingsSection() {
         imageVector = Icons.Default.Cloud
     ) {
         showServerDialog = true
+    }
+    IconPreference(
+        title = stringResource(R.string.reset_identity),
+        summary = stringResource(R.string.reset_identity_summary),
+        imageVector = Icons.Default.RestartAlt
+    ) {
+        showResetDialog = true
     }
     HorizontalDivider(
         modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
@@ -104,6 +115,30 @@ fun SocialSettingsSection() {
             dismissButton = {
                 OutlinedButton(onClick = { showServerDialog = false }) {
                     Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text(stringResource(R.string.reset_identity)) },
+            text = { Text(stringResource(R.string.reset_identity_confirmation)) },
+            confirmButton = {
+                DialogButton(
+                    label = R.string.reset_identity_confirm,
+                    style = DialogButtonStyle.DESTRUCTIVE
+                ) {
+                    socialModel.resetIdentity()
+                    showResetDialog = false
+                }
+            },
+            dismissButton = {
+                DialogButton(
+                    label = R.string.cancel,
+                    style = DialogButtonStyle.SECONDARY
+                ) {
+                    showResetDialog = false
                 }
             }
         )

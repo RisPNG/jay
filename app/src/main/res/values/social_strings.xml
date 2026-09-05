@@ -109,6 +109,10 @@
     <string name="jay_social">Jay social</string>
     <string name="device_name">Device name</string>
     <string name="jay_server">Jay server</string>
+    <string name="reset_identity">Reset identity</string>
+    <string name="reset_identity_summary">Leave every group and start over as a new device</string>
+    <string name="reset_identity_confirmation">Leave every group and delete the groups only you lead, together with their shared alarms? You will start over with a brand-new identity. This can\'t be undone.</string>
+    <string name="reset_identity_confirm">Reset</string>
     <string name="clock_you_attribution">Jay is based on Clock You by You Apps and remains available under GPLv3.</string>
     <string name="jay_version">Jay version</string>
     <string name="recent_activity">Recent activity</string>

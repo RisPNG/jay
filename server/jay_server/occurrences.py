@@ -10,10 +10,12 @@ from zoneinfo import ZoneInfo
 
 from psycopg import Connection
 
+from jay_server.config import settings
 from jay_server.database import transaction
 from jay_server.domain import (
     get_group_push_tokens,
     record_group_change,
+    remove_device,
     sweep_shared_timers,
 )
 from jay_server.object_storage import delete_sound_object
@@ -531,6 +533,28 @@ def process_due_alarm_occurrences() -> None:
     send_group_sync(list(push_tokens))
 
 
+def process_inactive_devices() -> None:
+    if settings.device_inactivity_timeout_days <= 0:
+        return
+    push_tokens: set[str] = set()
+    with transaction() as connection:
+        devices = connection.execute(
+            """
+            SELECT id FROM devices
+            WHERE last_seen_at < now() - make_interval(days => %s)
+            ORDER BY created_at
+            LIMIT 50
+            FOR UPDATE SKIP LOCKED
+            """,
+            (settings.device_inactivity_timeout_days,),
+        ).fetchall()
+        for device in devices:
+            push_tokens.update(
+                remove_device(connection, device["id"], change_reason="inactivity")
+            )
+    send_group_sync(list(push_tokens))
+
+
 class AlarmOccurrenceMonitor:
     def __init__(self) -> None:
         self.task: asyncio.Task | None = None
@@ -550,6 +574,7 @@ class AlarmOccurrenceMonitor:
             try:
                 await asyncio.to_thread(process_due_alarm_occurrences)
                 await asyncio.to_thread(process_sound_deletions)
+                await asyncio.to_thread(process_inactive_devices)
             except asyncio.CancelledError:
                 raise
             except Exception:

@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 from jay_server.database import transaction
 from jay_server.live import LiveChangeBroker
 from jay_server.main import app
-from jay_server.occurrences import evaluate_alarm_cycle, process_due_alarm_occurrences
+from jay_server.occurrences import (
+    evaluate_alarm_cycle,
+    process_due_alarm_occurrences,
+    process_inactive_devices,
+)
 from jay_server.config import settings
 
 
@@ -322,6 +326,211 @@ def test_any_group_leader_can_delete_group() -> None:
             assert connection.execute(
                 "SELECT count(*) AS count FROM devices"
             ).fetchone()["count"] == 2
+
+
+def test_inactive_devices_are_removed_with_their_sole_led_groups() -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_occurrences, alarm_deliveries, "
+                "shared_alarms, group_invites, group_members, groups, devices, "
+                "retired_devices CASCADE"
+            )
+
+        owner = register_device(client, "Distant Ember", "owner-secret-that-is-long-enough")
+        friend = register_device(client, "Cozy Otter", "friend-secret-that-is-long-enough")
+        keeper = register_device(client, "Quiet Mango", "keeper-secret-that-is-long-enough")
+
+        owned_group = client.post(
+            "/v1/groups",
+            headers=owner,
+            json={"name": "Airport friends", "alarm_permission": "everyone"},
+        ).json()["id"]
+        invitation = client.post(
+            f"/v1/groups/{owned_group}/invites", headers=owner, json={}
+        ).json()
+        client.post(
+            "/v1/groups/join", headers=friend, json={"token": invitation["token"]}
+        )
+        client.post("/v1/alarms", headers=owner, json=alarm_payload(owned_group))
+
+        kept_group = client.post(
+            "/v1/groups",
+            headers=keeper,
+            json={"name": "House", "alarm_permission": "everyone"},
+        ).json()["id"]
+        kept_invitation = client.post(
+            f"/v1/groups/{kept_group}/invites", headers=keeper, json={}
+        ).json()
+        client.post(
+            "/v1/groups/join", headers=owner, json={"token": kept_invitation["token"]}
+        )
+        kept_alarm = client.post(
+            "/v1/alarms", headers=owner, json=alarm_payload(kept_group)
+        ).json()["id"]
+
+        with transaction() as connection:
+            connection.execute(
+                "UPDATE devices SET last_seen_at = now() - interval '121 days' WHERE id = %s",
+                (owner["X-Jay-Device-ID"],),
+            )
+            connection.execute(
+                "UPDATE shared_alarms SET inactive_cycle_streak = 2 WHERE id = %s",
+                (kept_alarm,),
+            )
+
+        process_inactive_devices()
+
+        assert client.get("/v1/sync", headers=friend).json()["groups"] == []
+        with transaction() as connection:
+            for table in ("groups", "group_members", "shared_alarms", "changes"):
+                assert connection.execute(
+                    f"SELECT count(*) AS count FROM {table} WHERE "
+                    f"{'id' if table == 'groups' else 'group_id'} = %s",
+                    (owned_group,),
+                ).fetchone()["count"] == 0
+            assert connection.execute(
+                "SELECT count(*) AS count FROM group_members WHERE group_id = %s",
+                (kept_group,),
+            ).fetchone()["count"] == 1
+            kept = connection.execute(
+                "SELECT created_by, inactive_cycle_streak FROM shared_alarms WHERE id = %s",
+                (kept_alarm,),
+            ).fetchone()
+            assert kept["created_by"] is None
+            assert kept["inactive_cycle_streak"] == 0
+            left = connection.execute(
+                """
+                SELECT subject_device_id, subject_label, details FROM changes
+                WHERE group_id = %s AND entity_type = 'membership' AND action = 'left'
+                """,
+                (kept_group,),
+            ).fetchone()
+            assert left["subject_device_id"] is None
+            assert left["subject_label"] == "Distant Ember"
+            assert left["details"]["reason"] == "inactivity"
+            assert connection.execute(
+                "SELECT count(*) AS count FROM devices WHERE id = %s",
+                (owner["X-Jay-Device-ID"],),
+            ).fetchone()["count"] == 0
+            assert connection.execute(
+                "SELECT count(*) AS count FROM retired_devices WHERE id = %s",
+                (owner["X-Jay-Device-ID"],),
+            ).fetchone()["count"] == 1
+
+        previous_timeout = settings.device_inactivity_timeout_days
+        settings.device_inactivity_timeout_days = 0
+        try:
+            with transaction() as connection:
+                connection.execute(
+                    "UPDATE devices SET last_seen_at = now() - interval '121 days'"
+                )
+            process_inactive_devices()
+            with transaction() as connection:
+                assert connection.execute(
+                    "SELECT count(*) AS count FROM devices"
+                ).fetchone()["count"] == 2
+        finally:
+            settings.device_inactivity_timeout_days = previous_timeout
+
+
+def test_resetting_a_device_identity_leaves_no_trace() -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_occurrences, alarm_deliveries, "
+                "shared_alarms, group_invites, group_members, groups, devices, "
+                "retired_devices CASCADE"
+            )
+
+        owner = register_device(client, "Distant Ember", "owner-secret-that-is-long-enough")
+        member = register_device(client, "Cozy Otter", "member-secret-that-is-long-enough")
+        keeper = register_device(client, "Quiet Mango", "keeper-secret-that-is-long-enough")
+
+        owned_group = client.post(
+            "/v1/groups",
+            headers=owner,
+            json={"name": "Airport friends", "alarm_permission": "everyone"},
+        ).json()["id"]
+        invitation = client.post(
+            f"/v1/groups/{owned_group}/invites", headers=owner, json={}
+        ).json()
+        client.post(
+            "/v1/groups/join", headers=member, json={"token": invitation["token"]}
+        )
+        client.post("/v1/alarms", headers=owner, json=alarm_payload(owned_group))
+
+        kept_group = client.post(
+            "/v1/groups",
+            headers=keeper,
+            json={"name": "House", "alarm_permission": "everyone"},
+        ).json()["id"]
+        kept_invitation = client.post(
+            f"/v1/groups/{kept_group}/invites", headers=keeper, json={}
+        ).json()
+        client.post(
+            "/v1/groups/join", headers=owner, json={"token": kept_invitation["token"]}
+        )
+        kept_alarm = client.post(
+            "/v1/alarms", headers=owner, json=alarm_payload(kept_group)
+        ).json()["id"]
+
+        assert client.delete("/v1/device", headers=owner).status_code == 204
+
+        assert client.get("/v1/sync", headers=owner).status_code == 401
+        assert client.get("/v1/sync", headers=member).json()["groups"] == []
+        keeper_sync = client.get("/v1/sync", headers=keeper).json()
+        assert [group["id"] for group in keeper_sync["groups"]] == [kept_group]
+        assert [member["device_id"] for member in keeper_sync["members"]] == [
+            keeper["X-Jay-Device-ID"]
+        ]
+        assert keeper_sync["alarms"][0]["id"] == kept_alarm
+        with transaction() as connection:
+            for table in ("groups", "group_members", "shared_alarms", "changes"):
+                assert connection.execute(
+                    f"SELECT count(*) AS count FROM {table} WHERE "
+                    f"{'id' if table == 'groups' else 'group_id'} = %s",
+                    (owned_group,),
+                ).fetchone()["count"] == 0
+            kept = connection.execute(
+                "SELECT created_by, updated_by FROM shared_alarms WHERE id = %s",
+                (kept_alarm,),
+            ).fetchone()
+            assert kept["created_by"] is None
+            assert kept["updated_by"] is None
+            assert connection.execute(
+                "SELECT count(*) AS count FROM changes WHERE entity_id = %s "
+                "AND action = 'left'",
+                (owner["X-Jay-Device-ID"],),
+            ).fetchone()["count"] == 0
+            assert connection.execute(
+                "SELECT count(*) AS count FROM changes WHERE actor_device_id = %s "
+                "OR subject_device_id = %s OR recipient_device_id = %s",
+                (
+                    owner["X-Jay-Device-ID"],
+                    owner["X-Jay-Device-ID"],
+                    owner["X-Jay-Device-ID"],
+                ),
+            ).fetchone()["count"] == 0
+            assert connection.execute(
+                "SELECT count(*) AS count FROM devices WHERE id = %s",
+                (owner["X-Jay-Device-ID"],),
+            ).fetchone()["count"] == 0
+            assert connection.execute(
+                "SELECT count(*) AS count FROM retired_devices WHERE id = %s",
+                (owner["X-Jay-Device-ID"],),
+            ).fetchone()["count"] == 1
+
+        reregistered = client.post(
+            "/v1/devices/register",
+            json={
+                "id": owner["X-Jay-Device-ID"],
+                "name": "Distant Ember",
+                "token": "owner-secret-that-is-long-enough",
+                "time_zone": "UTC",
+            },
+        )
+        assert reregistered.status_code == 409
 
 
 def test_leader_only_group_rejects_member_alarm_changes() -> None:

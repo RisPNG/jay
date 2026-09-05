@@ -81,6 +81,10 @@ class SocialApi(
             )
         )
 
+    fun deleteDevice() {
+        request("/v1/device", "DELETE")
+    }
+
     fun synchronize(cursor: Long): SyncResponse = json.decodeFromString(
         request("/v1/sync?since=$cursor")
     )

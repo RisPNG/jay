@@ -373,7 +373,7 @@ data class SharedTimerDto(
     @SerialName("duration_seconds") val durationSeconds: Int,
     @SerialName("increment_seconds") val incrementSeconds: Int,
     @SerialName("expires_at") val expiresAt: String,
-    @SerialName("started_by") val startedBy: String,
+    @SerialName("started_by") val startedBy: String? = null,
     val vibrate: Boolean = true,
     @SerialName("vibration_pattern") val vibrationPattern: List<Int> = emptyList(),
     @SerialName("vibration_pattern_name") val vibrationPatternName: String = "Default",

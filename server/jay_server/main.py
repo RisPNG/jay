@@ -16,6 +16,7 @@ from jay_server.database import close_database_pool, open_database_pool, transac
 from jay_server.domain import (
     record_group_change,
     get_group_push_tokens,
+    remove_device,
     require_alarm_editor,
     require_group_leader,
     require_group_member,
@@ -102,6 +103,13 @@ def register_device(registration: DeviceRegistration) -> dict:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unknown time zone")
     token_hash = hashlib.sha256(registration.token.encode()).digest()
     with transaction() as connection:
+        retired = connection.execute(
+            "SELECT 1 FROM retired_devices WHERE id = %s", (registration.id,)
+        ).fetchone()
+        if retired is not None:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "Device identity was removed; generate a new one"
+            )
         device = connection.execute(
             "SELECT token_hash, name, time_zone FROM devices WHERE id = %s",
             (registration.id,),
@@ -233,6 +241,13 @@ def update_play_entitlement(
         "shared_sound_upload": entitled,
         "expires_at": expires_at if entitled else None,
     }
+
+
+@app.delete("/v1/device", status_code=status.HTTP_204_NO_CONTENT)
+def delete_device(device: dict = Depends(authenticated_device)) -> None:
+    with transaction() as connection:
+        push_tokens = remove_device(connection, device["id"])
+    send_group_sync(push_tokens)
 
 
 @app.post("/v1/groups/{group_id}/sounds/uploads", status_code=status.HTTP_201_CREATED)

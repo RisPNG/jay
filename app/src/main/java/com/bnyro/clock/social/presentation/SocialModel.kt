@@ -241,6 +241,22 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun resetIdentity() {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.resetIdentity() }
+                .onSuccess { result ->
+                    deviceId = result.deviceId
+                    deviceName = Preferences.instance.getString(
+                        SocialPreferences.deviceNameKey,
+                        null
+                    ).orEmpty()
+                }
+                .onFailure { message = it.message ?: "Unable to reset identity" }
+            busy = false
+        }
+    }
+
     fun consumeMessage() {
         message = null
     }

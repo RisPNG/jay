@@ -35,6 +35,7 @@ The Android emulator can reach this local API at `http://10.0.2.2:8000`. Clearte
 | `PUBLIC_URL` | Public base URL included in generated invitations |
 | `INVITE_LIFETIME_HOURS` | Default lifetime of a one-use invitation, 24 hours |
 | `ALARM_OCCURRENCE_MONITOR_ENABLED` | Processes missing alarm outcomes on this server instance, enabled by default |
+| `DEVICE_INACTIVITY_TIMEOUT_DAYS` | Removes identities unseen for this many days together with the groups they solely lead, defaulting to 120; 0 disables the sweep |
 | `FIREBASE_CREDENTIALS_JSON` | Optional Firebase service-account JSON for immediate synchronization pushes |
 | `GOOGLE_PLAY_CREDENTIALS_JSON` | Optional Play Integrity service-account JSON for paid-app entitlement verification |
 | `PLAY_ENTITLEMENT_LIFETIME_HOURS` | Lifetime of a verified Play entitlement, defaulting to 48 hours |

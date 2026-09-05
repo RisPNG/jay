@@ -3,6 +3,7 @@ package com.bnyro.clock.social.data
 import android.content.Context
 import android.content.Intent
 import android.util.Base64
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.room.withTransaction
 import androidx.work.WorkManager
@@ -37,6 +38,8 @@ import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.AlarmService
 import com.bnyro.clock.util.services.TimerService
+import com.google.firebase.FirebaseApp
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -90,9 +93,17 @@ class SocialRepository(
                 SocialPreferences.serverUrlKey,
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
-            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            val api = SocialApi(serverUrl, identity)
-            api.register()
+            var identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+            var api = SocialApi(serverUrl, identity)
+            try {
+                api.register()
+            } catch (removed: SocialApiException) {
+                if (removed.status != 409) throw removed
+                discardLocalIdentity()
+                identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+                api = SocialApi(serverUrl, identity)
+                api.register()
+            }
             val previousCursor = Preferences.instance.getLong(SocialPreferences.syncCursorKey, 0)
             val knownGroupIds = groups.first().map { it.id }.toSet()
             val response = api.synchronize(previousCursor)
@@ -103,21 +114,7 @@ class SocialRepository(
 
             socialDao.getAlarmLinks().filter {
                 it.groupId !in remoteGroupIds || it.remoteAlarmId !in remoteAlarmIds
-            }.forEach { link ->
-                alarmRepository.getAlarmById(link.localAlarmId)?.let {
-                    context.sendBroadcast(
-                        Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
-                            .setPackage(context.packageName)
-                            .putExtra(AlarmHelper.EXTRA_ID, it.id)
-                    )
-                    alarmUseCase.deleteAlarm(it)
-                }
-                socialDao.deleteAlarmLink(link.remoteAlarmId)
-                SocialAlarmSchedule.setTimeZone(link.localAlarmId, null)
-                WorkManager.getInstance(context).cancelUniqueWork(
-                    "jay_ignored_alarm_${link.localAlarmId}"
-                )
-            }
+            }.forEach { deleteSharedAlarmLink(it) }
 
             response.alarms.forEach { remote ->
                 val link = socialDao.getAlarmLinkByRemoteId(remote.id)
@@ -981,23 +978,75 @@ class SocialRepository(
         }
     }
 
+    suspend fun resetIdentity(): SocialSyncResult = withContext(Dispatchers.IO) {
+        val serverUrl = Preferences.instance.getString(
+            SocialPreferences.serverUrlKey,
+            DEFAULT_SERVER_URL
+        ) ?: DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+        try {
+            SocialApi(serverUrl, identity).deleteDevice()
+        } catch (removed: SocialApiException) {
+            if (removed.status != 401) throw removed
+        }
+        discardLocalIdentity()
+        synchronize()
+    }
+
+    /**
+     * Drops every local trace of the current identity and rotates its secret, so the next
+     * registration is a brand-new device the server has never seen.
+     */
+    private suspend fun discardLocalIdentity() {
+        socialDao.getAlarmLinks().forEach { deleteSharedAlarmLink(it) }
+        socialDatabase.withTransaction {
+            socialDao.clearMembers()
+            socialDao.clearGroups()
+            socialDao.clearDismissedTimers(Long.MAX_VALUE)
+        }
+        Preferences.edit {
+            putLong(SocialPreferences.syncCursorKey, 0)
+            remove(SocialPreferences.pendingInvitationKey)
+            remove(SocialPreferences.entitlementSharedUploadKey)
+            remove(SocialPreferences.entitlementExpiresAtKey)
+            remove(SocialPreferences.deviceNameKey)
+        }
+        Preferences.instance.all.keys.filter {
+            it.startsWith(SocialPreferences.alarmOccurrencePrefix) ||
+                it.startsWith(SocialPreferences.alarmTimeZonePrefix)
+        }.forEach { key ->
+            Preferences.edit { remove(key) }
+        }
+        context.getSharedPreferences("jay_identity", Context.MODE_PRIVATE).edit { clear() }
+        context.getSharedPreferences(
+            "jay_social_notification_accumulation",
+            Context.MODE_PRIVATE
+        ).edit { clear() }
+        SharedSoundStore(context).prune(emptySet())
+        if (FirebaseApp.getApps(context).isNotEmpty()) {
+            runCatching { registerPushToken(Tasks.await(FirebaseMessaging.getInstance().token)) }
+        }
+    }
+
+    private suspend fun deleteSharedAlarmLink(link: SharedAlarmLink) {
+        alarmRepository.getAlarmById(link.localAlarmId)?.let {
+            context.sendBroadcast(
+                Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
+                    .setPackage(context.packageName)
+                    .putExtra(AlarmHelper.EXTRA_ID, it.id)
+            )
+            alarmUseCase.deleteAlarm(it)
+        }
+        socialDao.deleteAlarmLink(link.remoteAlarmId)
+        SocialAlarmSchedule.setTimeZone(link.localAlarmId, null)
+        WorkManager.getInstance(context).cancelUniqueWork(
+            "jay_ignored_alarm_${link.localAlarmId}"
+        )
+    }
+
     suspend fun changeServer(serverUrl: String) = withContext(Dispatchers.IO) {
         URI(serverUrl).toURL()
-        socialDao.getAlarmLinks().forEach { link ->
-            alarmRepository.getAlarmById(link.localAlarmId)?.let {
-                context.sendBroadcast(
-                    Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
-                        .setPackage(context.packageName)
-                        .putExtra(AlarmHelper.EXTRA_ID, it.id)
-                )
-                alarmUseCase.deleteAlarm(it)
-            }
-            socialDao.deleteAlarmLink(link.remoteAlarmId)
-            SocialAlarmSchedule.setTimeZone(link.localAlarmId, null)
-            WorkManager.getInstance(context).cancelUniqueWork(
-                "jay_ignored_alarm_${link.localAlarmId}"
-            )
-        }
+        socialDao.getAlarmLinks().forEach { deleteSharedAlarmLink(it) }
         socialDatabase.withTransaction {
             socialDao.clearMembers()
             socialDao.clearGroups()
