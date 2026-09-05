@@ -9,6 +9,7 @@ import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationManagerCompat
 import com.bnyro.clock.R
 import com.bnyro.clock.util.receivers.DeleteNotificationChannelReceiver
+import com.bnyro.clock.util.receivers.PreAlarmReceiver
 
 object NotificationHelper {
     const val STOPWATCH_CHANNEL = "stopwatch"
@@ -97,6 +98,6 @@ object NotificationHelper {
         )
 
         nManager.createNotificationChannelsCompat(channels)
-        nManager.deleteUnlistedNotificationChannels(channels.map { it.id })
+        nManager.deleteUnlistedNotificationChannels(channels.map { it.id } + PreAlarmReceiver.CHANNEL_ID)
     }
 }

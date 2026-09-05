@@ -110,7 +110,7 @@
     <string name="select_alarm_timeout">Select alarm timeout</string>
     <string name="select_timer_timeout">Select timer timeout</string>
     <string name="volume_ramp">Gradually increase volume</string>
-    <string name="select_volume_ramp">Select how long the volume takes to rise</string>
+    <string name="select_volume_ramp">Select volume ramp</string>
     <string name="volume_ramp_never">Never</string>
     <string name="missed_alarms">Missed alarms</string>
     <string name="named_alarm_missed">%1$s alarm at %2$s was missed</string>
