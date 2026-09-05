@@ -539,7 +539,7 @@ fun SettingsScreen(
             title = stringResource(R.string.select_volume_ramp),
             unit = stringResource(R.string.seconds),
             value = alarmVolumeRampSeconds,
-            maxValue = 60,
+            maxValue = 61,
             offset = 0,
             label = { it.toString() },
             onValueSet = {
@@ -555,7 +555,7 @@ fun SettingsScreen(
             title = stringResource(R.string.select_volume_ramp),
             unit = stringResource(R.string.seconds),
             value = timerVolumeRampSeconds,
-            maxValue = 60,
+            maxValue = 61,
             offset = 0,
             label = { it.toString() },
             onValueSet = {
