@@ -274,6 +274,7 @@ class AlarmService : Service() {
         player.setAudioAttributes(NotificationHelper.audioAttributes)
         player.prepare()
         player.start()
+        volumeRamp?.cancel()
         volumeRamp = VolumeRamp(
             player,
             Preferences.instance.getInt(Preferences.alarmVolumeRampSecondsKey, 0)
