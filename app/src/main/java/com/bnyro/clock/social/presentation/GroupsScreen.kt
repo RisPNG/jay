@@ -281,6 +281,9 @@ fun GroupsScreen(
         var alarmTimeZone by remember(group.id, group.alarmTimeZone) {
             mutableStateOf(group.alarmTimeZone)
         }
+        var sharedAnswers by remember(group.id, group.sharedAnswers) {
+            mutableStateOf(group.sharedAnswers)
+        }
         var showTimeZonePicker by remember(group.id) { mutableStateOf(false) }
         AlertDialog(
             modifier = Modifier
@@ -341,6 +344,9 @@ fun GroupsScreen(
                                     alarmTimeZone
                                 )
                             )
+                        }
+                        GroupSwitch(stringResource(R.string.answer_as_one), sharedAnswers) {
+                            sharedAnswers = it
                         }
                         HorizontalDivider(
                             modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
@@ -465,7 +471,8 @@ fun GroupsScreen(
                                     notifyMembership = notifyMembership,
                                     notifyAdministrative = notifyAdministrative,
                                     alarmTimeBasis = alarmTimeBasis,
-                                    alarmTimeZone = alarmTimeZone
+                                    alarmTimeZone = alarmTimeZone,
+                                    sharedAnswers = sharedAnswers
                                 )
                             )
                             selectedGroup = null

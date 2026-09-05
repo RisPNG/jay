@@ -109,6 +109,15 @@
     <string name="jay_social">Jay social</string>
     <string name="device_name">Device name</string>
     <string name="jay_server">Jay server</string>
+    <string name="export_profile">Export profile</string>
+    <string name="export_profile_summary">Share your identity to continue as this member on another device</string>
+    <string name="import_profile">Import profile</string>
+    <string name="import_profile_summary">Continue as a profile exported from another device</string>
+    <string name="import_profile_link">Profile link</string>
+    <string name="import_profile_confirmation">Importing replaces this device\'s identity: the groups and shared alarms of the imported profile replace the ones here, and its answers apply to every device carrying it. This can\'t be undone.</string>
+    <string name="import_profile_confirm">Import</string>
+    <string name="share_profile">Share Jay profile</string>
+    <string name="answer_as_one">Answer as one</string>
     <string name="reset_identity">Reset identity</string>
     <string name="reset_identity_summary">Leave every group and start over as a new device</string>
     <string name="reset_identity_confirmation">Leave every group and delete the groups only you lead, together with their shared alarms? You will start over with a brand-new identity. This can\'t be undone.</string>

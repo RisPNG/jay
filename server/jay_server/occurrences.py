@@ -266,7 +266,13 @@ def evaluate_alarm_cycle(
     cycle_date: date,
 ) -> list[str]:
     alarm = connection.execute(
-        "SELECT * FROM shared_alarms WHERE id = %s FOR UPDATE",
+        """
+        SELECT alarm.*, groups.shared_answers
+        FROM shared_alarms alarm
+        JOIN groups ON groups.id = alarm.group_id
+        WHERE alarm.id = %s
+        FOR UPDATE OF alarm
+        """,
         (alarm_id,),
     ).fetchone()
     if (
@@ -301,22 +307,35 @@ def evaluate_alarm_cycle(
     ).fetchone()
     if cycle["count"] < expected_members or cycle["pending"] > 0:
         return []
-    active = connection.execute(
-        """
-        SELECT 1
-        FROM alarm_activity activity
-        JOIN alarm_occurrences occurrence
-          ON occurrence.alarm_id = activity.alarm_id
-         AND occurrence.device_id = activity.device_id
-         AND occurrence.occurrence_id = activity.occurrence_id
-        WHERE activity.alarm_id = %s
-          AND activity.alarm_revision = %s
-          AND occurrence.cycle_date = %s
-          AND activity.kind IN ('snoozed', 'dismissed')
-        LIMIT 1
-        """,
-        (alarm_id, alarm_revision, cycle_date),
-    ).fetchone() is not None
+    if alarm["shared_answers"]:
+        # the fan-out resolves every member's occurrence without recording an activity
+        # for each of them, so any member answering keeps the shared cycle active
+        active = connection.execute(
+            """
+            SELECT 1 FROM alarm_activity
+            WHERE alarm_id = %s AND alarm_revision = %s
+              AND kind IN ('snoozed', 'dismissed')
+            LIMIT 1
+            """,
+            (alarm_id, alarm_revision),
+        ).fetchone() is not None
+    else:
+        active = connection.execute(
+            """
+            SELECT 1
+            FROM alarm_activity activity
+            JOIN alarm_occurrences occurrence
+              ON occurrence.alarm_id = activity.alarm_id
+             AND occurrence.device_id = activity.device_id
+             AND occurrence.occurrence_id = activity.occurrence_id
+            WHERE activity.alarm_id = %s
+              AND activity.alarm_revision = %s
+              AND occurrence.cycle_date = %s
+              AND activity.kind IN ('snoozed', 'dismissed')
+            LIMIT 1
+            """,
+            (alarm_id, alarm_revision, cycle_date),
+        ).fetchone() is not None
     streak = 0 if active else alarm["inactive_cycle_streak"] + 1
     if streak < 3:
         connection.execute(
@@ -414,7 +433,7 @@ def process_due_alarm_occurrences() -> None:
             """
             SELECT occurrence.*, alarm.label, alarm.time,
                 alarm.enabled, alarm.deleted, alarm.revision,
-                group_settings.notify_ignored,
+                group_settings.notify_ignored, group_settings.shared_answers,
                 gm.device_id IS NOT NULL AS is_member
             FROM alarm_occurrences occurrence
             JOIN shared_alarms alarm ON alarm.id = occurrence.alarm_id
@@ -522,6 +541,36 @@ def process_due_alarm_occurrences() -> None:
                 occurrence["device_id"],
                 occurrence["trigger_at"] + timedelta(milliseconds=1),
             )
+            if occurrence["shared_answers"]:
+                # the same unified rule as reported outcomes ends the whole group's
+                # current occurrences with this unanswered one
+                for fanned in connection.execute(
+                    """
+                    UPDATE alarm_occurrences
+                    SET status = 'ignored', resolved_at = now()
+                    WHERE alarm_id = %s AND device_id != %s
+                      AND alarm_revision = %s AND status = 'pending'
+                    RETURNING device_id, trigger_at
+                    """,
+                    (
+                        occurrence["alarm_id"],
+                        occurrence["device_id"],
+                        occurrence["alarm_revision"],
+                    ),
+                ).fetchall():
+                    schedule_alarm_occurrences(
+                        connection,
+                        occurrence["alarm_id"],
+                        fanned["device_id"],
+                        fanned["trigger_at"] + timedelta(milliseconds=1),
+                    )
+                push_tokens.update(
+                    get_group_push_tokens(
+                        connection,
+                        occurrence["group_id"],
+                        occurrence["device_id"],
+                    )
+                )
             push_tokens.update(
                 evaluate_alarm_cycle(
                     connection,

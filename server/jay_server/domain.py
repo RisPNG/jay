@@ -234,15 +234,14 @@ def get_group_push_tokens(
     category: str | None = None,
 ) -> list[str]:
     return [
-        row["push_token"]
+        row["token"]
         for row in connection.execute(
             """
-            SELECT d.push_token
-            FROM group_members gm
-            JOIN devices d ON d.id = gm.device_id
+            SELECT t.token
+            FROM device_push_tokens t
+            JOIN group_members gm ON gm.device_id = t.device_id
             WHERE gm.group_id = %s
-              AND gm.device_id != %s
-              AND d.push_token IS NOT NULL
+              AND t.device_id != %s
               AND (
                 %s::text IS NULL
                 OR (%s::text = 'membership' AND gm.notify_membership)

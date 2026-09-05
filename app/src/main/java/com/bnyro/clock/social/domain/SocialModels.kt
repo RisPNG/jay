@@ -60,7 +60,8 @@ data class SocialGroup(
     val notifyAdministrative: Boolean,
     val role: MemberRole,
     val alarmTimeBasis: AlarmTimeBasis = AlarmTimeBasis.MEMBER_LOCAL,
-    val alarmTimeZone: String = "UTC"
+    val alarmTimeZone: String = "UTC",
+    val sharedAnswers: Boolean = false
 )
 
 val SocialGroup.canEditAlarms: Boolean
@@ -177,7 +178,8 @@ data class GroupUpdate(
     @SerialName("notify_dismissed") val notifyDismissed: Boolean,
     @SerialName("notify_ignored") val notifyIgnored: Boolean,
     @SerialName("alarm_time_basis") val alarmTimeBasis: String,
-    @SerialName("alarm_time_zone") val alarmTimeZone: String
+    @SerialName("alarm_time_zone") val alarmTimeZone: String,
+    @SerialName("shared_answers") val sharedAnswers: Boolean = false
 )
 
 @Serializable
@@ -298,7 +300,8 @@ data class SocialGroupDto(
     @SerialName("notify_administrative") val notifyAdministrative: Boolean,
     val role: String,
     @SerialName("alarm_time_basis") val alarmTimeBasis: String = "member_local",
-    @SerialName("alarm_time_zone") val alarmTimeZone: String = "UTC"
+    @SerialName("alarm_time_zone") val alarmTimeZone: String = "UTC",
+    @SerialName("shared_answers") val sharedAnswers: Boolean = false
 )
 
 @Serializable
@@ -395,11 +398,19 @@ data class SharedTimerDto(
 )
 
 @Serializable
+data class SocialOccurrenceDto(
+    @SerialName("alarm_id") val alarmId: String,
+    @SerialName("occurrence_id") val occurrenceId: String,
+    val status: String
+)
+
+@Serializable
 data class SyncResponse(
     val cursor: Long,
     val groups: List<SocialGroupDto>,
     val members: List<SocialMemberDto>,
     val alarms: List<SharedAlarmDto>,
     val timers: List<SharedTimerDto> = emptyList(),
+    val occurrences: List<SocialOccurrenceDto> = emptyList(),
     val changes: List<SocialChangeDto> = emptyList()
 )

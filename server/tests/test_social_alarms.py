@@ -984,3 +984,383 @@ def test_shared_sound_upload_requires_entitlement_and_unrelated_edits_preserve_i
                 "SELECT 1 FROM sound_deletions WHERE object_key LIKE %s",
                 (f"%/{sound_id}.flac",),
             ).fetchone() is not None
+
+
+def test_shared_answers_resolve_every_member_occurrence() -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_occurrences, alarm_deliveries, "
+                "shared_alarms, group_invites, group_members, groups, devices CASCADE"
+            )
+
+        leader = register_device(client, "Lively Wren", "leader-secret-that-is-long-enough")
+        member = register_device(client, "Mellow Otter", "member-secret-that-is-long-enough")
+        group_id = client.post(
+            "/v1/groups",
+            headers=leader,
+            json={
+                "name": "As one",
+                "alarm_permission": "everyone",
+                "shared_answers": True,
+            },
+        ).json()["id"]
+        invitation = client.post(
+            f"/v1/groups/{group_id}/invites", headers=leader, json={}
+        ).json()
+        client.post(
+            "/v1/groups/join",
+            headers=member,
+            json={"token": invitation["token"]},
+        )
+        alarm = client.post(
+            "/v1/alarms", headers=leader, json=alarm_payload(group_id)
+        ).json()
+
+        with transaction() as connection:
+            occurrences = connection.execute(
+                """
+                SELECT device_id, occurrence_id FROM alarm_occurrences
+                WHERE alarm_id = %s AND status = 'pending'
+                """,
+                (alarm["id"],),
+            ).fetchall()
+        assert {occurrence["device_id"] for occurrence in occurrences} == {
+            leader["X-Jay-Device-ID"],
+            member["X-Jay-Device-ID"],
+        }
+        leader_occurrence = next(
+            occurrence
+            for occurrence in occurrences
+            if occurrence["device_id"] == leader["X-Jay-Device-ID"]
+        )["occurrence_id"]
+
+        dismissed = client.post(
+            f"/v1/alarms/{alarm['id']}/activity",
+            headers=leader,
+            json={
+                "id": str(uuid4()),
+                "alarm_revision": 1,
+                "kind": "dismissed",
+                "occurred_at": datetime.now(UTC).isoformat(),
+                "occurrence_id": leader_occurrence,
+            },
+        )
+        assert dismissed.status_code == 201
+
+        with transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT device_id, status, occurrence_id FROM alarm_occurrences
+                WHERE alarm_id = %s AND alarm_revision = 1
+                """,
+                (alarm["id"],),
+            ).fetchall()
+        assert any(
+            row["device_id"] == member["X-Jay-Device-ID"]
+            and row["status"] == "dismissed"
+            and row["occurrence_id"] == leader_occurrence
+            for row in rows
+        )
+        pending = [row for row in rows if row["status"] == "pending"]
+        assert {row["device_id"] for row in pending} == {
+            leader["X-Jay-Device-ID"],
+            member["X-Jay-Device-ID"],
+        }
+        assert all(row["occurrence_id"] != leader_occurrence for row in pending)
+
+        member_sync = client.get("/v1/sync", headers=member).json()
+        assert member_sync["groups"][0]["shared_answers"] is True
+        synced_occurrences = [
+            occurrence
+            for occurrence in member_sync["occurrences"]
+            if occurrence["alarm_id"] == alarm["id"]
+        ]
+        assert any(
+            occurrence["status"] == "dismissed"
+            and occurrence["occurrence_id"] == leader_occurrence
+            for occurrence in synced_occurrences
+        )
+        assert any(occurrence["status"] == "pending" for occurrence in synced_occurrences)
+
+        toggled = client.patch(
+            f"/v1/groups/{group_id}",
+            headers=leader,
+            json={
+                "name": "As one",
+                "alarm_permission": "everyone",
+                "notify_alarm_changes": True,
+                "notify_snoozed": True,
+                "notify_dismissed": True,
+                "notify_ignored": True,
+                "shared_answers": False,
+            },
+        )
+        assert toggled.status_code == 200
+        assert (
+            client.get("/v1/sync", headers=leader).json()["groups"][0]["shared_answers"]
+            is False
+        )
+
+
+def test_shared_answers_carry_a_snooze_to_every_member() -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_occurrences, alarm_deliveries, "
+                "shared_alarms, group_invites, group_members, groups, devices CASCADE"
+            )
+
+        leader = register_device(client, "Lively Wren", "leader-secret-that-is-long-enough")
+        member = register_device(client, "Mellow Otter", "member-secret-that-is-long-enough")
+        group_id = client.post(
+            "/v1/groups",
+            headers=leader,
+            json={
+                "name": "As one",
+                "alarm_permission": "everyone",
+                "shared_answers": True,
+            },
+        ).json()["id"]
+        invitation = client.post(
+            f"/v1/groups/{group_id}/invites", headers=leader, json={}
+        ).json()
+        client.post(
+            "/v1/groups/join",
+            headers=member,
+            json={"token": invitation["token"]},
+        )
+        alarm = client.post(
+            "/v1/alarms", headers=leader, json=alarm_payload(group_id)
+        ).json()
+        with transaction() as connection:
+            leader_occurrence = connection.execute(
+                """
+                SELECT occurrence_id FROM alarm_occurrences
+                WHERE alarm_id = %s AND device_id = %s AND status = 'pending'
+                """,
+                (alarm["id"], leader["X-Jay-Device-ID"]),
+            ).fetchone()["occurrence_id"]
+
+        snoozed = client.post(
+            f"/v1/alarms/{alarm['id']}/activity",
+            headers=leader,
+            json={
+                "id": str(uuid4()),
+                "alarm_revision": 1,
+                "kind": "snoozed",
+                "occurred_at": datetime.now(UTC).isoformat(),
+                "occurrence_id": leader_occurrence,
+            },
+        )
+        assert snoozed.status_code == 201
+
+        with transaction() as connection:
+            statuses = {
+                row["device_id"]: row["status"]
+                for row in connection.execute(
+                    """
+                    SELECT device_id, status FROM alarm_occurrences
+                    WHERE alarm_id = %s AND occurrence_id = %s
+                    """,
+                    (alarm["id"], leader_occurrence),
+                ).fetchall()
+            }
+        assert statuses[leader["X-Jay-Device-ID"]] == "pending"
+        assert statuses[member["X-Jay-Device-ID"]] == "snoozed"
+
+
+def test_shared_answers_carry_an_unanswered_ring_to_every_member() -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_occurrences, alarm_deliveries, "
+                "shared_alarms, group_invites, group_members, groups, devices CASCADE"
+            )
+
+        leader = register_device(client, "Lively Wren", "leader-secret-that-is-long-enough")
+        member = register_device(client, "Mellow Otter", "member-secret-that-is-long-enough")
+        group_id = client.post(
+            "/v1/groups",
+            headers=leader,
+            json={
+                "name": "As one",
+                "alarm_permission": "everyone",
+                "shared_answers": True,
+            },
+        ).json()["id"]
+        invitation = client.post(
+            f"/v1/groups/{group_id}/invites", headers=leader, json={}
+        ).json()
+        client.post(
+            "/v1/groups/join",
+            headers=member,
+            json={"token": invitation["token"]},
+        )
+        alarm = client.post(
+            "/v1/alarms", headers=leader, json=alarm_payload(group_id)
+        ).json()
+        with transaction() as connection:
+            connection.execute(
+                """
+                UPDATE alarm_occurrences
+                SET deadline_at = now() - interval '1 minute'
+                WHERE alarm_id = %s
+                """,
+                (alarm["id"],),
+            )
+
+        process_due_alarm_occurrences()
+
+        with transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT device_id, status FROM alarm_occurrences
+                WHERE alarm_id = %s AND alarm_revision = 1
+                """,
+                (alarm["id"],),
+            ).fetchall()
+            activities = connection.execute(
+                "SELECT count(*) AS count FROM alarm_activity WHERE alarm_id = %s",
+                (alarm["id"],),
+            ).fetchone()["count"]
+        assert (
+            len([row for row in rows if row["status"] == "ignored"])
+            == 2
+        )
+        pending_devices = {
+            row["device_id"] for row in rows if row["status"] == "pending"
+        }
+        assert pending_devices == {
+            leader["X-Jay-Device-ID"],
+            member["X-Jay-Device-ID"],
+        }
+        assert activities == 1
+        with transaction() as connection:
+            streak = connection.execute(
+                "SELECT inactive_cycle_streak FROM shared_alarms WHERE id = %s",
+                (alarm["id"],),
+            ).fetchone()["inactive_cycle_streak"]
+        assert streak == 1
+
+
+def test_answers_stay_individual_without_the_group_setting() -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_occurrences, alarm_deliveries, "
+                "shared_alarms, group_invites, group_members, groups, devices CASCADE"
+            )
+
+        leader = register_device(client, "Lively Wren", "leader-secret-that-is-long-enough")
+        member = register_device(client, "Mellow Otter", "member-secret-that-is-long-enough")
+        group_id = client.post(
+            "/v1/groups",
+            headers=leader,
+            json={"name": "Each their own", "alarm_permission": "everyone"},
+        ).json()["id"]
+        invitation = client.post(
+            f"/v1/groups/{group_id}/invites", headers=leader, json={}
+        ).json()
+        client.post(
+            "/v1/groups/join",
+            headers=member,
+            json={"token": invitation["token"]},
+        )
+        alarm = client.post(
+            "/v1/alarms", headers=leader, json=alarm_payload(group_id)
+        ).json()
+        with transaction() as connection:
+            leader_occurrence = connection.execute(
+                """
+                SELECT occurrence_id FROM alarm_occurrences
+                WHERE alarm_id = %s AND device_id = %s AND status = 'pending'
+                """,
+                (alarm["id"], leader["X-Jay-Device-ID"]),
+            ).fetchone()["occurrence_id"]
+
+        dismissed = client.post(
+            f"/v1/alarms/{alarm['id']}/activity",
+            headers=leader,
+            json={
+                "id": str(uuid4()),
+                "alarm_revision": 1,
+                "kind": "dismissed",
+                "occurred_at": datetime.now(UTC).isoformat(),
+                "occurrence_id": leader_occurrence,
+            },
+        )
+        assert dismissed.status_code == 201
+
+        with transaction() as connection:
+            member_status = connection.execute(
+                """
+                SELECT status FROM alarm_occurrences
+                WHERE alarm_id = %s AND device_id = %s AND occurrence_id = %s
+                """,
+                (alarm["id"], member["X-Jay-Device-ID"], leader_occurrence),
+            ).fetchone()["status"]
+        assert member_status == "pending"
+        member_sync = client.get("/v1/sync", headers=member).json()
+        assert member_sync["groups"][0]["shared_answers"] is False
+        assert all(
+            occurrence["status"] == "pending"
+            for occurrence in member_sync["occurrences"]
+            if occurrence["alarm_id"] == alarm["id"]
+        )
+
+
+def test_a_device_holds_one_push_token_per_installation() -> None:
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_occurrences, alarm_deliveries, "
+                "shared_alarms, group_invites, group_members, groups, devices, "
+                "retired_devices CASCADE"
+            )
+
+        leader = register_device(client, "Peppermint Lynx", "leader-secret-that-is-long-enough")
+        member = register_device(client, "Peach Puffin", "member-secret-that-is-long-enough")
+        assert client.put(
+            "/v1/device/push-token",
+            headers=leader,
+            json={"token": "leader-install-token"},
+        ).status_code == 204
+        assert client.put(
+            "/v1/device/push-token",
+            headers=member,
+            json={"token": "member-install-token"},
+        ).status_code == 204
+        with transaction() as connection:
+            tokens = {
+                row["device_id"]: row["token"]
+                for row in connection.execute(
+                    "SELECT device_id, token FROM device_push_tokens"
+                ).fetchall()
+            }
+        assert tokens == {
+            leader["X-Jay-Device-ID"]: "leader-install-token",
+            member["X-Jay-Device-ID"]: "member-install-token",
+        }
+
+        # an install moving to another profile takes its token with it
+        assert client.put(
+            "/v1/device/push-token",
+            headers=member,
+            json={"token": "leader-install-token"},
+        ).status_code == 204
+        with transaction() as connection:
+            tokens = connection.execute(
+                "SELECT device_id, token FROM device_push_tokens ORDER BY token"
+            ).fetchall()
+        assert tokens == [
+            {"device_id": member["X-Jay-Device-ID"], "token": "leader-install-token"},
+            {"device_id": member["X-Jay-Device-ID"], "token": "member-install-token"},
+        ]
+
+        assert client.delete("/v1/device", headers=member).status_code == 204
+        with transaction() as connection:
+            remaining = connection.execute(
+                "SELECT token FROM device_push_tokens"
+            ).fetchall()
+        assert remaining == []

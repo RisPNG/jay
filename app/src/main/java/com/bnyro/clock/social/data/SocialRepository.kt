@@ -237,6 +237,63 @@ class SocialRepository(
                 }
             }
 
+            // an outcome the server holds for the occurrence this device is living in was
+            // answered elsewhere: stop the ring, move the local schedule past it, and arm the
+            // next occurrence, whether the answer came from another member or another device
+            // carrying this same profile
+            response.occurrences.groupBy { it.alarmId }.forEach { (remoteAlarmId, rows) ->
+                val link = socialDao.getAlarmLinkByRemoteId(remoteAlarmId) ?: return@forEach
+                val occurrenceId = Preferences.instance.getString(
+                    "${SocialPreferences.alarmOccurrencePrefix}${link.localAlarmId}",
+                    null
+                ) ?: return@forEach
+                if (
+                    rows.none {
+                        it.occurrenceId == occurrenceId &&
+                            it.status in RESOLVED_OCCURRENCE_STATUSES
+                    }
+                ) return@forEach
+                alarmRepository.getAlarmById(link.localAlarmId)?.let { alarm ->
+                    context.sendBroadcast(
+                        Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
+                            .setPackage(context.packageName)
+                            .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                    )
+                    WorkManager.getInstance(context).cancelUniqueWork(
+                        "jay_ignored_alarm_${alarm.id}"
+                    )
+                    Preferences.edit {
+                        remove("${SocialPreferences.alarmOccurrencePrefix}${alarm.id}")
+                    }
+                    if ((occurrenceId.toLongOrNull() ?: 0L) > System.currentTimeMillis()) {
+                        alarmUseCase.dismissUpcomingAlarm(alarm)
+                    } else if (alarm.enabled) {
+                        AlarmHelper.enqueue(context, alarm, skipToday = true)
+                    }
+                    scheduleIgnoredOutcome(alarm, remoteAlarmId, link.revision)
+                }
+            }
+
+            // a snooze leaves the shared occurrence pending for the re-ring where it was
+            // answered, so the devices sharing this profile only stop ringing
+            if (previousCursor != 0L) {
+                response.changes.filter {
+                    it.entityType == "outcome" && it.action == "snoozed" &&
+                        it.subjectDeviceId == identity.id
+                }.forEach { change ->
+                    socialDao.getAlarmLinkByRemoteId(change.entityId)?.let { link ->
+                        context.sendBroadcast(
+                            Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
+                                .setPackage(context.packageName)
+                                .putExtra(AlarmHelper.EXTRA_ID, link.localAlarmId)
+                        )
+                        WorkManager.getInstance(context).cancelUniqueWork(
+                            "jay_ignored_alarm_${link.localAlarmId}"
+                        )
+                    }
+                }
+            }
+
             val synchronizedGroups = response.groups.map {
                 SocialGroup(
                     it.id,
@@ -250,7 +307,8 @@ class SocialRepository(
                     it.notifyAdministrative,
                     MemberRole.valueOf(it.role.uppercase()),
                     AlarmTimeBasis.valueOf(it.alarmTimeBasis.uppercase()),
-                    it.alarmTimeZone
+                    it.alarmTimeZone,
+                    it.sharedAnswers
                 )
             }
             socialDatabase.withTransaction {
@@ -371,7 +429,8 @@ class SocialRepository(
                         group.notifyDismissed,
                         group.notifyIgnored,
                         group.alarmTimeBasis.name.lowercase(),
-                        group.alarmTimeZone
+                        group.alarmTimeZone,
+                        group.sharedAnswers
                     )
                 )
             }
@@ -801,6 +860,10 @@ class SocialRepository(
                         .putExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, expiresAt)
                         .putExtra(TimerService.SHARED_TIMER_CAN_EDIT_EXTRA_KEY, group.canEditAlarms)
                         .putExtra(
+                            TimerService.SHARED_TIMER_ANSWER_AS_ONE_EXTRA_KEY,
+                            group.sharedAnswers
+                        )
+                        .putExtra(
                             TimerService.SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY,
                             soundMode != SharedSoundMode.OFF
                         )
@@ -999,6 +1062,49 @@ class SocialRepository(
         }
     }
 
+    suspend fun exportIdentity(): String = withContext(Dispatchers.IO) {
+        val serverUrl = Preferences.instance.getString(
+            SocialPreferences.serverUrlKey,
+            DEFAULT_SERVER_URL
+        ) ?: DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+        "jay://profile?name=${java.net.URLEncoder.encode(identity.name, Charsets.UTF_8.name())}" +
+                "&key=${java.net.URLEncoder.encode(identity.secret, Charsets.UTF_8.name())}"
+    }
+
+    /**
+     * Adopts an exported profile as this device's identity: everything the identity here owns
+     * goes away, and the device continues as the imported member with its groups, shared
+     * alarms, and answers.
+     */
+    suspend fun importIdentity(profile: String): SocialSyncResult = withContext(Dispatchers.IO) {
+        val uri = URI(profile.trim())
+        require(uri.scheme == "jay" && uri.host == "profile") { "Not a Jay profile link" }
+        val parameters = uri.rawQuery.orEmpty().split('&').mapNotNull {
+            val parts = it.split('=', limit = 2)
+            if (parts.size == 2) parts[0] to java.net.URLDecoder.decode(
+                parts[1],
+                Charsets.UTF_8.name()
+            ) else null
+        }.toMap()
+        val name = parameters["name"]?.takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("The profile link is incomplete")
+        val secret = parameters["key"]
+            ?: throw IllegalArgumentException("The profile link is incomplete")
+        require(Base64.decode(secret, Base64.NO_WRAP or Base64.URL_SAFE).size == 32) {
+            "The profile link is incomplete"
+        }
+        discardLocalIdentityState()
+        context.getSharedPreferences("jay_identity", Context.MODE_PRIVATE).edit {
+            putString(SocialPreferences.deviceSecretKey, secret)
+        }
+        Preferences.edit { putString(SocialPreferences.deviceNameKey, name) }
+        if (FirebaseApp.getApps(context).isNotEmpty()) {
+            runCatching { registerPushToken(Tasks.await(FirebaseMessaging.getInstance().token)) }
+        }
+        synchronize()
+    }
+
     suspend fun resetIdentity(): SocialSyncResult = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
             SocialPreferences.serverUrlKey,
@@ -1019,6 +1125,19 @@ class SocialRepository(
      * registration is a brand-new device the server has never seen.
      */
     private suspend fun discardLocalIdentity() {
+        discardLocalIdentityState()
+        Preferences.edit { remove(SocialPreferences.deviceNameKey) }
+        context.getSharedPreferences("jay_identity", Context.MODE_PRIVATE).edit { clear() }
+        if (FirebaseApp.getApps(context).isNotEmpty()) {
+            runCatching { registerPushToken(Tasks.await(FirebaseMessaging.getInstance().token)) }
+        }
+    }
+
+    /**
+     * Clears everything the current identity owns locally, leaving the stored secret behind
+     * for whoever adopts this device next: a fresh identity or an imported profile.
+     */
+    private suspend fun discardLocalIdentityState() {
         socialDao.getAlarmLinks().forEach { deleteSharedAlarmLink(it) }
         socialDatabase.withTransaction {
             socialDao.clearMembers()
@@ -1030,7 +1149,6 @@ class SocialRepository(
             remove(SocialPreferences.pendingInvitationKey)
             remove(SocialPreferences.entitlementSharedUploadKey)
             remove(SocialPreferences.entitlementExpiresAtKey)
-            remove(SocialPreferences.deviceNameKey)
         }
         Preferences.instance.all.keys.filter {
             it.startsWith(SocialPreferences.alarmOccurrencePrefix) ||
@@ -1038,15 +1156,11 @@ class SocialRepository(
         }.forEach { key ->
             Preferences.edit { remove(key) }
         }
-        context.getSharedPreferences("jay_identity", Context.MODE_PRIVATE).edit { clear() }
         context.getSharedPreferences(
             "jay_social_notification_accumulation",
             Context.MODE_PRIVATE
         ).edit { clear() }
         SharedSoundStore(context).prune(emptySet())
-        if (FirebaseApp.getApps(context).isNotEmpty()) {
-            runCatching { registerPushToken(Tasks.await(FirebaseMessaging.getInstance().token)) }
-        }
     }
 
     private suspend fun deleteSharedAlarmLink(link: SharedAlarmLink) {
@@ -1123,6 +1237,7 @@ class SocialRepository(
     companion object {
         const val DEFAULT_SERVER_URL = "https://jay.poppybit.com"
 
+        private val RESOLVED_OCCURRENCE_STATUSES = setOf("dismissed", "ignored", "snoozed")
         private const val SHARED_TIMER_LINGER_MILLIS = 15 * 60_000L
         private const val SUPPRESSED_TIMER_LIFETIME_MILLIS = 30 * 60_000L
     }

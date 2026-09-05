@@ -72,6 +72,7 @@ class GroupCreate(BaseModel):
     notify_ignored: bool = True
     alarm_time_basis: AlarmTimeBasis = AlarmTimeBasis.MEMBER_LOCAL
     alarm_time_zone: str = Field(default="UTC", min_length=1, max_length=100)
+    shared_answers: bool = False
 
 
 class GroupUpdate(BaseModel):
@@ -83,6 +84,7 @@ class GroupUpdate(BaseModel):
     notify_ignored: bool
     alarm_time_basis: AlarmTimeBasis = AlarmTimeBasis.MEMBER_LOCAL
     alarm_time_zone: str = Field(default="UTC", min_length=1, max_length=100)
+    shared_answers: bool = False
 
 
 class MemberNotificationUpdate(BaseModel):

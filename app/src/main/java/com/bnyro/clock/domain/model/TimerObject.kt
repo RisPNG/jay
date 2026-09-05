@@ -20,7 +20,8 @@ data class TimerObject(
     var incrementSeconds: Int? = null,
     var sharedTimerId: String? = null,
     var sharedGroupName: String? = null,
-    var sharedCanEdit: Boolean = true
+    var sharedCanEdit: Boolean = true,
+    var sharedAnswerAsOne: Boolean = false
 ) {
     val secondsLeft: Int
         get() = ceil(currentPosition.value / 1000.0).toInt()

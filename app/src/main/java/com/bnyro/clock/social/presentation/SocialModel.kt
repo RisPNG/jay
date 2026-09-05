@@ -42,6 +42,8 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         private set
     var invitation by mutableStateOf<String?>(null)
         private set
+    var profile by mutableStateOf<String?>(null)
+        private set
     var groupActivity by mutableStateOf<List<SocialChange>>(emptyList())
         private set
     var groupActivityNextBefore by mutableStateOf<Long?>(null)
@@ -241,6 +243,32 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportProfile() {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.exportIdentity() }
+                .onSuccess { profile = it }
+                .onFailure { message = it.message ?: "Unable to export profile" }
+            busy = false
+        }
+    }
+
+    fun importProfile(profileLink: String) {
+        viewModelScope.launch {
+            busy = true
+            runCatching { repository.importIdentity(profileLink) }
+                .onSuccess { result ->
+                    deviceId = result.deviceId
+                    deviceName = Preferences.instance.getString(
+                        SocialPreferences.deviceNameKey,
+                        null
+                    ).orEmpty()
+                }
+                .onFailure { message = it.message ?: "Unable to import profile" }
+            busy = false
+        }
+    }
+
     fun resetIdentity() {
         viewModelScope.launch {
             busy = true
@@ -263,5 +291,9 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
 
     fun consumeInvitation() {
         invitation = null
+    }
+
+    fun consumeProfile() {
+        profile = null
     }
 }

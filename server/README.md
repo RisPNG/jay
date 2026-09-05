@@ -1,6 +1,6 @@
 # Jay server
 
-The Jay server synchronizes device identities, groups, alarm revisions, delivery acknowledgements, and alarm outcomes. It tracks each member's expected alarm occurrences so a missing dismissal or snooze becomes an ignored outcome after the ringing deadline even when that device is offline. Authenticated server-sent events make changes appear immediately while Jay is open; Firebase and periodic synchronization recover changes while it is in the background. Android clients communicate with this API and never connect directly to PostgreSQL.
+The Jay server synchronizes device identities, groups, alarm revisions, delivery acknowledgements, and alarm outcomes. It tracks each member's expected alarm occurrences so a missing dismissal or snooze becomes an ignored outcome after the ringing deadline even when that device is offline. A group may answer as one, carrying any member's dismissal, snooze, or missed response to every member's current occurrence; devices that share an imported profile are one member and always answer as one. Authenticated server-sent events make changes appear immediately while Jay is open; Firebase and periodic synchronization recover changes while it is in the background. Android clients communicate with this API and never connect directly to PostgreSQL.
 
 ## Local development
 

@@ -15,7 +15,8 @@ import javax.crypto.spec.SecretKeySpec
 data class DeviceIdentity(
     val id: String,
     val name: String,
-    val token: String
+    val token: String,
+    val secret: String
 )
 
 object DeviceIdentityStore {
@@ -48,6 +49,6 @@ object DeviceIdentityStore {
             mac.doFinal(normalizedServer.toByteArray()),
             Base64.NO_WRAP or Base64.URL_SAFE
         )
-        return DeviceIdentity(id, name, token)
+        return DeviceIdentity(id, name, token, encodedSecret)
     }
 }

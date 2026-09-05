@@ -1,10 +1,15 @@
 package com.bnyro.clock.social.presentation
 
+import android.content.Intent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -13,11 +18,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,10 +37,34 @@ import com.bnyro.clock.presentation.screens.settings.components.SettingsCategory
 
 @Composable
 fun SocialSettingsSection() {
+    val context = LocalContext.current
     val socialModel: SocialModel = viewModel()
     var showDeviceNameDialog by remember { mutableStateOf(false) }
     var showServerDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
+    val shareProfileTitle = stringResource(R.string.share_profile)
+
+    LaunchedEffect(socialModel.message) {
+        socialModel.message?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+            socialModel.consumeMessage()
+        }
+    }
+    LaunchedEffect(socialModel.profile) {
+        socialModel.profile?.let {
+            context.startActivity(
+                Intent.createChooser(
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, it)
+                    },
+                    shareProfileTitle
+                )
+            )
+            socialModel.consumeProfile()
+        }
+    }
 
     SettingsCategory(stringResource(R.string.jay_social))
     IconPreference(
@@ -49,6 +80,20 @@ fun SocialSettingsSection() {
         imageVector = Icons.Default.Cloud
     ) {
         showServerDialog = true
+    }
+    IconPreference(
+        title = stringResource(R.string.export_profile),
+        summary = stringResource(R.string.export_profile_summary),
+        imageVector = Icons.Default.Share
+    ) {
+        socialModel.exportProfile()
+    }
+    IconPreference(
+        title = stringResource(R.string.import_profile),
+        summary = stringResource(R.string.import_profile_summary),
+        imageVector = Icons.Default.Download
+    ) {
+        showImportDialog = true
     }
     IconPreference(
         title = stringResource(R.string.reset_identity),
@@ -115,6 +160,40 @@ fun SocialSettingsSection() {
             dismissButton = {
                 OutlinedButton(onClick = { showServerDialog = false }) {
                     Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+    if (showImportDialog) {
+        var profile by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false },
+            title = { Text(stringResource(R.string.import_profile)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = profile,
+                        onValueChange = { profile = it },
+                        label = { Text(stringResource(R.string.import_profile_link)) }
+                    )
+                    Text(stringResource(R.string.import_profile_confirmation))
+                }
+            },
+            confirmButton = {
+                DialogButton(
+                    label = R.string.import_profile_confirm,
+                    style = DialogButtonStyle.PRIMARY
+                ) {
+                    socialModel.importProfile(profile.trim())
+                    showImportDialog = false
+                }
+            },
+            dismissButton = {
+                DialogButton(
+                    label = R.string.cancel,
+                    style = DialogButtonStyle.SECONDARY
+                ) {
+                    showImportDialog = false
                 }
             }
         )

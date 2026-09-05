@@ -141,11 +141,14 @@ class TimerService : Service() {
             val obj = timerObjects.find { it.id == id } ?: return
             when (val action = intent.getStringExtra(ACTION_EXTRA_KEY)) {
                 ACTION_STOP -> {
-                    // answering a ring is each member's own answer, while stopping one that is
-                    // still counting cancels it for the whole group when this member may edit it
+                    // answering a ring is each member's own answer unless the group answers
+                    // as one, while stopping one that is still counting cancels it for the
+                    // whole group when this member may edit it
                     val answeringTheRing = ringingTimerId == obj.id
                     obj.sharedTimerId?.let { sharedId ->
-                        if (!answeringTheRing && obj.sharedCanEdit) {
+                        val answersForEveryone = obj.sharedCanEdit &&
+                            (!answeringTheRing || obj.sharedAnswerAsOne)
+                        if (answersForEveryone) {
                             SocialTimerActions.cancel(applicationContext, sharedId)
                         } else {
                             SocialTimerActions.dismissed(applicationContext, sharedId)
@@ -501,6 +504,7 @@ class TimerService : Service() {
         val incrementSeconds = intent.getIntExtra(SHARED_TIMER_INCREMENT_EXTRA_KEY, 60)
         val expiresAt = intent.getLongExtra(SHARED_TIMER_EXPIRES_EXTRA_KEY, 0L)
         val canEdit = intent.getBooleanExtra(SHARED_TIMER_CAN_EDIT_EXTRA_KEY, false)
+        val answerAsOne = intent.getBooleanExtra(SHARED_TIMER_ANSWER_AS_ONE_EXTRA_KEY, false)
         val soundEnabled = intent.getBooleanExtra(SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY, true)
         val soundName = intent.getStringExtra(SHARED_TIMER_SOUND_NAME_EXTRA_KEY)
         val soundUri = intent.getStringExtra(SHARED_TIMER_SOUND_URI_EXTRA_KEY)
@@ -526,6 +530,7 @@ class TimerService : Service() {
                 sharedTimerId = sharedId,
                 sharedGroupName = groupName,
                 sharedCanEdit = canEdit,
+                sharedAnswerAsOne = answerAsOne,
                 soundEnabled = soundEnabled,
                 soundName = soundName,
                 soundUri = soundUri,
@@ -549,6 +554,7 @@ class TimerService : Service() {
 
         existing.sharedGroupName = groupName
         existing.sharedCanEdit = canEdit
+        existing.sharedAnswerAsOne = answerAsOne
         existing.incrementSeconds = incrementSeconds
         existing.soundEnabled = soundEnabled
         existing.soundName = soundName
@@ -945,6 +951,7 @@ class TimerService : Service() {
         const val SHARED_TIMER_INCREMENT_EXTRA_KEY = "shared_timer_increment"
         const val SHARED_TIMER_EXPIRES_EXTRA_KEY = "shared_timer_expires"
         const val SHARED_TIMER_CAN_EDIT_EXTRA_KEY = "shared_timer_can_edit"
+        const val SHARED_TIMER_ANSWER_AS_ONE_EXTRA_KEY = "shared_timer_answer_as_one"
         const val SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY = "shared_timer_sound_enabled"
         const val SHARED_TIMER_SOUND_NAME_EXTRA_KEY = "shared_timer_sound_name"
         const val SHARED_TIMER_SOUND_URI_EXTRA_KEY = "shared_timer_sound_uri"

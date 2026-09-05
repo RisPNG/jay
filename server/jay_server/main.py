@@ -209,11 +209,12 @@ def update_push_token(
 ) -> None:
     with transaction() as connection:
         connection.execute(
-            "UPDATE devices SET push_token = NULL WHERE push_token = %s AND id != %s",
-            (update.token, device["id"]),
-        )
-        connection.execute(
-            "UPDATE devices SET push_token = %s, updated_at = now() WHERE id = %s",
+            """
+            INSERT INTO device_push_tokens (token, device_id)
+            VALUES (%s, %s)
+            ON CONFLICT (token) DO UPDATE
+            SET device_id = EXCLUDED.device_id, updated_at = now()
+            """,
             (update.token, device["id"]),
         )
 
@@ -362,8 +363,8 @@ def create_group(group: GroupCreate, device: dict = Depends(authenticated_device
             INSERT INTO groups (
                 id, name, alarm_permission, notify_alarm_changes, notify_snoozed,
                 notify_dismissed, notify_ignored, alarm_time_basis,
-                alarm_time_zone, created_by
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                alarm_time_zone, shared_answers, created_by
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 group_id,
@@ -375,6 +376,7 @@ def create_group(group: GroupCreate, device: dict = Depends(authenticated_device
                 group.notify_ignored,
                 group.alarm_time_basis.value,
                 group.alarm_time_zone,
+                group.shared_answers,
                 device["id"],
             ),
         )
@@ -416,12 +418,17 @@ def update_group(
             if "alarm_time_zone" in update.model_fields_set
             else previous["alarm_time_zone"]
         )
+        shared_answers = (
+            update.shared_answers
+            if "shared_answers" in update.model_fields_set
+            else previous["shared_answers"]
+        )
         connection.execute(
             """
             UPDATE groups
             SET name = %s, alarm_permission = %s, notify_alarm_changes = %s,
                 notify_snoozed = %s, notify_dismissed = %s, notify_ignored = %s,
-                alarm_time_basis = %s, alarm_time_zone = %s,
+                alarm_time_basis = %s, alarm_time_zone = %s, shared_answers = %s,
                 updated_at = now()
             WHERE id = %s
             """,
@@ -434,6 +441,7 @@ def update_group(
                 update.notify_ignored,
                 alarm_time_basis,
                 alarm_time_zone,
+                shared_answers,
                 group_id,
             ),
         )
@@ -480,6 +488,8 @@ def update_group(
                 "alarm_time_basis": alarm_time_basis,
                 "previous_alarm_time_zone": previous["alarm_time_zone"],
                 "alarm_time_zone": alarm_time_zone,
+                "previous_shared_answers": previous["shared_answers"],
+                "shared_answers": shared_answers,
             },
         )
         push_tokens = get_group_push_tokens(
@@ -679,7 +689,7 @@ def update_member(
         require_group_leader(connection, group_id, device["id"])
         member = connection.execute(
             """
-            SELECT gm.role, d.name, d.push_token
+            SELECT gm.role, d.name
             FROM group_members gm
             JOIN devices d ON d.id = gm.device_id
             WHERE gm.group_id = %s AND gm.device_id = %s
@@ -720,12 +730,15 @@ def update_member(
         push_tokens = get_group_push_tokens(
             connection, group_id, device["id"], "administrative"
         )
-        if (
-            member_id != device["id"]
-            and member["push_token"] is not None
-            and member["push_token"] not in push_tokens
-        ):
-            push_tokens.append(member["push_token"])
+        if member_id != device["id"]:
+            push_tokens.extend(
+                row["token"]
+                for row in connection.execute(
+                    "SELECT token FROM device_push_tokens WHERE device_id = %s",
+                    (member_id,),
+                ).fetchall()
+                if row["token"] not in push_tokens
+            )
     send_group_sync(push_tokens)
     return {"device_id": member_id, "role": update.role}
 
@@ -771,7 +784,7 @@ def remove_member(
                 "Use Leave group to remove yourself",
             )
         removed_device = connection.execute(
-            "SELECT name, push_token FROM devices WHERE id = %s", (member_id,)
+            "SELECT name FROM devices WHERE id = %s", (member_id,)
         ).fetchone()
         removed = connection.execute(
             "DELETE FROM group_members WHERE group_id = %s AND device_id = %s RETURNING device_id",
@@ -809,8 +822,14 @@ def remove_member(
         push_tokens = get_group_push_tokens(
             connection, group_id, device["id"], "membership"
         )
-        if removed_device["push_token"] is not None:
-            push_tokens.append(removed_device["push_token"])
+        push_tokens.extend(
+            row["token"]
+            for row in connection.execute(
+                "SELECT token FROM device_push_tokens WHERE device_id = %s",
+                (member_id,),
+            ).fetchall()
+            if row["token"] not in push_tokens
+        )
     send_group_sync(push_tokens)
 
 
@@ -1377,11 +1396,35 @@ def record_alarm_activity(
                 )
         group = connection.execute(
             """
-            SELECT notify_snoozed, notify_dismissed, notify_ignored
+            SELECT notify_snoozed, notify_dismissed, notify_ignored, shared_answers
             FROM groups WHERE id = %s
             """,
             (alarm["group_id"],),
         ).fetchone()
+        if group["shared_answers"]:
+            # a group that answers as one carries the outcome to every other member's
+            # current occurrence, so one answer silences the ring on all their devices
+            for occurrence in connection.execute(
+                """
+                UPDATE alarm_occurrences
+                SET status = %s, resolved_at = now()
+                WHERE alarm_id = %s AND device_id != %s
+                  AND alarm_revision = %s AND status = 'pending'
+                RETURNING device_id, trigger_at
+                """,
+                (
+                    activity.kind.value,
+                    alarm_id,
+                    device["id"],
+                    activity.alarm_revision,
+                ),
+            ).fetchall():
+                schedule_alarm_occurrences(
+                    connection,
+                    alarm_id,
+                    occurrence["device_id"],
+                    occurrence["trigger_at"] + timedelta(milliseconds=1),
+                )
         should_notify = (
             activity.kind.value == "snoozed" and group["notify_snoozed"]
         ) or (
@@ -1389,9 +1432,11 @@ def record_alarm_activity(
         ) or (
             activity.kind.value == "ignored" and group["notify_ignored"]
         )
-        push_tokens = get_group_push_tokens(
-            connection, alarm["group_id"], device["id"]
-        ) if should_notify else []
+        push_tokens = (
+            get_group_push_tokens(connection, alarm["group_id"], device["id"])
+            if group["shared_answers"] or should_notify
+            else []
+        )
         if activity.occurrence_id is not None and resolved_occurrence is not None:
             push_tokens = list(
                 set(push_tokens)
@@ -1655,6 +1700,16 @@ def synchronize(
             """,
             (group_ids,),
         ).fetchall()
+        occurrences = connection.execute(
+            """
+            SELECT alarm_id, occurrence_id, status
+            FROM alarm_occurrences
+            WHERE device_id = %s
+              AND status != 'canceled'
+              AND (status = 'pending' OR resolved_at > now() - interval '2 days')
+            """,
+            (device["id"],),
+        ).fetchall()
         changes = connection.execute(
             """
             SELECT c.sequence, c.group_id, c.entity_type, c.entity_id,
@@ -1705,5 +1760,6 @@ def synchronize(
         "members": members,
         "alarms": alarms,
         "timers": timers,
+        "occurrences": occurrences,
         "changes": changes,
     }
