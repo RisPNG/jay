@@ -12,6 +12,7 @@ import com.bnyro.clock.App
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.navigation.NavRoutes
+import com.bnyro.clock.social.domain.SharedSoundProgress
 import com.bnyro.clock.util.TimeHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,9 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
         get() = socialRepository.canUploadSharedSounds
 
     var busy by mutableStateOf(false)
+        private set
+
+    var soundProgress by mutableStateOf<SharedSoundProgress?>(null)
         private set
 
     var createdAlarm by mutableStateOf<Alarm?>(null)
@@ -71,12 +75,13 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                 if (groupId == null) {
                     createUpdateDeleteAlarmUseCase.createAlarm(alarm)
                 } else {
-                    socialRepository.createSharedAlarm(groupId, alarm)
+                    socialRepository.createSharedAlarm(groupId, alarm) { soundProgress = it }
                 }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
                 busy = false
+                soundProgress = null
                 Toast.makeText(
                     getApplication(),
                     exception.message ?: "Unable to create shared alarm",
@@ -84,6 +89,7 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                 ).show()
                 return@launch
             }
+            soundProgress = null
             createdAlarm = alarm
             onCreated()
         }
@@ -94,11 +100,12 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
         busy = true
         viewModelScope.launch {
             try {
-                socialRepository.updateAlarm(alarm)
+                socialRepository.updateAlarm(alarm) { soundProgress = it }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
                 busy = false
+                soundProgress = null
                 socialRepository.synchronize()
                 Toast.makeText(
                     getApplication(),
@@ -107,6 +114,7 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
                 ).show()
                 return@launch
             }
+            soundProgress = null
             onUpdated()
         }
     }

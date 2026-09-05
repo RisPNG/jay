@@ -27,6 +27,7 @@ import com.bnyro.clock.social.domain.MemberNotificationUpdate
 import com.bnyro.clock.social.domain.SharedAlarmLink
 import com.bnyro.clock.social.domain.SharedAlarmRequest
 import com.bnyro.clock.social.domain.SharedSoundMode
+import com.bnyro.clock.social.domain.SharedSoundProgress
 import com.bnyro.clock.social.domain.SharedSoundSelection
 import com.bnyro.clock.social.domain.SharedSoundUploadRequest
 import com.bnyro.clock.social.domain.SocialChange
@@ -534,7 +535,11 @@ class SocialRepository(
         synchronize()
     }
 
-    suspend fun createSharedAlarm(groupId: String, alarm: Alarm): Long =
+    suspend fun createSharedAlarm(
+        groupId: String,
+        alarm: Alarm,
+        onProgress: (SharedSoundProgress) -> Unit = {}
+    ): Long =
         synchronizationMutex.withLock {
             withContext(Dispatchers.IO) {
                 val serverUrl = Preferences.instance.getString(
@@ -554,7 +559,7 @@ class SocialRepository(
                     else -> SharedSoundMode.MEMBER_DEFAULT
                 }
                 val soundId = if (soundMode == SharedSoundMode.SHARED) {
-                    uploadSharedSound(groupId, alarm.soundName, alarm.soundUri!!.toUri(), api)
+                    uploadSharedSound(groupId, alarm.soundName, alarm.soundUri!!.toUri(), api, onProgress)
                 } else null
                 if (soundMode != SharedSoundMode.SHARED) {
                     alarm.soundName = null
@@ -608,7 +613,10 @@ class SocialRepository(
             }
         }
 
-    suspend fun updateAlarm(alarm: Alarm) = synchronizationMutex.withLock {
+    suspend fun updateAlarm(
+        alarm: Alarm,
+        onProgress: (SharedSoundProgress) -> Unit = {}
+    ) = synchronizationMutex.withLock {
         withContext(Dispatchers.IO) {
             val link = socialDao.getAlarmLinkByLocalId(alarm.id)
             if (link == null) {
@@ -648,7 +656,8 @@ class SocialRepository(
                             link.groupId,
                             alarm.soundName,
                             alarm.soundUri!!.toUri(),
-                            api
+                            api,
+                            onProgress
                         )
                         SharedSoundSelection(SharedSoundMode.SHARED.name.lowercase(), soundId)
                     }
@@ -828,7 +837,12 @@ class SocialRepository(
         }
     }
 
-    suspend fun startSharedTimer(groupId: String, label: String?, settings: TimerSettings) =
+    suspend fun startSharedTimer(
+        groupId: String,
+        label: String?,
+        settings: TimerSettings,
+        onProgress: (SharedSoundProgress) -> Unit = {}
+    ) =
         withContext(Dispatchers.IO) {
             val serverUrl = Preferences.instance.getString(
                 SocialPreferences.serverUrlKey,
@@ -842,7 +856,7 @@ class SocialRepository(
                 else -> SharedSoundMode.MEMBER_DEFAULT
             }
             val soundId = if (soundMode == SharedSoundMode.SHARED) {
-                uploadSharedSound(groupId, settings.soundName, settings.soundUri!!.toUri(), api)
+                uploadSharedSound(groupId, settings.soundName, settings.soundUri!!.toUri(), api, onProgress)
             } else null
             api.startTimer(
                 groupId,
@@ -863,13 +877,14 @@ class SocialRepository(
             synchronize()
         }
 
-    private fun uploadSharedSound(
+    private suspend fun uploadSharedSound(
         groupId: String,
         title: String?,
         source: android.net.Uri,
-        api: SocialApi
+        api: SocialApi,
+        onProgress: (SharedSoundProgress) -> Unit
     ): String {
-        val processed = SharedSoundStore(context).process(source)
+        val processed = SharedSoundProcessor(context).process(source, onProgress)
         try {
             val upload = api.beginSoundUpload(
                 groupId,
@@ -880,7 +895,13 @@ class SocialRepository(
                     processed.durationMs
                 )
             )
-            api.uploadSound(upload, processed.file)
+            api.uploadSound(upload, processed.file) { uploaded ->
+                onProgress(
+                    SharedSoundProgress.Uploading(
+                        (uploaded.toFloat() / processed.file.length()).coerceAtMost(1f)
+                    )
+                )
+            }
             api.completeSoundUpload(upload.id)
             SharedSoundStore(context).keep(upload.id, processed.file)
             return upload.id

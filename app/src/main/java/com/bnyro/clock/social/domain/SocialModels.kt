@@ -27,6 +27,18 @@ enum class SharedSoundMode {
     SHARED
 }
 
+sealed interface SharedSoundProgress {
+    data object Preparing : SharedSoundProgress
+    data class Processing(val fraction: Float?) : SharedSoundProgress
+    data class Uploading(val fraction: Float) : SharedSoundProgress
+    data object Finalizing : SharedSoundProgress
+}
+
+const val SHARED_SOUND_SAMPLE_RATE = 48_000
+const val SHARED_SOUND_MAX_DURATION_MS = 300_000
+const val SHARED_SOUND_MAX_OUTPUT_FRAMES = 14_400_000L
+const val SHARED_SOUND_MAX_DURATION_US = SHARED_SOUND_MAX_DURATION_MS * 1_000L
+
 enum class AlarmActivityKind {
     SNOOZED,
     DISMISSED,

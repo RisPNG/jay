@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -63,6 +64,7 @@ import com.bnyro.clock.presentation.screens.alarm.components.AlarmTimePicker
 import com.bnyro.clock.presentation.screens.alarm.components.ScrollAlarmTimePicker
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.TimeHelper
+import com.bnyro.clock.social.domain.SharedSoundProgress
 import com.bnyro.clock.social.domain.SocialGroup
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +77,7 @@ fun AlarmPicker(
     canSave: Boolean = true,
     canUploadSharedSounds: Boolean = false,
     busy: Boolean = false,
+    soundProgress: SharedSoundProgress? = null,
     onSave: (Alarm, String?) -> Unit,
     onDelete: ((Alarm) -> Unit)? = null,
     onCancel: () -> Unit
@@ -390,6 +393,23 @@ fun AlarmPicker(
                 } else {
                     Text(text = stringResource(R.string.save))
                 }
+            }
+        }
+
+        soundProgress?.let { progress ->
+            Spacer(modifier = Modifier.height(16.dp))
+            val fraction = when (progress) {
+                is SharedSoundProgress.Processing -> progress.fraction
+                is SharedSoundProgress.Uploading -> progress.fraction
+                SharedSoundProgress.Preparing, SharedSoundProgress.Finalizing -> null
+            }
+            if (fraction != null) {
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
         }
 

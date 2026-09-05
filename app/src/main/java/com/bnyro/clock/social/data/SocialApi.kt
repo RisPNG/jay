@@ -31,6 +31,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URI
@@ -144,20 +146,40 @@ class SocialApi(
         )
     )
 
-    fun uploadSound(upload: SharedSoundUploadResponse, file: File) {
+    suspend fun uploadSound(
+        upload: SharedSoundUploadResponse,
+        file: File,
+        onProgress: (Long) -> Unit = {}
+    ) {
         val connection = URI(upload.url).toURL().openConnection() as HttpURLConnection
-        connection.requestMethod = "PUT"
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 120_000
-        connection.doOutput = true
-        connection.setFixedLengthStreamingMode(file.length())
-        upload.headers.forEach(connection::setRequestProperty)
-        connection.outputStream.use { output -> file.inputStream().use { it.copyTo(output) } }
-        val status = connection.responseCode
-        val response = (if (status in 200..299) connection.inputStream else connection.errorStream)
-            ?.bufferedReader()?.use { it.readText() }.orEmpty()
-        connection.disconnect()
-        if (status !in 200..299) throw SocialApiException(status, response)
+        try {
+            connection.requestMethod = "PUT"
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 120_000
+            connection.doOutput = true
+            connection.setFixedLengthStreamingMode(file.length())
+            upload.headers.forEach(connection::setRequestProperty)
+            var uploaded = 0L
+            connection.outputStream.use { output ->
+                file.inputStream().use { input ->
+                    val bytes = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val count = input.read(bytes)
+                        if (count < 0) break
+                        output.write(bytes, 0, count)
+                        uploaded += count
+                        onProgress(uploaded)
+                    }
+                }
+            }
+            val status = connection.responseCode
+            val response = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                ?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (status !in 200..299) throw SocialApiException(status, response)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     fun completeSoundUpload(soundId: String) {
