@@ -37,20 +37,23 @@ The Android emulator can reach this API at `http://10.0.2.2:8000`. Use a debug b
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection URL used by the API and migrations |
 | `PUBLIC_URL` | Public base URL included in generated invitations |
-| `ANDROID_APP_LINKS` | JSON object mapping Android package names to lists of SHA-256 signing certificate fingerprints; defaults to `{}` |
 | `INVITE_LIFETIME_HOURS` | Default lifetime of a one-use invitation, 24 hours |
 | `ALARM_OCCURRENCE_MONITOR_ENABLED` | Processes missing alarm outcomes on this server instance, enabled by default |
 | `DEVICE_INACTIVITY_TIMEOUT_DAYS` | Removes identities unseen for this many days together with the groups they solely lead, defaulting to 120; 0 disables the sweep |
-| `FIREBASE_CREDENTIALS_JSON` | Optional Firebase service-account JSON for immediate synchronisation pushes |
-| `GOOGLE_PLAY_CREDENTIALS_JSON` | Optional Play Integrity service-account JSON for paid-app entitlement verification |
 | `SHARED_SOUND_ACCESS` | Shared-sound upload and selection policy: `play` (default) requires a current Play entitlement; `everyone` grants access to every authenticated device, subject to group edit permissions |
-| `PLAY_ENTITLEMENT_LIFETIME_HOURS` | Lifetime of a verified Play entitlement, defaulting to 48 hours |
 | `B2_S3_ENDPOINT` | Backblaze B2 S3-compatible endpoint |
 | `B2_BUCKET_NAME` | Private B2 bucket that stores normalised shared sounds |
 | `B2_APPLICATION_KEY_ID` | B2 application key ID scoped to the sound bucket |
 | `B2_APPLICATION_KEY` | B2 application key secret scoped to the sound bucket |
 
-If Firebase is not configured, synchronisation still occurs when Jay launches, when the user requests it, after local group operations, and periodically in the background.
+Although the other variables are available, they're only relevant to the official jay.poppybit.com deployment (for now). Self-hosting needs neither the Firebase nor the Google Play credentials. If Firebase is not configured, synchronisation still occurs when Jay launches, when the user requests it, after local group operations, and periodically in the background. Google Play credentials are only consulted while `SHARED_SOUND_ACCESS` is `play`; on an `everyone` server they are never used:
+
+| Variable | Purpose |
+| --- | --- |
+| `ANDROID_APP_LINKS` | JSON object mapping Android package names to lists of SHA-256 signing certificate fingerprints; defaults to `{}` |
+| `FIREBASE_CREDENTIALS_JSON` | Optional Firebase service-account JSON for immediate synchronisation pushes |
+| `GOOGLE_PLAY_CREDENTIALS_JSON` | Optional Play Integrity service-account JSON for paid-app entitlement verification |
+| `PLAY_ENTITLEMENT_LIFETIME_HOURS` | Lifetime of a verified Play entitlement, defaulting to 48 hours |
 
 ## Shared sounds on your own server
 
@@ -60,7 +63,7 @@ If you are hosting Jay yourself and want everyone on your server to use shared s
 SHARED_SOUND_ACCESS=everyone
 ```
 
-In Render, add `SHARED_SOUND_ACCESS` with the value `everyone` and redeploy. With the included Compose file, run this from the repository root:
+With the included Compose file, run this from the repository root:
 
 ```sh
 SHARED_SOUND_ACCESS=everyone docker compose -f server/compose.yaml up --build -d
@@ -72,9 +75,9 @@ You still decide who can edit each group, and you still provide the storage. The
 
 ### Storage for shared sounds
 
-You need your own private storage bucket and credentials. You do not need to operate a storage server yourself: the current setup uses Backblaze B2 through its S3-compatible API, so a managed B2 bucket works. The included Docker Compose setup runs the API and PostgreSQL only; it does not include audio storage.
+You need your own private storage bucket and credentials. You do not need to operate a storage server yourself: this guide is specifically for setup that uses Backblaze B2 through its S3-compatible API, but any storage with a S3-compatible API, although I haven't personally tried them, so take this with a grain of salt. The included Docker Compose setup runs the API and PostgreSQL only; it does not include audio storage.
 
-Configure these variables on the Jay server:
+Once your storage and application key are setup, configure these variables on the Jay API server:
 
 | Variable | What to provide |
 | --- | --- |
@@ -85,37 +88,15 @@ Configure these variables on the Jay server:
 
 The key needs to support uploading, reading, and deleting sound objects. Android uploads and downloads directly through temporary signed URLs, so the storage endpoint must be reachable by both the server and members' devices. The bucket itself stays private.
 
-For example, you can run the Jay API on your own machine and keep the audio in your B2 bucket. You cover the API hosting and storage costs; users on that server do not need Play access when its policy is `everyone`. Setting `everyone` without configuring storage still leaves uploads unavailable. Other S3-compatible providers are not documented or verified here, so do not assume they are interchangeable with the current B2 configuration.
-
-### Changing the policy
-
-Leave the setting unset, or use `play`, to require verified Play access. If you switch back to `play`, the server checks that requirement on every upload, upload completion, and sound selection, even before the app syncs again. Sounds already selected keep working, and editing something unrelated keeps them in place. Any value other than `play` or `everyone` is rejected at startup.
-
-Deploy the server before the updated Android app, since the app expects the new capability response. There is no database migration for this setting.
+For example, you can run the Jay API on your own machine and keep the audio in your B2 bucket. You cover the API hosting and storage costs; users on that server do not need Play access when its policy is `everyone`. Setting `everyone` without configuring storage still leaves uploads unavailable.
 
 ## Shared links
 
-Shared links currently use `jay.poppybit.com`. Changing the API address in the app does not change this link domain. For the distributed app to verify links, Android needs to retrieve `https://jay.poppybit.com/.well-known/assetlinks.json` directly over HTTPS, without authentication or redirects.
+Note that shared links are currently hard-coded to use `jay.poppybit.com`, and changing the API address in the app does not change this link domain. For the distributed app to verify links, Android needs to retrieve `https://jay.poppybit.com/.well-known/assetlinks.json` directly over HTTPS, without authentication or redirects.
 
-Set `ANDROID_APP_LINKS` to a JSON object such as `{"com.rispng.jay":["PRODUCTION_SHA256_FINGERPRINT"],"com.rispng.jay.debug":["PRERELEASE_SHA256_FINGERPRINT"]}`, replacing the placeholders with colon-separated SHA-256 certificate fingerprints. Include every certificate used to sign distributed APKs. For Google Play installations, use the app signing certificate from Play Console, not the upload certificate. Omit packages that should not handle links.
+A self-hosted server needs none of the setup in this section. Its invitations still use `jay.poppybit.com` and carry the server's own address as the `server` parameter, so they open the app and connect back to your server unchanged. The following is only for whoever operates the official `jay.poppybit.com` deployment and publishes the distributed app.
 
-In Render, paste the JSON object directly into the environment value without surrounding shell quotes. If you are testing prereleases before publishing on Play, use only `{"com.rispng.jay.debug":["PRERELEASE_SHA256_FINGERPRINT"]}`. You can get the fingerprint from the keystore used by the prerelease workflow with `mise exec -- keytool -list -v -keystore /path/to/jay-prerelease.jks`, entering the password at the prompt, and copy the `SHA256` certificate fingerprint. Production GitHub APKs use the production keystore. Play-installed builds use the certificate listed under Play Console's App signing key certificate. If they differ, include both fingerprints in the `com.rispng.jay` list.
-
-The fingerprint is a public certificate identifier, so it is safe to use here. Keep the private key and password private, and use the certificate for the build you actually distribute, not a temporary local test build. Redeploy after changing the setting.
-
-Once Android has verified the installed app, `/join` and `/profile` links open in Jay. Browser visits go to the Play listing for `com.rispng.jay`, which needs to be available to the person opening it. After installing, they must tap the original link again.
-
-Invitations still expire and can only be used once. A messaging app fetching a link preview does not use up the invitation, and neither does a browser visit.
-
-Profile credentials sit in the URL fragment, the part after `#`, which browsers do not send to the server. The store redirect clears that fragment and suppresses the referrer. Jay still asks before importing a profile. All shared links use HTTPS.
-
-Before publishing, test a signed installation by running `mise exec -- adb shell pm verify-app-links --re-verify com.rispng.jay` and then `mise exec -- adb shell pm get-app-links com.rispng.jay`. Use `com.rispng.jay.debug` for prerelease builds. Check links from a messaging app with Jay installed, both closed and already open, and with Jay uninstalled. Verify profile cancellation leaves the current identity intact. Repeat with the Play-installed build on a testing track before release.
-
-## Render
-
-The `render.yaml` file at the repository root sets up the Python service and PostgreSQL database. Set `PUBLIC_URL` to the deployed HTTPS address.
-
-For prompt background delivery, add the Firebase service-account JSON as the secret `FIREBASE_CREDENTIALS_JSON`. For Play verification, put the service-account JSON from the linked Play Integrity Cloud project in `GOOGLE_PLAY_CREDENTIALS_JSON`. Configure the four B2 variables as Render secrets too. The B2 application key must stay on the server.
+If and when this hard-coded behaviour changes, which it will, I will provide a proper guide.
 
 ## Tests
 

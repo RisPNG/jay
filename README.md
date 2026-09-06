@@ -19,13 +19,11 @@
 
 ---
 
-Jay is your run-of-the-mill clock app for Android, with groups, shared alarms, and shared timers. It is built on [Clock You by You Apps](https://github.com/you-apps/ClockYou), so you still get the personal alarms, world clocks, stopwatch, and widgets you would expect. Sharing is there for when you want it.
+Jay is your run-of-the-mill [clock app](https://github.com/you-apps/ClockYou) for Android, but with groups, allowing for shared alarms and shared timers. I built it to replace your personal clock app, so you still get the personal alarms, world clocks, stopwatch, and widgets you would expect. Group is there for when you want it.
 
-**No login. No account registration. No telemetry\*. Self-hostable.**
+**No login. No account registration. [No telemetry\*](#privacy-and-your-data). Self-hostable.**
 
-Jay creates a profile for you automatically, so getting started is basically choosing a name, creating a group, and inviting someone. If you use more than one device, you can bring the same profile over and continue as the same member.
-
-\* **If you run your own server and control its logging and integrations.** There is a bit more to this than changing the server address: groups need data to synchronise, and a Firebase-enabled app can still contact Firebase. The [privacy section](#privacy-and-your-data) explains what that means in practice.
+Jay creates a profile for you automatically, so getting started is basically choosing a name (or stick with the auto-generated one), creating a group, and inviting someone. If you use more than one device, you can bring the same profile over and continue as the same member.
 
 ## What you can do
 
@@ -37,7 +35,9 @@ Jay creates a profile for you automatically, so getting started is basically cho
 | **See what happened.** Check shared alarm activity, membership changes, and responses. | **Choose how it rings.** Configure full-screen timer alerts, gradual volume increase, vibration, and volume-button actions. |
 | **Choose who can edit.** Allow everyone or only group leaders to change shared alarms and timers. | **Use more than one device.** Export and import your profile to continue as the same member. |
 
-### For people in different places
+**Some of the notable features are:**
+
+### Share alarms across the world
 
 People in a group might live in different time zones, so Jay lets you choose what a shared alarm actually means:
 
@@ -52,7 +52,7 @@ With **Answer as one** enabled, dismissing or snoozing an alarm also answers the
 
 For a group timer, a member with edit permission can dismiss it for everyone when this setting is enabled. Otherwise, dismissing its ring stays local. Adding time, resetting, and cancelling a shared timer always follow the group's edit permissions.
 
-### Shared sounds[*](#a-note-on-shared-sounds)
+### [Shared sounds*](#a-note-on-shared-sounds)
 
 You can use each device's default sound, keep it silent, or send a custom sound to the group. Jay prepares the audio and downloads it to the other devices so they can play it locally.
 
@@ -74,10 +74,10 @@ If you want to try work that is still being tested, look for prereleases in [all
 
 ## Getting started
 
-1. **Open Jay and choose your name.** Your profile is created automatically; no email address or password is needed.
-2. **Create a group in Groups.** Invite the people you want to share alarms or timers with. Invitations are single-use and expire after 24 hours by default.
+1. **Open Jay and optionally change your name.** Your profile is created automatically; no email address or password is needed.
+2. **Create a group in the Groups tab.** Invite the people you want to share alarms or timers with. Invitations are single-use and expire after 24 hours by default.
 3. **Share an alarm.** Choose the group in the alarm editor and set its schedule. Members receive it through synchronisation.
-4. **Try a countdown.** Hold the timer start button to choose the group. Save a group timer if you will use it again.
+4. **Try a countdown.** Hold the timer start button to choose the group. Save a group timer if you want use it again.
 5. **Choose the group's rules.** Decide who can make changes and whether members answer alarms individually or together.
 
 For example, a household can share a wake-up alarm and let whoever gets up first answer it. A study group can save a timer and reuse it for the next session. You can keep your own alarms and timers alongside those; they do not all have to belong to a group.
@@ -103,11 +103,11 @@ There is no email-and-password account to register, but the server still needs t
 
 Groups need a server to keep track of members, shared alarms and timers, activity, alarm outcomes, and when a device was last seen. Other members can see the activity and responses relevant to their group. The operator and hosting provider also control who can access the infrastructure and what gets logged.
 
-You can use the default service if you do not want to look after a server. If you do host it yourself, you get to decide what is logged and how long it is kept, including the services you connect it to. That is the condition behind **no telemetry\***.
+You can use the default service if you do not want to look after a server. I do not have an interest in collecting, selling, or keeping data that is not needed to run it.
 
-There is one more detail: a Firebase-enabled app still contacts Firebase for push messaging, even if you change the server address. Production builds also check Play access when the server requires it. Basic synchronisation works without those server integrations, but using your own server alone does not mean the app stops contacting every third party. The [integration guide](docs/entitlements.md) explains what each service is used for.
+However, a hosted service still requires you to trust the person running it. If you would rather not have to rely on that trust, self-hosting is the safer option, and the reason why the option is available to you. You decide what is logged, how long it is kept, and which services it connects to. That is the condition behind **no telemetry\***.
 
-You can reset your identity to leave your groups and start again. Groups where you are the only leader are deleted as part of that reset. By default, the server also removes identities inactive for 120 days; operators can configure that interval.
+To harden privacy even more, you always have the option to completely reset and erase your identity to leave your groups and start again. Groups where you are the only leader are deleted as part of that reset. The server's default also removes identities that are inactive for 120 days but that interval can be configured .
 
 ## Self-hosting
 
@@ -115,13 +115,20 @@ You can run your own Jay server. Read the **[full server guide](server/README.md
 
 ## Contributing
 
-If something does not work as expected, or you have an idea that could make Jay more useful, please [open an issue](https://github.com/RisPNG/jay/issues). Include your Jay version, Android version, what you did, and what you expected to happen. It makes the problem much easier to understand and reproduce. Keep profile links, invitation tokens, and credentials out of the report.
+If something does not work as expected, or you have an idea that could make Jay more useful, please [open an issue](https://github.com/RisPNG/jay/issues). Please try to include as much detail as possible such as your Jay version, Android version, reproduction steps, and what is expected to happen. It makes the problem much easier to debug. Keep anything confidential like profile links, invitation tokens, and credentials out of the issue.
 
-Jay builds directly on Clock You's source, so improvements to the clock itself should go back upstream. Group features, synchronisation, and the server are developed here. The branches follow that same separation:
+Jay builds directly on Clock You's source, so improvements to the clock itself should go back upstream. Whilst group features, synchronisation, and the server are developed here. The branches follow that same separation:
 
-```text
-Clock You → main → main-canary → jay
+```mermaid
+flowchart LR
+    upstream[Clock You] --> main
+    main --> canary[main-canary]
+    main --> contributions[Active contribution branches]
+    contributions -->|while pending upstream| canary
+    canary --> jay
 ```
+
+Every active contribution branch receives updates from `main` and merges into `main-canary`. Once Clock You accepts a contribution, its upstream implementation comes through `main` and the old contribution branch leaves the active workflow. When no contributions are pending, updates flow directly from `main` through `main-canary` to `jay`.
 
 | Guide | What it covers |
 | --- | --- |
@@ -138,8 +145,20 @@ Jay is free and open-source software under the [GNU General Public License v3.0]
 
 ## A note on shared sounds
 
-\* The Google Play version of Jay is paid, and uploading and choosing custom shared sounds on the default service requires that version. Those audio files need to be stored and delivered to the group, which comes with ongoing storage costs. That is why this is the only feature gated behind Play access.
+\* The following only applies to shared items. Personal items are not affected by this.
 
-I'd like to make it free for everyone too; the storage still needs to be paid for. Everything else is available in the free GitHub APK, and receiving and playing a shared sound is free as well. One person can choose the sound without the whole group having to buy the app.
+The Google Play version of Jay is paid, with the only difference being the ability to upload custom sounds for shared alarms and timers.
 
-If you run your own server and provide the storage, you can make shared sounds available to everyone there without a Play purchase. The [full server guide](server/README.md) covers that setup, and the [access guide](docs/entitlements.md) explains the checks.
+Keeping Jay's hosted service running does have ongoing costs. The API and PostgreSQL database both need hosting, but those costs are relatively small: the API mainly acts as a middle layer, while the database mostly stores text and metadata.
+
+Audio is the more expensive part. Custom sounds need to be stored as files and delivered to the rest of the group, so shared sound uploads are the one feature tied to Play access.
+
+Receiving and playing shared sounds is still free. Only the person uploading the sound needs the paid version.
+
+The Play version remains a one-time purchase. I see it more as a way to support Jay and help cover the hosted service than as paying for a feature.
+
+Jay can also be fully self-hosted. If you provide your own server and storage, shared sounds can be made available to everyone there without Play access.
+
+That self-hosting option is intentional. Jay should not become unusable just because the official servers stop running someday. The hosted service can disappear without taking the project itself with it.
+
+The [full server guide](server/README.md) covers the setup, and the [access guide](docs/entitlements.md) explains the checks.

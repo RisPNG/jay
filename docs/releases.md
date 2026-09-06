@@ -1,6 +1,6 @@
 # Releases
 
-Releases come from `jay`. The head commit message decides whether a push publishes a prerelease or a stable release, so check that message before pushing.
+Releases come only from the `jay` branch. The head commit message decides whether a push publishes a prerelease or a stable release, so check that message before pushing.
 
 ## Which version to change
 
@@ -22,7 +22,7 @@ The workflow puts the build information together like this:
 
 The run number is padded so GitHub keeps the tags in chronological order through run 99,999. For example, `0.4.0-pre.r00018.g<sha>` sorts after `0.4.0-pre.r00017.g<sha>`. The `r` also makes this an alphanumeric SemVer identifier, where the leading zeroes are allowed.
 
-The prerelease contains only the debug APK, signed with the prerelease key, and is marked as a GitHub prerelease. Bleeding Edge or `BE` builds no longer exist. Older unpadded prereleases may remain out of order; they can be removed without affecting the new sequence.
+The prerelease contains only the debug APK, signed with the prerelease key, and is marked as a GitHub prerelease.
 
 ## Stable releases
 
@@ -34,15 +34,7 @@ The stable tag is `v<jayVersionName>`. Artifact names use `jayVersionName` from 
 - `jay-<version>.aab`: minified production AAB signed with the production key;
 - `jay-<version>-debug.apk`: debug APK signed with the prerelease key for debugging.
 
-The production APK and AAB both use `com.rispng.jay` and the same access checks at runtime. Shared-sound access comes from the server's policy and the device's entitlement, rather than a separate paid APK. See [Shared sounds and Play access](entitlements.md).
-
-For invitation and profile links to open in Jay, the server's `ANDROID_APP_LINKS` setting needs the installed app's package name and SHA-256 signing certificate fingerprint. Use the Google Play app signing certificate for Play installations. If direct-download APKs use a different certificate, include that one too. Prereleases need their own `com.rispng.jay.debug` entry.
-
-The [server guide](../server/README.md#shared-links) covers setup and device checks. The Play Store fallback only works once the listing is available to the recipient. After installing, they need to tap the original link again.
-
-Publishing a stable release removes the prereleases before it and their tags. This keeps older testing builds from crowding the release list.
-
-`main`, `main-canary`, and feature branches do not publish releases.
+The production APK and AAB both use `com.rispng.jay`. Publishing a stable release removes the prereleases before it and their tags. This keeps older testing builds from crowding the release list.
 
 ## Signing material
 
