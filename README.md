@@ -10,6 +10,14 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/github/license/RisPNG/jay" alt="License badge">
+  <img src="https://img.shields.io/github/downloads/RisPNG/jay/total" alt="Downloads badge">
+  <img src="https://img.shields.io/github/last-commit/RisPNG/jay" alt="Last commit badge">
+  <img src="https://img.shields.io/github/repo-size/RisPNG/jay" alt="Repo size badge">
+  <img src="https://img.shields.io/github/stars/RisPNG/jay" alt="Stars badge">
+</p>
+
+<p align="center">
   <a href="https://github.com/RisPNG/jay/releases/latest">Download</a> ·
   <a href="#what-you-can-do">Features</a> ·
   <a href="#getting-started">Get started</a> ·
@@ -21,7 +29,7 @@
 
 Jay is your run-of-the-mill [clock app](https://github.com/you-apps/ClockYou) for Android, but with groups, allowing for shared alarms and shared timers. I built it to replace your personal clock app, so you still get the personal alarms, world clocks, stopwatch, and widgets you would expect. Group is there for when you want it.
 
-**No login. No account registration. [No telemetry\*](#privacy-and-your-data). Self-hostable.**
+**No login. No account registration. No telemetry[\*](#privacy-and-your-data). Self-hostable.**
 
 Jay creates a profile for you automatically, so getting started is basically choosing a name (or stick with the auto-generated one), creating a group, and inviting someone. If you use more than one device, you can bring the same profile over and continue as the same member.
 
@@ -35,7 +43,7 @@ Jay creates a profile for you automatically, so getting started is basically cho
 | **See what happened.** Check shared alarm activity, membership changes, and responses. | **Choose how it rings.** Configure full-screen timer alerts, gradual volume increase, vibration, and volume-button actions. |
 | **Choose who can edit.** Allow everyone or only group leaders to change shared alarms and timers. | **Use more than one device.** Export and import your profile to continue as the same member. |
 
-**Some of the notable features are:**
+Some of the notable features are:
 
 ### Share alarms across the world
 
@@ -52,15 +60,41 @@ With **Answer as one** enabled, dismissing or snoozing an alarm also answers the
 
 For a group timer, a member with edit permission can dismiss it for everyone when this setting is enabled. Otherwise, dismissing its ring stays local. Adding time, resetting, and cancelling a shared timer always follow the group's edit permissions.
 
-### [Shared sounds*](#a-note-on-shared-sounds)
+### Shared sounds
 
 You can use each device's default sound, keep it silent, or send a custom sound to the group. Jay prepares the audio and downloads it to the other devices so they can play it locally.
 
+<details>
+<summary><strong>A note on shared sounds</strong></summary>
+
+The following only applies to shared items. Personal items are not affected by this.
+
+The Google Play version of Jay is paid, with the only difference being the ability to upload custom sounds for shared alarms and timers.
+
+Keeping Jay's hosted service running does have ongoing costs. The API and PostgreSQL database both need hosting, but those costs are relatively small: the API mainly acts as a middle layer, while the database mostly stores text and metadata.
+
+Audio is the more expensive part. Custom sounds need to be stored as files and delivered to the rest of the group, so shared sound uploads are the one feature tied to Play access.
+
+Receiving and playing shared sounds is still free. Only the person uploading the sound needs the paid version.
+
+The Play version remains a one-time purchase. I see it more as a way to support Jay and help cover the hosted service than as paying for a feature.
+
+Jay can also be fully self-hosted. If you provide your own server and storage, shared sounds can be made available to everyone there without Play access.
+
+That self-hosting option is intentional. Jay should not become unusable just because the official servers stop running someday. The hosted service can disappear without taking the project itself with it.
+
+The [full server guide](server/README.md) covers the setup, and the [access guide](docs/entitlements.md) explains the checks.
+
+</details>
+
 ## Download
 
-**[Download the latest release](https://github.com/RisPNG/jay/releases/latest)**
+<p align="center">
+  <a href="https://github.com/RisPNG/jay/releases/latest"><img src="ghbadge.png" width="180" alt="Get it on GitHub"></a>
+  <a href="https://play.google.com/store/apps/details?id=com.rispng.jay"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" width="180" alt="Get it on Google Play"></a>
+</p>
 
-You will need **Android 6.0 or newer**. Open **Assets** on the release page and choose the production APK. There are a few files there, so here is what each one is for:
+You will need **Android 6.0 or newer**. Open **Assets** on the GitHub release and choose the production APK. There are a few files there, so here is what each one is for:
 
 | File | Who it is for |
 | --- | --- |
@@ -119,28 +153,10 @@ If something does not work as expected, or you have an idea that could make Jay 
 
 If you want to contribute code, start with the [contributing guide](CONTRIBUTING.md). It explains how Jay builds on Clock You's source, the branch pipeline, and where each kind of change belongs.
 
-## Built on Clock You
+## Credits
 
 A lot of what makes Jay useful is already there because of [You Apps](https://github.com/you-apps) and [Clock You's contributors](https://github.com/you-apps/ClockYou/graphs/contributors). The alarms, world clocks, stopwatch, widgets, and much of the Android behaviour come from their work. Thank you for making that available for others to build on.
 
+## License
+
 Jay is free and open-source software under the [GNU General Public License v3.0](LICENSE).
-
-## A note on shared sounds
-
-\* The following only applies to shared items. Personal items are not affected by this.
-
-The Google Play version of Jay is paid, with the only difference being the ability to upload custom sounds for shared alarms and timers.
-
-Keeping Jay's hosted service running does have ongoing costs. The API and PostgreSQL database both need hosting, but those costs are relatively small: the API mainly acts as a middle layer, while the database mostly stores text and metadata.
-
-Audio is the more expensive part. Custom sounds need to be stored as files and delivered to the rest of the group, so shared sound uploads are the one feature tied to Play access.
-
-Receiving and playing shared sounds is still free. Only the person uploading the sound needs the paid version.
-
-The Play version remains a one-time purchase. I see it more as a way to support Jay and help cover the hosted service than as paying for a feature.
-
-Jay can also be fully self-hosted. If you provide your own server and storage, shared sounds can be made available to everyone there without Play access.
-
-That self-hosting option is intentional. Jay should not become unusable just because the official servers stop running someday. The hosted service can disappear without taking the project itself with it.
-
-The [full server guide](server/README.md) covers the setup, and the [access guide](docs/entitlements.md) explains the checks.
