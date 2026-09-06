@@ -24,7 +24,7 @@ class CanonicalSoundConverter(
     private var nextOutput = 0L
     var outputFrames = 0L
         private set
-    private val outputChunk = ShortArray(OUTPUT_CHUNK_FRAMES)
+    private var outputChunk = ShortArray(OUTPUT_CHUNK_FRAMES)
     private var outputChunkFrames = 0
 
     val isComplete: Boolean
@@ -120,6 +120,7 @@ class CanonicalSoundConverter(
             val firstTaps = phases[phaseIndex]
             val secondTaps = phases[(phaseIndex + 1) % phaseCount]
             var value = 0f
+            val exactPhase = blend == 0f
             for (tap in 0 until windowSize) {
                 val sampleIndex = center - halfLength + 1 + tap
                 val sample = when {
@@ -127,7 +128,13 @@ class CanonicalSoundConverter(
                     sampleIndex < consumedFrames -> tail[sampleIndex - tailStart]
                     else -> chunk[sampleIndex - consumedFrames]
                 }
-                value += sample * (firstTaps[tap] + (secondTaps[tap] - firstTaps[tap]) * blend)
+                value += sample * (
+                    if (exactPhase) {
+                        firstTaps[tap]
+                    } else {
+                        firstTaps[tap] + (secondTaps[tap] - firstTaps[tap]) * blend
+                    }
+                    )
             }
             appendOutput(value)
             nextOutput++
@@ -167,6 +174,7 @@ class CanonicalSoundConverter(
     private suspend fun flushOutput() {
         if (outputChunkFrames > 0) {
             sink(outputChunk, outputChunkFrames)
+            outputChunk = ShortArray(OUTPUT_CHUNK_FRAMES)
             outputChunkFrames = 0
         }
     }

@@ -47,7 +47,7 @@ class FlacStreamEncoder(private val outputFile: File) : Closeable {
         while (offset < frames) {
             currentCoroutineContext().ensureActive()
             var progressed = false
-            val index = codec.dequeueInputBuffer(CODEC_TIMEOUT_US)
+            val index = codec.dequeueInputBuffer(0)
             if (index >= 0) {
                 val buffer = codec.getInputBuffer(index)!!
                 val capacityFrames = buffer.remaining() / 2
@@ -66,7 +66,7 @@ class FlacStreamEncoder(private val outputFile: File) : Closeable {
                     progressed = true
                 }
             }
-            if (drain()) progressed = true
+            if (drain(if (progressed) 0 else CODEC_TIMEOUT_US)) progressed = true
             if (progressed) stalls = 0 else if (++stalls > MAX_CODEC_STALLS) {
                 error("The device audio encoder stalled")
             }
@@ -78,7 +78,7 @@ class FlacStreamEncoder(private val outputFile: File) : Closeable {
             currentCoroutineContext().ensureActive()
             var progressed = false
             if (!inputEnded) {
-                val index = codec.dequeueInputBuffer(CODEC_TIMEOUT_US)
+                val index = codec.dequeueInputBuffer(0)
                 if (index >= 0) {
                     codec.queueInputBuffer(
                         index,
@@ -91,7 +91,7 @@ class FlacStreamEncoder(private val outputFile: File) : Closeable {
                     progressed = true
                 }
             }
-            if (drain()) progressed = true
+            if (drain(if (progressed) 0 else CODEC_TIMEOUT_US)) progressed = true
             if (progressed) stalls = 0 else if (++stalls > MAX_CODEC_STALLS) {
                 error("The device audio encoder stalled")
             }
@@ -122,11 +122,12 @@ class FlacStreamEncoder(private val outputFile: File) : Closeable {
         output.close()
     }
 
-    private fun drain(): Boolean {
+    private fun drain(timeoutUs: Long): Boolean {
         var progressed = false
+        var waitUs = timeoutUs
         val info = MediaCodec.BufferInfo()
         while (true) {
-            val index = codec.dequeueOutputBuffer(info, CODEC_TIMEOUT_US)
+            val index = codec.dequeueOutputBuffer(info, waitUs)
             if (index >= 0) {
                 val buffer = codec.getOutputBuffer(index)!!
                 val bytes = ByteArray(info.size)
@@ -136,8 +137,10 @@ class FlacStreamEncoder(private val outputFile: File) : Closeable {
                 outputEnded = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
                 codec.releaseOutputBuffer(index, false)
                 progressed = true
+                waitUs = 0
             } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                 progressed = true
+                waitUs = 0
             } else {
                 return progressed
             }
