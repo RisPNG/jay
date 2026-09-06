@@ -77,7 +77,7 @@ If you want to try work that is still being tested, look for prereleases in [all
 1. **Open Jay and optionally change your name.** Your profile is created automatically; no email address or password is needed.
 2. **Create a group in the Groups tab.** Invite the people you want to share alarms or timers with. Invitations are single-use and expire after 24 hours by default.
 3. **Share an alarm.** Choose the group in the alarm editor and set its schedule. Members receive it through synchronisation.
-4. **Try a countdown.** Hold the timer start button to choose the group. Save a group timer if you want use it again.
+4. **Try a countdown.** Hold the timer start button to choose the group. Save a group timer if you want to use it again.
 5. **Choose the group's rules.** Decide who can make changes and whether members answer alarms individually or together.
 
 For example, a household can share a wake-up alarm and let whoever gets up first answer it. A study group can save a timer and reuse it for the next session. You can keep your own alarms and timers alongside those; they do not all have to belong to a group.
@@ -107,7 +107,7 @@ You can use the default service if you do not want to look after a server. I do 
 
 However, a hosted service still requires you to trust the person running it. If you would rather not have to rely on that trust, self-hosting is the safer option, and the reason why the option is available to you. You decide what is logged, how long it is kept, and which services it connects to. That is the condition behind **no telemetry\***.
 
-To harden privacy even more, you always have the option to completely reset and erase your identity to leave your groups and start again. Groups where you are the only leader are deleted as part of that reset. The server's default also removes identities that are inactive for 120 days but that interval can be configured .
+To harden privacy even more, you always have the option to completely reset and erase your identity to leave your groups and start again. Groups where you are the only leader are deleted as part of that reset. The server's default also removes identities that are inactive for 120 days but that interval can be configured.
 
 ## Self-hosting
 
@@ -117,25 +117,7 @@ You can run your own Jay server. Read the **[full server guide](server/README.md
 
 If something does not work as expected, or you have an idea that could make Jay more useful, please [open an issue](https://github.com/RisPNG/jay/issues). Please try to include as much detail as possible such as your Jay version, Android version, reproduction steps, and what is expected to happen. It makes the problem much easier to debug. Keep anything confidential like profile links, invitation tokens, and credentials out of the issue.
 
-Jay builds directly on Clock You's source, so improvements to the clock itself should go back upstream. Whilst group features, synchronisation, and the server are developed here. The branches follow that same separation:
-
-```mermaid
-flowchart LR
-    upstream[Clock You] --> main
-    main --> canary[main-canary]
-    main --> contributions[Active contribution branches]
-    contributions -->|while pending upstream| canary
-    canary --> jay
-```
-
-Every active contribution branch receives updates from `main` and merges into `main-canary`. Once Clock You accepts a contribution, its upstream implementation comes through `main` and the old contribution branch leaves the active workflow. When no contributions are pending, updates flow directly from `main` through `main-canary` to `jay`.
-
-| Guide | What it covers |
-| --- | --- |
-| [Upstream workflow](docs/upstream.md) | Branch ownership, contribution flow, and integration boundaries. |
-| [Server development](server/README.md) | Local setup, configuration, migrations, and tests. |
-| [Releases](docs/releases.md) | Build variants, versioning, signing, and publishing. |
-| [Entitlements](docs/entitlements.md) | Shared sound access and optional service integrations. |
+If you want to contribute code, start with the [contributing guide](docs/CONTRIBUTING.md). It explains how Jay builds on Clock You's source, the branch pipeline, and where each kind of change belongs.
 
 ## Built on Clock You
 

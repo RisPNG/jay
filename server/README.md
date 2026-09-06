@@ -75,7 +75,7 @@ You still decide who can edit each group, and you still provide the storage. The
 
 ### Storage for shared sounds
 
-You need your own private storage bucket and credentials. You do not need to operate a storage server yourself: this guide is specifically for setup that uses Backblaze B2 through its S3-compatible API, but any storage with a S3-compatible API, although I haven't personally tried them, so take this with a grain of salt. The included Docker Compose setup runs the API and PostgreSQL only; it does not include audio storage.
+You need your own private storage bucket and credentials. You do not need to operate a storage server yourself: this guide is specifically for setup that uses Backblaze B2 through its S3-compatible API, but any other S3-compatible storage should work too, although I haven't personally tried any of them, so take this with a grain of salt. The included Docker Compose setup runs the API and PostgreSQL only; it does not include audio storage.
 
 Once your storage and application key are setup, configure these variables on the Jay API server:
 
