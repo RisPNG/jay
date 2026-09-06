@@ -49,11 +49,17 @@ Fix a problem where it belongs, then let the fix follow the pipeline. A Clock Yo
 
 When Clock You changes:
 
-1. Review the upstream changes before merging.
-2. Merge the upstream main branch into `main` without squashing it.
-3. Merge the updated `main` into `main-canary`. If Clock You accepted a contribution with changes, use its accepted implementation. Once that implementation is in `main`, stop merging the old contribution branch into `main-canary`.
-4. Merge `main-canary` into `jay` and resolve conflicts only at the integration points listed above.
-5. Run the server tests and Android unit tests.
-6. Verify creation, update, deletion, snooze, early dismissal, reboot rescheduling, invitation links, and server switching on devices.
+1. Fetch `origin` with pruning and fetch `upstream`. Inspect all local branches, their remote counterparts, and linked worktrees, preserving uncommitted work. Review the upstream changes before merging.
+2. Merge the upstream main branch into `main` without squashing it. If `origin/main` already contains the update, use it after verifying that it matches `upstream/main`.
+3. Identify which contributions are still pending upstream. If Clock You accepted a contribution with changes, use its accepted implementation. Once that implementation is in `main`, stop updating and merging the old contribution branch into `main-canary`.
+4. Merge the updated `main` into every active contribution branch, including branches checked out in linked worktrees. Resolve conflicts on the contribution branch, preserving its pending changes alongside the accepted upstream implementation. Contribution branches receive base updates from `main`, never from `main-canary` or `jay`.
+5. Merge the updated `main` into `main-canary`, then merge every active contribution branch into `main-canary`.
+6. Merge `main-canary` into `jay` and resolve conflicts only at the integration points listed above.
+7. Remove local contribution branches whose tracked branches were deleted from `origin` only after verifying that their work is preserved in `main` or `main-canary`, or superseded by an accepted upstream implementation. Check linked worktrees and uncommitted work before removal. Keep branches with unpreserved work and report them; a missing remote alone is not enough to delete them.
+8. Run the server tests against PostgreSQL and Android unit tests, and compile Android debug and release variants. Verify changed contribution branches as well as the integrated `jay` result.
+9. Verify creation, update, deletion, snooze, early dismissal, reboot rescheduling, invitation links, and server switching on devices. Report any checks that could not be completed.
+10. When committing and pushing is authorized, commit any remaining resolutions and push all updated branches to `origin`: `main`, every active contribution branch, `main-canary`, and `jay`. Check the `jay` head message against the [release rules](releases.md) before pushing. Verify that the local branches match their remote counterparts afterward.
+
+An upstream update includes active contribution branch synchronization and obsolete local branch cleanup, even when the accepted changes are already present in `main-canary` and `jay`. Updating only the three pipeline branches is not the complete workflow.
 
 This keeps the relationship readable: `main` is Clock You, `main-canary` adds the contributions still waiting upstream, and `jay` adds the social features. The original upstream commits stay intact.
