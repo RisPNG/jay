@@ -117,7 +117,7 @@ You can run your own Jay server. Read the **[full server guide](server/README.md
 
 If something does not work as expected, or you have an idea that could make Jay more useful, please [open an issue](https://github.com/RisPNG/jay/issues). Please try to include as much detail as possible such as your Jay version, Android version, reproduction steps, and what is expected to happen. It makes the problem much easier to debug. Keep anything confidential like profile links, invitation tokens, and credentials out of the issue.
 
-If you want to contribute code, start with the [contributing guide](docs/CONTRIBUTING.md). It explains how Jay builds on Clock You's source, the branch pipeline, and where each kind of change belongs.
+If you want to contribute code, start with the [contributing guide](CONTRIBUTING.md). It explains how Jay builds on Clock You's source, the branch pipeline, and where each kind of change belongs.
 
 ## Built on Clock You
 
