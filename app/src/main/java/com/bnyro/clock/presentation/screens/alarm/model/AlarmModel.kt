@@ -60,9 +60,9 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
                     ?: PERSONAL_ALARM_SOURCE_ID
                 (filter.startTime <= alarm.time && alarm.time <= filter.endTime)
                         && !Collections.disjoint(filter.weekDays, alarm.days)
-                        && (alarm.label?.lowercase()?.contains(filter.label.lowercase())
-                    ?: true) && (TimeHelper.millisToFormatted(getApplication(), alarm.time).lowercase()
-                    .contains(filter.label.lowercase()))
+                        && (alarm.label.orEmpty().contains(filter.label, ignoreCase = true)
+                        || TimeHelper.millisToFormatted(getApplication(), alarm.time)
+                            .contains(filter.label, ignoreCase = true))
                         && (sourceIds == null || sourceId in sourceIds)
 
             }
