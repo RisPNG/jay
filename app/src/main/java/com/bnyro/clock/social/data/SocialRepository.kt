@@ -742,8 +742,8 @@ class SocialRepository(
                         SharedSoundSelection(SharedSoundMode.MEMBER_DEFAULT.name.lowercase())
                     alarm.soundUri == null -> null
                     link.soundMode == SharedSoundMode.SHARED &&
-                        alarm.soundUri == SharedSoundStore(context).cached(link.soundId.orEmpty())
-                            ?.toURI()?.toString() -> null
+                        alarm.soundName == link.soundTitle &&
+                        SharedSoundStore(context).cached(link.soundId.orEmpty()) != null -> null
                     !canUploadSharedSounds -> {
                         alarm.soundName = null
                         alarm.soundUri = null
