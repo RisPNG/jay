@@ -85,9 +85,9 @@
     <string name="alarm_log_delivered">Alarm delivered to %1$s</string>
     <string name="alarm_log_corrected">An ignored report was corrected</string>
     <string name="alarm_log_name">Name: %1$s</string>
-    <string name="alarm_log_name_changed">Name: %1$s → %2$s</string>
+    <string name="alarm_log_name_changed">Name: %1$s to %2$s</string>
     <string name="alarm_log_time">Alarm time: %1$s</string>
-    <string name="alarm_log_time_changed">Alarm time: %1$s → %2$s</string>
+    <string name="alarm_log_time_changed">Alarm time: %1$s to %2$s</string>
     <string name="alarm_log_other_changes">Also changed: %1$s</string>
     <string name="alarm_log_snooze_duration">Snooze duration</string>
     <string name="alarm_log_vibration_pattern">Vibration pattern</string>

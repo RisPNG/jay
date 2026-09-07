@@ -18,16 +18,17 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/RisPNG/jay/releases/latest">Download</a> ·
-  <a href="#what-you-can-do">Features</a> ·
-  <a href="#getting-started">Get started</a> ·
-  <a href="#self-hosting">Self-host</a> ·
-  <a href="#contributing">Contribute</a>
+  <a href="#what-you-can-do">What you can do</a> ·
+  <a href="#download">Download</a> ·
+  <a href="#getting-started">Getting started</a> ·
+  <a href="#privacy-and-your-data">Privacy and your data</a> ·
+  <a href="#self-hosting">Self-hosting</a> ·
+  <a href="#contributing">Contributing</a>
 </p>
 
 ---
 
-Jay is your run-of-the-mill [clock app](https://github.com/you-apps/ClockYou) for Android, but with groups, allowing for shared alarms and shared timers. I built it to replace your personal clock app, so you still get the personal alarms, world clocks, stopwatch, and widgets you would expect. Group is there for when you want it.
+Jay is your run-of-the-mill [clock app](https://github.com/you-apps/ClockYou) for Android, but with groups, allowing for shared alarms and shared timers. I built it to replace your personal clock app, so you still get the personal alarms, world clocks, stopwatch, and widgets you would expect. Groups are there for when you want them.
 
 **No login. No account registration. No telemetry[\*](#privacy-and-your-data). Self-hostable.**
 
@@ -43,7 +44,7 @@ Jay creates a profile for you automatically, so getting started is basically cho
 | **See what happened.** Check shared alarm activity, membership changes, and responses. | **Choose how it rings.** Configure full-screen timer alerts, gradual volume increase, vibration, and volume-button actions. |
 | **Choose who can edit.** Allow everyone or only group leaders to change shared alarms and timers. | **Use more than one device.** Export and import your profile to continue as the same member. |
 
-Some of the notable features are:
+Here is how some of that works in practice:
 
 ### Share alarms across the world
 

@@ -1,6 +1,6 @@
 # Jay server
 
-The server keeps the group side of Jay in sync: identities, memberships, shared alarms and timers, delivery records, and alarm responses. The Android app talks to this API; it never connects directly to PostgreSQL.
+The server keeps the group side of Jay in sync: identities, memberships, shared alarms and timers, delivery records, and alarm responses. The Android app talks to this API, which handles the database work in PostgreSQL.
 
 It also tracks when each member is expected to answer an alarm. If no dismissal or snooze arrives before the ringing deadline, the server records an ignored outcome, including when the device is offline. With **Answer as one**, a member's dismissal, snooze, or missed response applies to the group's corresponding occurrences. Devices using the same imported profile are one member and always answer together.
 
@@ -8,14 +8,14 @@ While Jay is open, authenticated server-sent events tell it when something chang
 
 ## Local development
 
-From the `server/` directory, create a virtual environment and install the server:
+For local development, a virtual environment keeps the server dependencies together. From the `server/` directory:
 
 ```sh
 mise exec -- python -m venv .venv
 mise exec -- .venv/bin/python -m pip install -e '.[test]'
 ```
 
-Point `DATABASE_URL` at your local PostgreSQL database, apply the migrations, then start the API:
+The API and migrations use `DATABASE_URL` to find PostgreSQL. With a local database available, the setup looks like this:
 
 ```sh
 export DATABASE_URL='postgresql+psycopg://jay:jay@127.0.0.1:5432/jay'
@@ -46,7 +46,7 @@ The Android emulator can reach this API at `http://10.0.2.2:8000`. Use a debug b
 | `B2_APPLICATION_KEY_ID` | B2 application key ID scoped to the sound bucket |
 | `B2_APPLICATION_KEY` | B2 application key secret scoped to the sound bucket |
 
-Although the other variables are available, they're only relevant to the official jay.poppybit.com deployment (for now). Self-hosting needs neither the Firebase nor the Google Play credentials. If Firebase is not configured, synchronisation still occurs when Jay launches, when the user requests it, after local group operations, and periodically in the background. Google Play credentials are only consulted while `SHARED_SOUND_ACCESS` is `play`; on an `everyone` server they are never used:
+The variables below are currently relevant to the official jay.poppybit.com deployment. You can self-host without Firebase or Google Play credentials. Without Firebase, Jay still synchronises on launch, on manual refresh, after local group operations, and periodically in the background. Google Play credentials are used only when `SHARED_SOUND_ACCESS` is `play`; an `everyone` server does not use them:
 
 | Variable | Purpose |
 | --- | --- |
@@ -71,13 +71,13 @@ SHARED_SOUND_ACCESS=everyone docker compose -f server/compose.yaml up --build -d
 
 This allows uploads and sound selection without a Play purchase, including from GitHub and debug builds. The app learns what is available during synchronisation, and access on an `everyone` server does not expire or need Play verification.
 
-You still decide who can edit each group, and you still provide the storage. The access setting removes the Play requirement; it does not supply somewhere to store the audio. Google Play credentials are not needed for `everyone` mode.
+You still decide who can edit each group, and you still provide the storage. The access setting makes shared sounds available without Play verification, it does not supply somewhere to store the audio. Google Play credentials are not needed for `everyone` mode.
 
 ### Storage for shared sounds
 
-You need your own private storage bucket and credentials. You do not need to operate a storage server yourself: this guide is specifically for setup that uses Backblaze B2 through its S3-compatible API, but any other S3-compatible storage should work too, although I haven't personally tried any of them, so take this with a grain of salt. The included Docker Compose setup runs the API and PostgreSQL only; it does not include audio storage.
+The included Docker Compose setup earlier only runs the API and PostgreSQL, but audio storage is setup separately. Shared sounds need a private storage bucket and credentials. The project uses Backblaze B2 through its S3-compatible API, so that is the setup this guide covers. Other S3-compatible storage may work too, but it has not been tested or covered.
 
-Once your storage and application key are setup, configure these variables on the Jay API server:
+Once the storage and application key are set up, these variables connect the Jay API server to the bucket:
 
 | Variable | What to provide |
 | --- | --- |
@@ -92,15 +92,15 @@ For example, you can run the Jay API on your own machine and keep the audio in y
 
 ## Shared links
 
-Note that shared links are currently hard-coded to use `jay.poppybit.com`, and changing the API address in the app does not change this link domain. For the distributed app to verify links, Android needs to retrieve `https://jay.poppybit.com/.well-known/assetlinks.json` directly over HTTPS, without authentication or redirects.
+Shared links currently use the hard-coded domain `jay.poppybit.com`, even when you change the API address in the app. For the distributed app to verify links, Android needs to retrieve `https://jay.poppybit.com/.well-known/assetlinks.json` directly over HTTPS, without authentication or redirects.
 
-A self-hosted server needs none of the setup in this section. Its invitations still use `jay.poppybit.com` and carry the server's own address as the `server` parameter, so they open the app and connect back to your server unchanged. The following is only for whoever operates the official `jay.poppybit.com` deployment and publishes the distributed app.
+For a self-hosted server, there is no extra link setup. Invitations will still use `jay.poppybit.com` but carry your server's address in the `server` parameter, so they open the app and connect back to your server. Hosting the verification file is part of operating the official domain and publishing the distributed app.
 
-If and when this hard-coded behaviour changes, which it will, I will provide a proper guide.
+I intend to make this configurable and will add a guide when that is available.
 
 ## Tests
 
-Use a separate test database, apply its migrations, then run this from `server/`:
+A separate PostgreSQL database keeps test data away from the data you use during development. With `DATABASE_URL` pointing to that database and its migrations applied, run this from `server/`:
 
 ```sh
 mise exec -- .venv/bin/pytest

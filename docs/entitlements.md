@@ -1,13 +1,13 @@
 # Shared sounds and Play access
 
-Shared sounds are the part of Jay where access depends on the server you use. The setting is `SHARED_SOUND_ACCESS`, and there are two choices:
+This document covers how shared sounds work in Jay, and it is mostly for relevant to Jay developers as a knowledge base. It is not a guide to setting up shared sounds.
+
+Shared sounds need storage and delivery. On the default Jay's hosted service, The setting is `SHARED_SOUND_ACCESS`, with two choices:
 
 | Value | What it means |
 | --- | --- |
 | `play` | Uploading and choosing a shared sound requires verified Play access. This is the default. |
 | `everyone` | Every authenticated device can upload and choose shared sounds without a purchase or an expiry. Group editing permissions still apply. |
-
-If you run your own server, `everyone` lets you make this feature available to your users. You still need to provide the audio storage, and uploaded audio still goes through validation. See the [server setup guide](../server/README.md#shared-sounds-on-your-own-server) for the environment setting.
 
 ## What the rest of the group gets
 
@@ -29,7 +29,7 @@ On a `play` server, production builds refresh Play access immediately and every 
 
 Changing the server setting back to `play` restores the server-side checks immediately. The app learns about it on its next sync or refresh, but an old cached grant cannot get an upload past the server. Sounds already selected remain playable, and unrelated edits preserve them.
 
-Deploy the server before the updated Android client, since the client expects the capability response. This policy does not need a database migration.
+For deployment, the server update comes before the Android client update, since the client expects the capability response to be available. This policy does not need a database migration.
 
 ## What Play verification checks
 
@@ -42,16 +42,16 @@ The production app requests a Standard Play Integrity token with a request hash 
 - the app licensing verdict is `LICENSED`;
 - the recognised package is `com.rispng.jay`.
 
-If those checks pass, the server stores the entitlement for that device. The APK itself does not contain a separate paid feature flag that grants access.
+If those checks pass, the server stores the entitlement for that device. Access comes from this server verification rather than a separate paid feature flag in the APK.
 
 ## Where Firebase fits
 
 Firebase Cloud Messaging lets the app receive prompt background sync notifications. It is separate from Play verification and shared-sound access.
 
-Synchronisation must still work without Firebase: when Jay opens, when the user refreshes, after local group operations, and periodically in the background. Leaving Firebase unconfigured on the server does not, by itself, disable Firebase in an Android build that already includes its configuration.
+Jay also needs to work for people running a server without Firebase. Synchronisation remains available when Jay opens, when the user refreshes, after local group operations, and periodically in the background. Leaving Firebase unconfigured on the server does not, by itself, disable Firebase in an Android build that already includes its configuration.
 
 ## Keeping credentials out of the repository
 
-Use local secure configuration, deployment secrets, or GitHub Actions secrets for Firebase and Google Play service-account JSON, Firebase application credentials, and Play Integrity credentials. Do not put them in source control, logs, fixtures, screenshots, or generated artifacts.
+Firebase and Google Play service-account JSON, Firebase application credentials, and Play Integrity credentials belong in secure local configuration, deployment secrets, or GitHub Actions secrets. Keeping them out of source control, logs, fixtures, screenshots, and generated artifacts lets us share and troubleshoot the project without sharing access to the services behind it.
 
-The server reads service-account JSON from `FIREBASE_CREDENTIALS_JSON` and `GOOGLE_PLAY_CREDENTIALS_JSON`. If either is missing, the corresponding integration may be unavailable. Do not work around that by embedding credentials in the code.
+The server reads service-account JSON from `FIREBASE_CREDENTIALS_JSON` and `GOOGLE_PLAY_CREDENTIALS_JSON`. If either is missing, the corresponding integration may be unavailable. The place to resolve that is the server configuration, so credentials stay outside the code.

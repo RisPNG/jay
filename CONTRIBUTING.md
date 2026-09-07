@@ -1,22 +1,22 @@
-# Maintaining Jay on top of Clock You
+# Contributing to Jay
 
-Jay builds directly on Clock You's source. This lets it use the same alarm services, Room database, activities, and Android manifest components. A runtime plugin could not safely share all of that by injecting features into another APK, which is why the separation here happens in the source code.
-
-I keep this structure mainly because I want to contribute back to the projects I build on whenever I can. Jay benefits directly from Clock You, and I do not want generally useful improvements to become trapped in the fork just because I happened to need them here first.
+Jay builds directly on Clock You's source, and a lot of what makes it useful comes from the work already done there, mainly the base clock features. I keep this structure mainly because I want to contribute back to the projects I build on whenever I can. Jay benefits directly from Clock You, and I do not want generally useful improvements to become trapped in the fork just because I happened to need them here first.
 
 Keeping `main` as Clock You, `main-canary` as Clock You plus contributions still waiting upstream, and `jay` as the social extension makes that relationship explicit. It preserves the original upstream history, gives suitable changes a clear route back, and keeps my additions distinguishable from the work Jay was built on.
 
 ## Where things belong
 
-Keep the social code together so it is clear what Jay adds and what comes from Clock You:
+Jay uses Clock You's alarm services, Room database, activities, and Android manifest components directly. This is possible because the extension happens in the source code. A runtime plugin would not be able to safely share all of that by injecting features into another APK.
 
-- `server/` owns the complete Jay server and PostgreSQL protocol.
-- `app/src/main/java/com/bnyro/clock/social/` owns social storage, networking, synchronization, workers, and group UI.
-- `device_alias_words.json` owns generated device-name vocabulary.
-- `SocialDatabase` owns group and remote-revision state separately from Clock You's database.
-- `SharedAlarmLink` maps remote alarms to unchanged Clock You `Alarm` rows.
+The social code lives together so that someone reading the project can understand what Jay adds:
 
-Some social features need to connect to the clock itself. These are the places where that integration belongs:
+- `server/` contains the complete Jay server and PostgreSQL protocol.
+- `app/src/main/java/com/bnyro/clock/social/` contains social storage, networking, synchronization, workers, and group UI.
+- `device_alias_words.json` contains the generated device-name vocabulary.
+- `SocialDatabase` keeps group and remote-revision state separate from Clock You's database.
+- `SharedAlarmLink` connects remote alarms to unchanged Clock You `Alarm` rows.
+
+Some Jay's social features have to be built on top of the clock core implementation itself. Changes to Clock You-owned files for those features commonly stay within these integration points, but not limited to:
 
 - application startup and dependency construction.
 - the home navigation list.
@@ -31,13 +31,13 @@ Some social features need to connect to the clock itself. These are the places w
 - the saved-timer sheet's group template field.
 - settings, launcher branding, dependencies, resources, and manifest declarations.
 
-If an improvement would be useful in Clock You on its own, develop it on a focused feature branch off of `main` and submit it upstream. That includes alarms, clocks, timers, the stopwatch, settings, onboarding, notifications, and pickers. Social groups, shared alarms, membership, synchronisation, social notifications, entitlements, and the server belong on `jay`.
+The existing clock behaviour is the foundation for these connections. For example, a shared alarm uses Clock You's alarm scheduling too. Maintaining a second scheduler just for groups would mean fixing the same problems in two places, and the two could eventually behave differently.
 
-A social feature may change a Clock You-owned file only at one of the integration points above. Use the existing clock behaviour there. For example, a shared alarm should use Clock You's alarm scheduling rather than a second scheduler written just for groups.
+For changes that are useful to Clock You on its own, the starting point is a focused contribution branch from `main`, with the work submitted upstream. This includes alarms, clocks, timers, the stopwatch, settings, onboarding, notifications, and pickers. Social groups, shared alarms, membership, synchronisation, social notifications, entitlements, and the server are developed directly on `jay`.
 
-## Branch responsibilities
+## How the branches fit together
 
-The branches form a pipeline, and merges only flow down it:
+There are three long-lived branches, with merges flowing in one direction: `main` -> `main-canary` -> `jay`. Contribution branches join that flow while their work is waiting upstream.
 
 ```mermaid
 flowchart LR
@@ -48,29 +48,49 @@ flowchart LR
     canary --> jay
 ```
 
-The contribution path applies while contributions are pending upstream; every active contribution branch must follow it. The direct `main` → `main-canary` path always applies, including when there are no pending contributions.
+| Branch | What it is for |
+| --- | --- |
+| `main` | The clean Clock You base, with its exact upstream history, original commit messages, and commit hashes. |
+| Contribution branches | Focused Clock You improvements intended for upstream. Each starts from `main` and receives base updates from there. |
+| `main-canary` | Clock You together with every active contribution still waiting upstream. It contains no social code and publishes nothing. |
+| `jay` | The social extension on top of `main-canary`, with the integration points described above. All prereleases and stable releases come from here. |
 
-Keep an `upstream` remote pointing to Clock You. `main` must contain the exact upstream history, including its original commit messages and hashes. That makes it possible to compare and update the base without introducing another copy of the same commits.
+An `upstream` remote points to Clock You. Preserving its history in `main` means we can compare and update the base without creating another copy of the same commits. `main` always feeds into `main-canary`, even when there are no pending contributions, and every active contribution branch is merged into `main-canary` while it waits upstream.
 
-Start Clock You contributions on focused branches from `main`, then merge every active contribution branch into `main-canary` while the work waits upstream. `main-canary` contains the upstream base and those pending contributions. It carries no social code and publishes nothing.
+Fixes follow the same arrangement. A Clock You defect is fixed on its contribution branch, then brought into `main-canary` and `jay`. A social defect is fixed directly on `jay`. This keeps the fix with the work it belongs to, so an upstream contribution includes its own corrections.
 
-Develop the social extension directly on `jay`, on top of `main-canary`. Keep changes outside the social package limited to the integration points above. `jay` is the publishing branch in which ordinary pushes create prereleases, and commits beginning exactly with `Release ` create stable releases.
+Pushing to `jay` also publishes a build. Ordinary pushes create prereleases, while a head commit message beginning exactly with `Release ` creates a stable release. The [release guide](docs/releases.md) explains the details, so it is worth checking the head message before a push.
 
-Fix a problem where it belongs, then let the fix follow the pipeline. A Clock You defect gets fixed on its contribution branch and merged into `main-canary`. A social defect gets fixed directly on `jay`. Merge `main-canary` into `jay` to bring the clock improvements along, resolving conflicts only at the documented integration points.
+## Bringing in upstream changes
 
-## Updating upstream
+An upstream update involves the contribution branches as well as the three long-lived branches. Keeping them current means the work we send back to Clock You is based on what Clock You actually has now.
 
-When Clock You changes:
+### Before starting any implementation...
 
-1. Fetch `origin` with pruning and fetch `upstream`. Inspect all local branches, their remote counterparts, and linked worktrees, preserving uncommitted work. Review the upstream changes before merging.
-2. Merge the upstream main branch into `main` without squashing it. If `origin/main` already contains the update, use it after verifying that it matches `upstream/main`.
-3. Identify which contributions are still pending upstream. If Clock You accepted a contribution with changes, use its accepted implementation. Once that implementation is in `main`, stop updating and merging the old contribution branch into `main-canary`.
-4. Merge the updated `main` into every active contribution branch, including branches checked out in linked worktrees. Resolve conflicts on the contribution branch, preserving its pending changes alongside the accepted upstream implementation. Contribution branches receive base updates from `main`, never from `main-canary` or `jay`.
-5. Merge the updated `main` into `main-canary`, then merge every active contribution branch into `main-canary`.
-6. Merge `main-canary` into `jay` and resolve conflicts only at the integration points listed above.
-7. Remove local contribution branches whose tracked branches were deleted from `origin` only after verifying that their work is preserved in `main` or `main-canary`, or superseded by an accepted upstream implementation. Check linked worktrees and uncommitted work before removal. Keep branches with unpreserved work and report them; a missing remote alone is not enough to delete them.
-8. Run the server tests against PostgreSQL and Android unit tests, and compile Android debug and release variants. Verify changed contribution branches as well as the integrated `jay` result.
-9. Verify creation, update, deletion, snooze, early dismissal, reboot rescheduling, invitation links, and server switching on devices. Report any checks that could not be completed.
-10. When committing and pushing is authorized, commit any remaining resolutions and push all updated branches to `origin/main`, every active contribution branch, `main-canary`, and `jay`. Check the `jay` head message against the [release rules](docs/releases.md) before pushing. Verify that the local branches match their remote counterparts afterward.
+A good starting point is fetching `origin` with pruning and fetching `upstream`, then reviewing the upstream changes alongside the local branches, their remote counterparts, and any linked worktrees. Uncommitted work needs to be preserved throughout the update. Looking at all of this first helps avoid overlooking a contribution just because it is checked out somewhere else.
 
-An upstream update includes active contribution branch synchronization and obsolete local branch cleanup, even when the accepted changes are already present in `main-canary` and `jay`. Updating only the three pipeline branches is not the complete workflow.
+The upstream main branch is merged into `main` without squashing, preserving the original history. If `origin/main` already has the update, it can be used after checking that it matches `upstream/main`.
+
+### Keeping contributions current
+
+The next part is identifying which contributions are still pending. When Clock You accepts a contribution, its accepted implementation becomes the one we use, including any changes made during upstream review. Once that implementation is in `main`, the old contribution branch no longer needs updates or further merges into `main-canary`.
+
+Every contribution that is still active receives the updated `main`, including those checked out in linked worktrees. Conflicts are resolved on the contribution branch so its pending changes work alongside the accepted upstream implementation. Base updates come from `main`; bringing in `main-canary` or `jay` would also bring unrelated contributions or social code into the upstream work.
+
+From there, the updated `main` is merged into `main-canary`, followed by every active contribution branch. Finally, `main-canary` is merged into `jay`, where conflict resolution stays within the documented integration points.
+
+### Tidying up finished branches
+
+Local contribution branches can be removed when their tracked branches have been deleted from `origin` and their work is preserved in `main` or `main-canary`, or superseded by an accepted upstream implementation. Linked worktrees and uncommitted changes need a check before removal too.
+
+A missing remote branch on its own does not tell us whether the work is safe to remove. If there is work that has not been preserved, the branch stays, and that outstanding work should be noted in the update. This cleanup and the contribution branch updates are part of keeping the repository current, even if the accepted changes have already reached `main-canary` and `jay`.
+
+### Checking the result and sharing it
+
+Verification covers both the changed contribution branches and the integrated `jay` result. For an upstream update, that means running the server tests against PostgreSQL and the Android unit tests, and compiling the Android debug and release variants.
+
+Device checks cover creation, update, deletion, snooze, early dismissal, reboot rescheduling, invitation links, and server switching. If a check could not be completed, please include that in the update so the next person knows what still needs attention.
+
+Once the update is ready and committing and pushing have been agreed, any remaining conflict resolutions are committed and all updated branches are pushed to `origin/main`, every active contribution branch, `main-canary`, and `jay`. Checking the `jay` head message against the [release rules](docs/releases.md) beforehand makes sure the push publishes the intended kind of build. A final comparison between the local branches and their remote counterparts confirms that the complete update was shared.
+
+For example, if Clock You accepts a timer improvement with some changes, those changes come into `main` first. Any other pending contributions are updated from that base, then everything flows through `main-canary` into `jay`. The old timer contribution stops being merged, and its local branch can be cleaned up once its tracked remote branch is gone and its work is accounted for. Jay gets the accepted implementation, and the remaining contributions stay ready for upstream review.
