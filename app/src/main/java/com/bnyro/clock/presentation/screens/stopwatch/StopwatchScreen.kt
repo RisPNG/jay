@@ -126,17 +126,15 @@ fun StopwatchScreen(onClickSettings: () -> Unit, stopwatchModel: StopwatchModel)
                         context = context
                     )
                 }
-                Box(Modifier.weight(1f).fillMaxHeight()) {
-                    if (stopwatchModel.rememberedTimeStamps.isNotEmpty()) {
-                        LapTable(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight()
-                                .padding(8.dp),
-                            stopwatchModel = stopwatchModel,
-                            timeStampsState = timeStampsState
-                        )
-                    }
+                if (stopwatchModel.rememberedTimeStamps.isNotEmpty()) {
+                    LapTable(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .padding(8.dp),
+                        stopwatchModel = stopwatchModel,
+                        timeStampsState = timeStampsState
+                    )
                 }
             }
         }
