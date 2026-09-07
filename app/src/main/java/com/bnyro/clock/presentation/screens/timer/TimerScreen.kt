@@ -170,7 +170,8 @@ fun TimerScreen(
         Row(Modifier.fillMaxSize().padding(paddingValues)) {
             if (isLandscape) {
                 Column(
-                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())
+                    modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.Center
                 ) {
                     timerPicker()
                 }
