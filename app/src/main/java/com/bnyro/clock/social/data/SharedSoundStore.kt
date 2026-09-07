@@ -1,70 +1,105 @@
 package com.bnyro.clock.social.data
 
 import android.content.Context
+import androidx.core.net.toUri
+import com.bnyro.clock.social.domain.SHARED_SOUND_MAX_DURATION_US
+import com.bnyro.clock.social.domain.SHARED_SOUND_SAMPLE_RATE
 import java.io.File
-import java.io.FileOutputStream
+import java.io.RandomAccessFile
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 
 class SharedSoundStore(private val context: Context) {
-    fun cache(soundId: String, api: SocialApi): File? {
+    suspend fun cache(soundId: String, api: SocialApi): File? {
+        cached(soundId)?.let { return it }
         val directory = sharedSoundDirectory()
-        val ready = File(directory, "$soundId.flac")
-        if (ready.exists()) return ready
-        val download = api.getSoundDownload(soundId)
+        val legacy = File(directory, "$soundId.flac")
         val temporary = File(directory, "$soundId.${UUID.randomUUID()}.part")
         try {
-            api.downloadSound(download, temporary)
-            SharedSoundFileVerifier.verify(
-                temporary,
-                sha256 = download.sha256,
-                byteLength = download.byteLength
-            )
-            sync(temporary)
-            if (ready.exists()) {
-                temporary.delete()
+            if (legacy.exists()) {
+                keep(soundId, legacy)
+                legacy.delete()
             } else {
-                check(temporary.renameTo(ready))
+                val download = api.getSoundDownload(soundId)
+                api.downloadSound(download, temporary)
+                SharedSoundFileVerifier.verify(
+                    temporary,
+                    sha256 = download.sha256,
+                    byteLength = download.byteLength
+                )
+                keep(soundId, temporary)
             }
-            return ready
+            return cached(soundId)
+        } catch (exception: CancellationException) {
+            throw exception
         } catch (_: Exception) {
-            temporary.delete()
             return null
+        } finally {
+            temporary.delete()
         }
     }
 
     fun cached(soundId: String): File? = File(
         File(context.filesDir, "shared-sounds"),
-        "$soundId.flac"
+        "$soundId.wav"
     ).takeIf(File::exists)
 
-    fun keep(soundId: String, processed: File) {
+    suspend fun keep(soundId: String, processed: File) {
         val directory = sharedSoundDirectory()
         val temporary = File(directory, "$soundId.${UUID.randomUUID()}.part")
-        val ready = File(directory, "$soundId.flac")
-        processed.inputStream().use { input ->
-            temporary.outputStream().use { output -> input.copyTo(output) }
-        }
+        val ready = File(directory, "$soundId.wav")
         try {
-            SharedSoundFileVerifier.verify(temporary)
-            sync(temporary)
+            SharedSoundFileVerifier.verify(processed)
+            val streamInfo = processed.inputStream().use(::readFlacStreamInfo)
+            val dataBytes = (streamInfo.totalSamples * 2).toInt()
+            RandomAccessFile(temporary, "rw").use { output ->
+                val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
+                    .put("RIFF".toByteArray(Charsets.US_ASCII))
+                    .putInt(36 + dataBytes)
+                    .put("WAVEfmt ".toByteArray(Charsets.US_ASCII))
+                    .putInt(16)
+                    .putShort(1)
+                    .putShort(1)
+                    .putInt(SHARED_SOUND_SAMPLE_RATE)
+                    .putInt(SHARED_SOUND_SAMPLE_RATE * 2)
+                    .putShort(2)
+                    .putShort(16)
+                    .put("data".toByteArray(Charsets.US_ASCII))
+                    .putInt(dataBytes)
+                output.write(header.array())
+                AndroidPcmDecoder(context, processed.toUri()).decode(
+                    SHARED_SOUND_MAX_DURATION_US
+                ) { block ->
+                    check(block.sampleRate == SHARED_SOUND_SAMPLE_RATE && block.channelCount == 1) {
+                        "The decoded shared sound format does not match"
+                    }
+                    val bytes = ByteBuffer.allocate(block.frames * 2).order(ByteOrder.LITTLE_ENDIAN)
+                    bytes.asShortBuffer().put(block.samples, 0, block.frames)
+                    output.write(bytes.array())
+                    true
+                }
+                check(output.length() == 44L + dataBytes) {
+                    "The decoded shared sound length does not match"
+                }
+                output.fd.sync()
+            }
             check(temporary.renameTo(ready))
-        } catch (exception: Exception) {
+        } finally {
             temporary.delete()
-            throw exception
         }
     }
 
     fun prune(activeSoundIds: Set<String>) {
         sharedSoundDirectory().listFiles().orEmpty().forEach {
-            if (it.extension == "flac" && it.nameWithoutExtension !in activeSoundIds) it.delete()
+            if (it.extension in setOf("flac", "wav") && it.nameWithoutExtension !in activeSoundIds) {
+                it.delete()
+            }
             if (it.extension == "part") it.delete()
         }
     }
 
     private fun sharedSoundDirectory(): File =
         File(context.filesDir, "shared-sounds").apply { mkdirs() }
-
-    private fun sync(file: File) {
-        FileOutputStream(file, true).use { it.fd.sync() }
-    }
 }

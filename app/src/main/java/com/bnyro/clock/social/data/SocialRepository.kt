@@ -663,6 +663,8 @@ class SocialRepository(
                 if (soundMode != SharedSoundMode.SHARED) {
                     alarm.soundName = null
                     alarm.soundUri = null
+                } else {
+                    alarm.soundUri = SharedSoundStore(context).cached(soundId!!)!!.toURI().toString()
                 }
                 val response = api.createAlarm(
                     SharedAlarmRequest(
@@ -743,7 +745,7 @@ class SocialRepository(
                     alarm.soundUri == null -> null
                     link.soundMode == SharedSoundMode.SHARED &&
                         alarm.soundName == link.soundTitle &&
-                        SharedSoundStore(context).cached(link.soundId.orEmpty()) != null -> null
+                        alarm.soundUri == alarmRepository.getAlarmById(alarm.id)?.soundUri -> null
                     !canUploadSharedSounds -> {
                         alarm.soundName = null
                         alarm.soundUri = null
@@ -792,6 +794,10 @@ class SocialRepository(
                         .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
                 )
                 SocialAlarmSchedule.setTimeZone(alarm.id, link.timeZone)
+                if ((soundChange?.mode ?: link.soundMode.name.lowercase()) == "shared") {
+                    alarm.soundUri = SharedSoundStore(context).cache(soundId!!, api)
+                        ?.toURI()?.toString()
+                }
                 alarmUseCase.updateAlarm(alarm, schedulingTimeZone)
                 val revision = response.revision ?: link.revision + 1
                 socialDao.putAlarmLink(

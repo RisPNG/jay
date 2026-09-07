@@ -17,6 +17,8 @@ For example, one member can choose an audio file for a shared alarm and everyone
 
 Android prepares a selected file or readable system ringtone as mono 48 kHz 16-bit FLAC, with a five-minute limit. It uploads the result directly to private Backblaze B2 storage using a signed request issued by the server. The server checks the uploaded object before allowing it to be selected.
 
+For playback, Android decodes each shared sound once and stores a lossless PCM/WAVE copy locally. This avoids device-specific FLAC playback problems and keeps the same playback file through alarm creation, edits, and synchronization. Existing cached FLAC sounds are converted on their next use without another download. A five-minute sound uses about 29 MB of local playback storage; uploads and downloads still use compressed FLAC.
+
 ## How the app knows what is available
 
 The app gets the device's effective capabilities through authenticated synchronisation and `/v1/device/capabilities`. It stores the result for that server and identity, so a grant from one server or profile cannot be reused by another.

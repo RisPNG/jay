@@ -6,6 +6,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
+import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -44,8 +45,36 @@ class AndroidPcmDecoder(private val context: Context, private val source: Uri) {
             val inputFormat = extractor.getTrackFormat(trackIndex)
             val mime = inputFormat.getString(MediaFormat.KEY_MIME)
                 ?: error("The selected audio format is unknown")
-            inputFormat.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
             extractor.selectTrack(trackIndex)
+            if (mime == MediaFormat.MIMETYPE_AUDIO_RAW) {
+                val sampleRate = inputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+                val channelCount = inputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+                check(
+                    !inputFormat.containsKey(MediaFormat.KEY_PCM_ENCODING) ||
+                        inputFormat.getInteger(MediaFormat.KEY_PCM_ENCODING) ==
+                        AudioFormat.ENCODING_PCM_16BIT
+                ) { "The device extractor did not produce 16-bit PCM" }
+                val buffer = ByteBuffer.allocate(64 * 1024).order(ByteOrder.LITTLE_ENDIAN)
+                while (extractor.sampleTime in 0 until limitUs) {
+                    currentCoroutineContext().ensureActive()
+                    buffer.clear()
+                    val size = extractor.readSampleData(buffer, 0)
+                    if (size < 0) break
+                    check(size % (channelCount * 2) == 0) {
+                        "The device extractor produced a partial PCM frame"
+                    }
+                    buffer.position(0)
+                    buffer.limit(size)
+                    val samples = ShortArray(size / 2)
+                    buffer.asShortBuffer().get(samples)
+                    if (!consume(DecodedPcmBlock(
+                            sampleRate, channelCount, samples, samples.size / channelCount
+                        ))) return
+                    extractor.advance()
+                }
+                return
+            }
+            inputFormat.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
             decoder = MediaCodec.createDecoderByType(mime)
             decoder.configure(inputFormat, null, null, 0)
             decoder.start()
