@@ -126,6 +126,7 @@
     <string name="jay_version">Jay version</string>
     <string name="recent_activity">Recent activity</string>
     <string name="alarm_source">Alarm source</string>
-    <string name="select_all">Select all</string>
     <string name="deselect_all">Deselect all</string>
+    <string name="selected_alarms_edit_denied">You do not have permission to change one or more selected shared alarms. Deselect the alarms with an error-colored ring to continue.</string>
+    <string name="toggle_shared_alarms_confirmation">Turn each selected alarm on if it is off, or off if it is on? Shared alarms will change for all group members.</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.bnyro.clock.presentation.screens.alarm
 
+import android.widget.Toast
 import android.content.res.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import com.bnyro.clock.presentation.screens.clock.components.DigitalClockDisplay
@@ -86,6 +87,8 @@ fun AlarmScreen(
 
     val selectedAlarmIds = remember { mutableStateListOf<Long>() }
     val isSelectionMode = selectedAlarmIds.isNotEmpty()
+    val canEditSelection = selectedAlarmIds.none { alarmEditability[it] == false }
+    val hasSharedSelection = selectedAlarmIds.any { it in remoteAlarmIds }
 
     LaunchedEffect(alarms) {
         selectedAlarmIds.retainAll(alarms.map { it.id }.toSet())
@@ -94,6 +97,14 @@ fun AlarmScreen(
     var showToggleConfirmation by remember { mutableStateOf(false) }
     var wannadeletequestion by remember { mutableStateOf(false) }
     var showAlarmKinds by remember { mutableStateOf(false) }
+
+    LaunchedEffect(canEditSelection, showToggleConfirmation, wannadeletequestion) {
+        if (!canEditSelection && (showToggleConfirmation || wannadeletequestion)) {
+            showToggleConfirmation = false
+            wannadeletequestion = false
+            Toast.makeText(context, R.string.selected_alarms_edit_denied, Toast.LENGTH_LONG).show()
+        }
+    }
 
     TopBarScaffold(
         title = if (isSelectionMode) {
@@ -169,7 +180,11 @@ fun AlarmScreen(
                         imageVector = Icons.Default.ToggleOn,
                         contentDescription = stringResource(R.string.toggle_selected_alarms)
                     ) {
-                        showToggleConfirmation = true
+                        if (canEditSelection) {
+                            showToggleConfirmation = true
+                        } else {
+                            Toast.makeText(context, R.string.selected_alarms_edit_denied, Toast.LENGTH_LONG).show()
+                        }
                     }
                     ClickableIcon(
                         imageVector = Icons.Default.ContentCopy,
@@ -184,7 +199,11 @@ fun AlarmScreen(
                         imageVector = Icons.Default.Delete,
                         contentDescription = stringResource(R.string.delete)
                     ) {
-                        wannadeletequestion = true
+                        if (canEditSelection) {
+                            wannadeletequestion = true
+                        } else {
+                            Toast.makeText(context, R.string.selected_alarms_edit_denied, Toast.LENGTH_LONG).show()
+                        }
                     }
                     ClickableIcon(
                         imageVector = Icons.Default.Close,
@@ -306,11 +325,16 @@ fun AlarmScreen(
             }
         }
 
-        if (showToggleConfirmation && isSelectionMode) {
+        if (showToggleConfirmation && isSelectionMode && canEditSelection) {
             AlertDialog(
                 onDismissRequest = { showToggleConfirmation = false },
                 title = { Text(stringResource(R.string.toggle_selected_alarms)) },
-                text = { Text(stringResource(R.string.toggle_selected_alarms_confirmation)) },
+                text = {
+                    Text(stringResource(
+                        if (hasSharedSelection) R.string.toggle_shared_alarms_confirmation
+                        else R.string.toggle_selected_alarms_confirmation
+                    ))
+                },
                 confirmButton = {
                     DialogButton(label = R.string.toggle, style = DialogButtonStyle.PRIMARY) {
                         alarms.filter { it.id in selectedAlarmIds }.forEach { alarm ->
@@ -328,7 +352,7 @@ fun AlarmScreen(
             )
         }
 
-        if (wannadeletequestion) {
+        if (wannadeletequestion && isSelectionMode && canEditSelection) {
             AlertDialog(
                 onDismissRequest = { wannadeletequestion = false },
                 title = {

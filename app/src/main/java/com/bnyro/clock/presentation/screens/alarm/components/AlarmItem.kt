@@ -103,7 +103,8 @@ fun AlarmItem(
                         if (isSelected) {
                             Modifier.border(
                                 width = 2.dp,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = if (canEdit) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.error,
                                 shape = cardShape
                             )
                         } else {
@@ -111,12 +112,8 @@ fun AlarmItem(
                         }
                     )
                     .combinedClickable(
-                        onClick = {
-                            if (!isSelectionMode || canEdit) onClick(alarm)
-                        },
-                        onLongClick = {
-                            if (canEdit) onLongClick(alarm)
-                        }
+                        onClick = { onClick(alarm) },
+                        onLongClick = { onLongClick(alarm) }
                     )
             ) {
                 AlarmCard(
