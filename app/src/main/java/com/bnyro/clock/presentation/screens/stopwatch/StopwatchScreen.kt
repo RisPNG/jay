@@ -66,7 +66,7 @@ fun StopwatchScreen(onClickSettings: () -> Unit, stopwatchModel: StopwatchModel)
     val scope = rememberCoroutineScope()
     val timeStampsState = rememberLazyListState()
     TopBarScaffold(title = stringResource(R.string.stopwatch), onClickSettings) { pv ->
-        if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+        if (orientation != Configuration.ORIENTATION_LANDSCAPE) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -116,15 +116,17 @@ fun StopwatchScreen(onClickSettings: () -> Unit, stopwatchModel: StopwatchModel)
                         context = context
                     )
                 }
-                AnimatedVisibility(stopwatchModel.rememberedTimeStamps.isNotEmpty()) {
-                    LapTable(
-                        modifier = Modifier
-                            .width(320.dp)
-                            .fillMaxHeight()
-                            .padding(8.dp),
-                        stopwatchModel = stopwatchModel,
-                        timeStampsState = timeStampsState
-                    )
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    if (stopwatchModel.rememberedTimeStamps.isNotEmpty()) {
+                        LapTable(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight()
+                                .padding(8.dp),
+                            stopwatchModel = stopwatchModel,
+                            timeStampsState = timeStampsState
+                        )
+                    }
                 }
             }
         }

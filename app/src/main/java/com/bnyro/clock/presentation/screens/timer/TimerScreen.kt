@@ -3,6 +3,8 @@ package com.bnyro.clock.presentation.screens.timer
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -76,6 +78,7 @@ import com.bnyro.clock.util.extensions.KeepScreenOn
 fun TimerScreen(
     onClickSettings: () -> Unit, timerModel: TimerModel, settingsModel: SettingsModel
 ) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
     val showExampleTimers = Preferences.instance.getBoolean(Preferences.timerShowExamplesKey, true)
     val usebigassStartButton = Preferences.instance.getBoolean("timer_BIG_start_button", false)
@@ -100,7 +103,7 @@ fun TimerScreen(
         onClickSettings = onClickSettings,
         fabPosition = settingsModel.fabAlignment.position,
         actions = {
-            if (scheduledObjects.isEmpty() && showExampleTimers && selectedPresets.isEmpty()) {
+            if ((isLandscape || scheduledObjects.isEmpty()) && showExampleTimers && selectedPresets.isEmpty()) {
                 ClickableIcon(
                     imageVector = Icons.Rounded.AddAlarm,
                     contentDescription = stringResource(R.string.add_preset_timer)
@@ -110,7 +113,7 @@ fun TimerScreen(
             }
         },
         fab = {
-            if (scheduledObjects.isNotEmpty() && selectedPresets.isEmpty()) {
+            if (!isLandscape && scheduledObjects.isNotEmpty() && selectedPresets.isEmpty()) {
                 FloatingActionButton(onClick = {
                     createNew = true
                 }) {
@@ -118,38 +121,39 @@ fun TimerScreen(
                 }
             }
         }) { paddingValues ->
-        if (scheduledObjects.isEmpty()) {
-            Column(
-                Modifier.padding(paddingValues)
-            ) {
-                TimerPicker(
-                    pickerStyle = settingsModel.timerPickerStyle,
-                    timerModel = timerModel,
-                    showExampleTimers = showExampleTimers,
-                    context = context,
-                    onCreateNew = { createNew = false },
-                    showFAB = false,
-                    useSimpleStartButton = usebigassStartButton,
-                    selectedPresets = selectedPresets,
-                    onSelectedPresetsChanged = { selectedPresets = it }
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                verticalArrangement = Arrangement.Top
-            ) {
-                items(scheduledObjects, key = { it.id }) { obj ->
-                    TimerItem(obj, timerModel)
+        Row(Modifier.fillMaxSize().padding(paddingValues)) {
+            if (isLandscape || scheduledObjects.isEmpty()) {
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    TimerPicker(
+                        pickerStyle = settingsModel.timerPickerStyle,
+                        timerModel = timerModel,
+                        showExampleTimers = showExampleTimers,
+                        context = context,
+                        onCreateNew = { createNew = false },
+                        showFAB = false,
+                        useSimpleStartButton = usebigassStartButton,
+                        selectedPresets = selectedPresets,
+                        onSelectedPresetsChanged = { selectedPresets = it }
+                    )
                 }
             }
+            if (isLandscape || scheduledObjects.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.Top
+                ) {
+                    items(scheduledObjects, key = { it.id }) { obj ->
+                        TimerItem(obj, timerModel)
+                    }
+                }
+            }
+        }
+        if (scheduledObjects.isNotEmpty()) {
             KeepScreenOn()
         }
     }
 
-    if (createNew) {
+    if (createNew && !isLandscape) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { createNew = false }, sheetState = sheetState
@@ -181,14 +185,19 @@ private fun TimerPicker(
     selectedPresets: Set<Int>,
     onSelectedPresetsChanged: (Set<Int>) -> Unit
 ) {
-    val orientation = LocalConfiguration.current.orientation
-    if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.weight(1f).then(
+                if (isLandscape) Modifier.verticalScroll(rememberScrollState()) else Modifier
+            ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
-                Modifier.weight(1f)
+                if (isLandscape) Modifier.fillMaxWidth() else Modifier.weight(1f)
             ) {
                 TimerPickerSelector(pickerStyle, timerModel)
             }
@@ -201,55 +210,16 @@ private fun TimerPicker(
                     onSelectedPresetsChanged = onSelectedPresetsChanged
                 )
             }
-            if (selectedPresets.isNotEmpty()) {
-                SelectionActionButtons(
-                    selectedPresets = selectedPresets,
-                    timerModel = timerModel,
-                    usebigassButtons = useSimpleStartButton,
-                    clearSelection = { onSelectedPresetsChanged(emptySet()) }
-                )
-            } else {
-                StartTimerButton(showFAB, onCreateNew, timerModel, context, useSimpleStartButton)
-            }
         }
-    } else {
-        Row(
-            modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center
-        ) {
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .weight(1f)
-            ) {
-                TimerPickerSelector(pickerStyle, timerModel)
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                if (showExampleTimers) {
-                    PresetTimers(
-                        timerModel = timerModel,
-                        onCreateNew = onCreateNew,
-                        context = context,
-                        selectedPresets = selectedPresets,
-                        onSelectedPresetsChanged = onSelectedPresetsChanged
-                    )
-                }
-                if (selectedPresets.isNotEmpty()) {
-                    SelectionActionButtons(
-                        selectedPresets = selectedPresets,
-                        timerModel = timerModel,
-                        usebigassButtons = useSimpleStartButton,
-                        clearSelection = { onSelectedPresetsChanged(emptySet()) }
-                    )
-                } else {
-                    StartTimerButton(showFAB, onCreateNew, timerModel, context, useSimpleStartButton)
-                }
-            }
+        if (selectedPresets.isNotEmpty()) {
+            SelectionActionButtons(
+                selectedPresets = selectedPresets,
+                timerModel = timerModel,
+                usebigassButtons = useSimpleStartButton,
+                clearSelection = { onSelectedPresetsChanged(emptySet()) }
+            )
+        } else {
+            StartTimerButton(showFAB, onCreateNew, timerModel, context, useSimpleStartButton)
         }
     }
 }
@@ -480,6 +450,7 @@ private fun TimerPickerSelector(
                 initialHours = timerModel.hours,
                 initialMinutes = timerModel.minutes,
                 is24Hour = true,
+                useVerticalLayout = true,
                 onHoursChanged = { timerModel.hours = it },
                 onMinutesChanged = {
                     timerModel.minutes = it
