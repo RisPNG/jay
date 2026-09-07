@@ -4,6 +4,11 @@ import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,6 +86,7 @@ fun TimerScreen(
     settingsModel: SettingsModel,
     socialModel: SocialModel
 ) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
     val activeTimers by timerModel.scheduledObjects.collectAsState()
     val groups by socialModel.groups.collectAsState()
@@ -109,13 +115,62 @@ fun TimerScreen(
     }
 
     val timerPageState = rememberLazyListState()
-    LaunchedEffect(showPicker) {
-        if (showPicker) timerPageState.animateScrollToItem(0)
+    LaunchedEffect(showPicker, isLandscape) {
+        if (!isLandscape && showPicker) timerPageState.animateScrollToItem(0)
     }
 
     val selectedSavedTimerIds = remember { mutableStateListOf<Int>() }
     val isSelectionMode = selectedSavedTimerIds.isNotEmpty()
     var showDeletionDialog by remember { mutableStateOf(false) }
+
+    val timerPicker = @Composable {
+        TimerPickerSelector(
+            pickerStyle = settingsModel.timerPickerStyle,
+            seconds = timerModel.timePickerSeconds,
+            onSecondsChanged = { timerModel.timePickerSeconds = it }
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            val startTimer = {
+                timerModel.startTimer(
+                    context,
+                    TimerSettings(seconds = timerModel.timePickerSeconds)
+                )
+            }
+            val askForGroup = {
+                selectedGroupTimerId = editableGroups.firstOrNull()?.id
+                showGroupTimerDialog = true
+            }
+            Box(
+                modifier = Modifier
+                    .size(
+                        if (settingsModel.timerBigStartButton) 96.dp else 48.dp
+                    )
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .combinedClickable(
+                        onClick = startTimer,
+                        onLongClick = askForGroup
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    modifier = if (settingsModel.timerBigStartButton) {
+                        Modifier.size(36.dp)
+                    } else {
+                        Modifier
+                    },
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    }
 
     TopBarScaffold(
         title = if (isSelectionMode) {
@@ -145,68 +200,75 @@ fun TimerScreen(
             }
         }
     ) { paddingValues ->
-        LazyColumn(
-            state = timerPageState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 16.dp)
-        ) {
-            if (showPicker) {
-                item(key = "picker") {
-                    Column(modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)) {
-                        TimerPickerSelector(
-                            pickerStyle = settingsModel.timerPickerStyle,
-                            seconds = timerModel.timePickerSeconds,
-                            onSecondsChanged = { timerModel.timePickerSeconds = it }
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 16.dp),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            val startTimer = {
-                                timerModel.startTimer(
-                                    context,
-                                    TimerSettings(seconds = timerModel.timePickerSeconds)
-                                )
-                            }
-                            val askForGroup = {
-                                selectedGroupTimerId = editableGroups.firstOrNull()?.id
-                                showGroupTimerDialog = true
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .size(
-                                        if (settingsModel.timerBigStartButton) 96.dp else 48.dp
-                                    )
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer)
-                                    .combinedClickable(
-                                        onClick = startTimer,
-                                        onLongClick = askForGroup
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    modifier = if (settingsModel.timerBigStartButton) {
-                                        Modifier.size(36.dp)
-                                    } else {
-                                        Modifier
-                                    },
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
+        Row(Modifier.fillMaxSize().padding(paddingValues)) {
+            if (isLandscape) {
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())
+                ) {
+                    timerPicker()
+                }
+            }
+            LazyColumn(
+                state = timerPageState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentPadding = PaddingValues(bottom = 16.dp)
+            ) {
+                if (!isLandscape && showPicker) {
+                    item(key = "picker") {
+                        Column(modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)) {
+                            timerPicker()
                         }
                     }
                 }
-            }
 
-            if (activeTimers.isNotEmpty()) {
-                item(key = "activeTimers") {
+                if (activeTimers.isNotEmpty()) {
+                    item(key = "activeTimers") {
+                        Column(
+                            modifier = Modifier
+                                .animateItem(ItemFade, ItemSlide, ItemFade)
+                                .padding(horizontal = 16.dp)
+                        ) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            SettingsCategory(
+                                pluralStringResource(R.plurals.active_timers, activeTimers.size)
+                            ) {
+                                if (!isLandscape) {
+                                    ClickableIcon(
+                                        imageVector = if (showPicker) {
+                                            Icons.Rounded.ExpandLess
+                                        } else {
+                                            Icons.Rounded.ExpandMore
+                                        },
+                                        contentDescription = stringResource(
+                                            if (showPicker) {
+                                                R.string.hide_timer_picker
+                                            } else {
+                                                R.string.show_timer_picker
+                                            }
+                                        )
+                                    ) {
+                                        showPicker = !showPicker
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    items(activeTimers, key = { it.id }) { timer ->
+                        TimerItem(
+                            obj = timer,
+                            timerModel = timerModel,
+                            onEdit = { editedTimer = timer },
+                            modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)
+                        )
+                    }
+                }
+
+                item(key = "savedTimers") {
                     Column(
                         modifier = Modifier
                             .animateItem(ItemFade, ItemSlide, ItemFade)
@@ -217,103 +279,62 @@ fun TimerScreen(
                             color = MaterialTheme.colorScheme.surfaceVariant
                         )
                         SettingsCategory(
-                            pluralStringResource(R.plurals.active_timers, activeTimers.size)
+                            pluralStringResource(R.plurals.saved_timers, timerModel.savedTimers.size)
                         ) {
-                            ClickableIcon(
-                                imageVector = if (showPicker) {
-                                    Icons.Rounded.ExpandLess
-                                } else {
-                                    Icons.Rounded.ExpandMore
-                                },
-                                contentDescription = stringResource(
-                                    if (showPicker) {
-                                        R.string.hide_timer_picker
-                                    } else {
-                                        R.string.show_timer_picker
-                                    }
-                                )
-                            ) {
-                                showPicker = !showPicker
-                            }
-                        }
-                    }
-                }
-                items(activeTimers, key = { it.id }) { timer ->
-                    TimerItem(
-                        obj = timer,
-                        timerModel = timerModel,
-                        onEdit = { editedTimer = timer },
-                        modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)
-                    )
-                }
-            }
-
-            item(key = "savedTimers") {
-                Column(
-                    modifier = Modifier
-                        .animateItem(ItemFade, ItemSlide, ItemFade)
-                        .padding(horizontal = 16.dp)
-                ) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                    SettingsCategory(
-                        pluralStringResource(R.plurals.saved_timers, timerModel.savedTimers.size)
-                    ) {
-                        if (!isSelectionMode) {
-                            ClickableIcon(
-                                imageVector = Icons.Rounded.AddAlarm,
-                                contentDescription = stringResource(R.string.add_saved_timer)
-                            ) {
-                                timerModel.addSavedTimer(timerModel.timePickerSeconds)
-                            }
-                        }
-                    }
-                }
-            }
-            items(timerModel.savedTimers, key = { it.id }) { timer ->
-                val isSelected = selectedSavedTimerIds.contains(timer.id)
-
-                SavedTimerItem(
-                    timer = timer,
-                    isSelected = isSelected,
-                    groupName = groups.firstOrNull { it.id == timer.groupId }?.name,
-                    onStart = {
-                        if (!isSelectionMode) {
-                            val groupId = timer.groupId
-                            if (groupId == null) {
-                                timerModel.startTimer(context, timer)
-                            } else {
-                                val group = groups.firstOrNull { it.id == groupId }
-                                if (group == null || !group.canEditAlarms) {
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(R.string.group_timer_requires_leader),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                } else {
-                                    socialModel.startGroupTimer(groupId, timer.label, timer)
+                            if (!isSelectionMode) {
+                                ClickableIcon(
+                                    imageVector = Icons.Rounded.AddAlarm,
+                                    contentDescription = stringResource(R.string.add_saved_timer)
+                                ) {
+                                    timerModel.addSavedTimer(timerModel.timePickerSeconds)
                                 }
                             }
                         }
-                    },
-                    onClick = {
-                        if (isSelectionMode) {
-                            if (isSelected) {
-                                selectedSavedTimerIds.remove(timer.id)
-                            } else {
-                                selectedSavedTimerIds.add(timer.id)
+                    }
+                }
+                items(timerModel.savedTimers, key = { it.id }) { timer ->
+                    val isSelected = selectedSavedTimerIds.contains(timer.id)
+
+                    SavedTimerItem(
+                        timer = timer,
+                        isSelected = isSelected,
+                        groupName = groups.firstOrNull { it.id == timer.groupId }?.name,
+                        onStart = {
+                            if (!isSelectionMode) {
+                                val groupId = timer.groupId
+                                if (groupId == null) {
+                                    timerModel.startTimer(context, timer)
+                                } else {
+                                    val group = groups.firstOrNull { it.id == groupId }
+                                    if (group == null || !group.canEditAlarms) {
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.group_timer_requires_leader),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else {
+                                        socialModel.startGroupTimer(groupId, timer.label, timer)
+                                    }
+                                }
                             }
-                        } else {
-                            editedSavedTimerId = timer.id
-                        }
-                    },
-                    onLongClick = {
-                        if (!isSelectionMode) selectedSavedTimerIds.add(timer.id)
-                    },
-                    modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)
-                )
+                        },
+                        onClick = {
+                            if (isSelectionMode) {
+                                if (isSelected) {
+                                    selectedSavedTimerIds.remove(timer.id)
+                                } else {
+                                    selectedSavedTimerIds.add(timer.id)
+                                }
+                            } else {
+                                editedSavedTimerId = timer.id
+                            }
+                        },
+                        onLongClick = {
+                            if (!isSelectionMode) selectedSavedTimerIds.add(timer.id)
+                        },
+                        modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)
+                    )
+                }
             }
         }
     }

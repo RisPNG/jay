@@ -1,5 +1,8 @@
 package com.bnyro.clock.presentation.screens.alarm
 
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
+import com.bnyro.clock.presentation.screens.clock.components.DigitalClockDisplay
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
@@ -68,6 +71,7 @@ fun AlarmScreen(
     alarmModel: AlarmModel,
     settingsModel: SettingsModel
 ) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
     val alarms by alarmModel.alarms.collectAsState()
     val filters by alarmModel.filters.collectAsState()
@@ -190,80 +194,83 @@ fun AlarmScreen(
             }
         }) { pv ->
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(pv)
-        ) {
-            if (alarmModel.showFilter) {
-                AlarmFilterSection(
-                    filters = filters,
-                    groups = groups,
-                    selectedSourceIds = alarmSourceIds,
-                    onChangeLabel = { alarmModel.updateLabelFilter(it) },
-                    onClickWeekDay = { alarmModel.updateWeekDayFilter(it) },
-                    onChangeSources = { alarmModel.alarmSourceIds.value = it },
-                    onClickStartTime = { alarmModel.updateStartTimeFilter(it) },
-                    onClickEndTime = { alarmModel.updateEndTimeFilter(it) }
-                )
-            }
-            Box(Modifier.weight(1f)) {
-                if (alarms.isEmpty()) {
-                    BlobIconBox(icon = R.drawable.ic_alarm)
+        Row(Modifier.fillMaxSize().padding(pv)) {
+            if (isLandscape) {
+                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                    DigitalClockDisplay()
                 }
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(
-                        items = alarms,
-                        key = { it.id }
-                    ) { alarm ->
-                        val isSelected = selectedAlarmIds.contains(alarm.id)
+            }
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                if (alarmModel.showFilter) {
+                    AlarmFilterSection(
+                        filters = filters,
+                        groups = groups,
+                        selectedSourceIds = alarmSourceIds,
+                        onChangeLabel = { alarmModel.updateLabelFilter(it) },
+                        onClickWeekDay = { alarmModel.updateWeekDayFilter(it) },
+                        onChangeSources = { alarmModel.alarmSourceIds.value = it },
+                        onClickStartTime = { alarmModel.updateStartTimeFilter(it) },
+                        onClickEndTime = { alarmModel.updateEndTimeFilter(it) }
+                    )
+                }
+                Box(Modifier.weight(1f)) {
+                    if (alarms.isEmpty()) {
+                        BlobIconBox(icon = R.drawable.ic_alarm)
+                    }
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(
+                            items = alarms,
+                            key = { it.id }
+                        ) { alarm ->
+                            val isSelected = selectedAlarmIds.contains(alarm.id)
 
-                        AlarmItem(
-                            alarm = alarm,
-                            groupName = alarmGroupNames[alarm.id],
-                            canEdit = alarmEditability[alarm.id] ?: true,
-                            isSelected = isSelected,
-                            isSelectionMode = isSelectionMode,
-                            onLongClick = { alarmItem ->
-                                if (!isSelectionMode) {
-                                    selectedAlarmIds.add(alarmItem.id)
-                                }
-                            },
-                            onClick = { alarmItem ->
-                                if (isSelectionMode) {
-                                    if (isSelected) {
-                                        selectedAlarmIds.remove(alarmItem.id)
-                                    } else {
+                            AlarmItem(
+                                alarm = alarm,
+                                groupName = alarmGroupNames[alarm.id],
+                                canEdit = alarmEditability[alarm.id] ?: true,
+                                isSelected = isSelected,
+                                isSelectionMode = isSelectionMode,
+                                onLongClick = { alarmItem ->
+                                    if (!isSelectionMode) {
                                         selectedAlarmIds.add(alarmItem.id)
                                     }
-                                } else {
-                                    onAlarm.invoke(alarmItem.id, alarmItem.advanced)
-                                }
-                            },
-                            onDeleteAlarm = { alarmItem ->
-                                alarmModel.deleteAlarm(alarmItem)
-                            },
-                            onActivity = remoteAlarmIds[alarm.id]?.let { remoteAlarmId ->
-                                { alarmModel.loadAlarmActivity(remoteAlarmId) }
-                            },
-                            onDismissAlarm = { alarmItem ->
-                                alarmModel.dismissUpcomingAlarm(alarmItem)
-                            },
-                            onUpdateAlarm = { updatedAlarm ->
-                                if (!isSelectionMode) {
-                                    alarmModel.updateAlarm(updatedAlarm)
-
-                                    if (updatedAlarm.enabled) {
-                                        AlarmHelper.showAlarmScheduledToast(context, updatedAlarm)
+                                },
+                                onClick = { alarmItem ->
+                                    if (isSelectionMode) {
+                                        if (isSelected) {
+                                            selectedAlarmIds.remove(alarmItem.id)
+                                        } else {
+                                            selectedAlarmIds.add(alarmItem.id)
+                                        }
+                                    } else {
+                                        onAlarm.invoke(alarmItem.id, alarmItem.advanced)
                                     }
-                                }
-                            },
-                            modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)
-                        )
-                    }
+                                },
+                                onDeleteAlarm = { alarmItem ->
+                                    alarmModel.deleteAlarm(alarmItem)
+                                },
+                                onActivity = remoteAlarmIds[alarm.id]?.let { remoteAlarmId ->
+                                    { alarmModel.loadAlarmActivity(remoteAlarmId) }
+                                },
+                                onDismissAlarm = { alarmItem ->
+                                    alarmModel.dismissUpcomingAlarm(alarmItem)
+                                },
+                                onUpdateAlarm = { updatedAlarm ->
+                                    if (!isSelectionMode) {
+                                        alarmModel.updateAlarm(updatedAlarm)
 
-                    item(key = "bottomSpacer") {
-                        Spacer(modifier = Modifier.height(80.dp))
+                                        if (updatedAlarm.enabled) {
+                                            AlarmHelper.showAlarmScheduledToast(context, updatedAlarm)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)
+                            )
+                        }
+
+                        item(key = "bottomSpacer") {
+                            Spacer(modifier = Modifier.height(80.dp))
+                        }
                     }
                 }
             }
