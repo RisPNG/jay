@@ -194,7 +194,8 @@ private fun TimerPicker(
             modifier = Modifier.weight(1f).then(
                 if (isLandscape) Modifier.verticalScroll(rememberScrollState()) else Modifier
             ),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = if (isLandscape) Arrangement.Center else Arrangement.Top
         ) {
             Box(
                 if (isLandscape) Modifier.fillMaxWidth() else Modifier.weight(1f)
