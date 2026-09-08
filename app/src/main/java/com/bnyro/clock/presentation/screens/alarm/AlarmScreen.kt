@@ -2,6 +2,7 @@ package com.bnyro.clock.presentation.screens.alarm
 
 import android.widget.Toast
 import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalConfiguration
 import com.bnyro.clock.presentation.screens.clock.components.DigitalClockDisplay
 import androidx.compose.foundation.layout.Column
@@ -104,6 +105,11 @@ fun AlarmScreen(
             wannadeletequestion = false
             Toast.makeText(context, R.string.selected_alarms_edit_denied, Toast.LENGTH_LONG).show()
         }
+    }
+
+    BackHandler(enabled = alarmModel.showFilter) {
+        alarmModel.showFilter = false
+        alarmModel.resetFilters()
     }
 
     TopBarScaffold(
