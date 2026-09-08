@@ -1,6 +1,7 @@
 package com.bnyro.clock.util
 
 import android.annotation.SuppressLint
+import androidx.core.app.NotificationManagerCompat
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
@@ -95,12 +96,14 @@ object AlarmHelper {
     }
 
     fun cancel(context: Context, alarm: Alarm) {
+        NotificationManagerCompat.from(context).cancel(alarm.id.toInt() + PRE_ALARM_ID_OFFSET)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         alarmManager.cancel(getPendingIntent(context, alarm))
         alarmManager.cancel(getPreAlarmPendingIntent(context, alarm))
     }
 
     fun cancel(context: Context, id: Long) {
+        NotificationManagerCompat.from(context).cancel(id.toInt() + PRE_ALARM_ID_OFFSET)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
         val mainIntent = Intent(context.applicationContext,
