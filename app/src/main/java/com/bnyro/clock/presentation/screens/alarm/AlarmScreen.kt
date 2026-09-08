@@ -1,5 +1,6 @@
 package com.bnyro.clock.presentation.screens.alarm
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
@@ -74,6 +75,11 @@ fun AlarmScreen(
 
     var wannadeletequestion by remember { mutableStateOf(false) }
     var showAlarmKinds by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = alarmModel.showFilter) {
+        alarmModel.showFilter = false
+        alarmModel.resetFilters()
+    }
 
     TopBarScaffold(
         title = if (isSelectionMode) {
