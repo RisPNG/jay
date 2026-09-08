@@ -65,6 +65,16 @@ def _run_starts(alarm: dict, start: date, from_day: date) -> Iterator[date]:
             (from_day.year - start.year) * MONTHS_PER_YEAR + from_day.month - start.month
         ) // months
         cycle = elapsed
+        while cycle > 0:
+            month = _add_months(start.replace(day=1), cycle * months)
+            day = (
+                date(month.year, month.month, min(start.day, monthrange(month.year, month.month)[1]))
+                if alarm["repeat_anchor"] == "DAY_OF_MONTH"
+                else _weekday_in_month(month.year, month.month, position, start.weekday())
+            )
+            if day is not None and day <= from_day:
+                break
+            cycle -= 1
         while True:
             month = _add_months(start.replace(day=1), cycle * months)
             if alarm["repeat_anchor"] == "DAY_OF_MONTH":
@@ -307,35 +317,22 @@ def evaluate_alarm_cycle(
     ).fetchone()
     if cycle["count"] < expected_members or cycle["pending"] > 0:
         return []
-    if alarm["shared_answers"]:
-        # the fan-out resolves every member's occurrence without recording an activity
-        # for each of them, so any member answering keeps the shared cycle active
-        active = connection.execute(
-            """
-            SELECT 1 FROM alarm_activity
-            WHERE alarm_id = %s AND alarm_revision = %s
-              AND kind IN ('snoozed', 'dismissed')
-            LIMIT 1
-            """,
-            (alarm_id, alarm_revision),
-        ).fetchone() is not None
-    else:
-        active = connection.execute(
-            """
-            SELECT 1
-            FROM alarm_activity activity
-            JOIN alarm_occurrences occurrence
-              ON occurrence.alarm_id = activity.alarm_id
-             AND occurrence.device_id = activity.device_id
-             AND occurrence.occurrence_id = activity.occurrence_id
-            WHERE activity.alarm_id = %s
-              AND activity.alarm_revision = %s
-              AND occurrence.cycle_date = %s
-              AND activity.kind IN ('snoozed', 'dismissed')
-            LIMIT 1
-            """,
-            (alarm_id, alarm_revision, cycle_date),
-        ).fetchone() is not None
+    active = connection.execute(
+        """
+        SELECT 1
+        FROM alarm_activity activity
+        JOIN alarm_occurrences occurrence
+          ON occurrence.alarm_id = activity.alarm_id
+         AND occurrence.device_id = activity.device_id
+         AND occurrence.occurrence_id = activity.occurrence_id
+        WHERE activity.alarm_id = %s
+          AND activity.alarm_revision = %s
+          AND occurrence.cycle_date = %s
+          AND activity.kind IN ('snoozed', 'dismissed')
+        LIMIT 1
+        """,
+        (alarm_id, alarm_revision, cycle_date),
+    ).fetchone() is not None
     streak = 0 if active else alarm["inactive_cycle_streak"] + 1
     if streak < 3:
         connection.execute(

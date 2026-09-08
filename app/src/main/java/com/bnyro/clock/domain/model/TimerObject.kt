@@ -19,6 +19,7 @@ data class TimerObject(
     var vibrationPatternName: String = "Default",
     var incrementSeconds: Int? = null,
     var sharedTimerId: String? = null,
+    var sharedExpiresAt: Long = 0L,
     var sharedGroupName: String? = null,
     var sharedCanEdit: Boolean = true,
     var sharedAnswerAsOne: Boolean = false

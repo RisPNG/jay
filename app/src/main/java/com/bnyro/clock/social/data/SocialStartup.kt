@@ -1,6 +1,12 @@
 package com.bnyro.clock.social.data
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
+import androidx.core.os.UserManagerCompat
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -17,6 +23,21 @@ import java.util.concurrent.TimeUnit
 
 object SocialStartup {
     fun initialize(application: Application) {
+        if (!UserManagerCompat.isUserUnlocked(application)) {
+            ContextCompat.registerReceiver(
+                application,
+                object : BroadcastReceiver() {
+                    override fun onReceive(context: Context, intent: Intent) {
+                        application.unregisterReceiver(this)
+                        initialize(application)
+                    }
+                },
+                IntentFilter(Intent.ACTION_USER_UNLOCKED),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            return
+        }
+        SocialActivityWorker.enqueuePending(application)
         SocialNotificationHelper.createNotificationChannel(application)
         if (
             BuildConfig.JAY_FIREBASE_APPLICATION_ID.isNotBlank() &&

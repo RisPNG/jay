@@ -137,15 +137,15 @@ class AlarmService : Service() {
         val alarm = runBlocking {
             alarmRepository.getAlarmById(id)
         } ?: return START_STICKY
+        occurrenceId = Preferences.instance.getString(
+            "${SocialPreferences.alarmOccurrencePrefix}${alarm.id}",
+            null
+        ) ?: "${alarm.id}:${System.currentTimeMillis()}"
         val notification = createNotification(this, alarm)
         startForeground(notificationId, notification)
 
         play(alarm)
         currentAlarm = alarm
-        occurrenceId = Preferences.instance.getString(
-            "${SocialPreferences.alarmOccurrencePrefix}${alarm.id}",
-            null
-        ) ?: "${alarm.id}:${System.currentTimeMillis()}"
         outcomeRecorded = false
         val alarmActivityIntent = Intent(this, AlarmActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
@@ -313,6 +313,7 @@ class AlarmService : Service() {
         val alarmActivityIntent = Intent(context, AlarmActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
             .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+            .putExtra(EXTRA_OCCURRENCE_ID, occurrenceId)
 
         val pendingIntent = PendingIntent.getActivity(
             this@AlarmService,

@@ -23,7 +23,7 @@ class SocialTimerWorker(context: Context, parameters: WorkerParameters) :
 
             ACTION_CANCEL -> repository.cancelSharedTimer(timerId)
 
-            ACTION_DISMISSED -> repository.suppressSharedTimer(timerId)
+            ACTION_DISMISSED -> repository.suppressSharedTimer(timerId, inputData.getLong(EXPIRES_AT, 0L))
 
             else -> return Result.failure()
         }
@@ -35,6 +35,7 @@ class SocialTimerWorker(context: Context, parameters: WorkerParameters) :
     }
 
     companion object {
+        private const val EXPIRES_AT = "expires_at"
         private const val TIMER_ID = "timer_id"
         private const val ACTION = "action"
         private const val ADJUSTMENT = "adjustment"
@@ -50,8 +51,10 @@ class SocialTimerWorker(context: Context, parameters: WorkerParameters) :
             enqueue(context, ACTION_CANCEL, timerId)
         }
 
-        fun dismissed(context: Context, timerId: String) {
-            enqueue(context, ACTION_DISMISSED, timerId, requiresNetwork = false)
+        fun dismissed(context: Context, timerId: String, expiresAt: Long) {
+            enqueue(context, ACTION_DISMISSED, timerId, requiresNetwork = false) {
+                putLong(EXPIRES_AT, expiresAt)
+            }
         }
 
         private fun enqueue(

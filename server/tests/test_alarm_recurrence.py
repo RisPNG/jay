@@ -115,3 +115,20 @@ def test_the_trigger_stops_where_the_repetition_ends():
     assert next_alarm_trigger(running, "UTC", after) == datetime(
         2099, 8, 7, 8, tzinfo=UTC
     )
+
+
+def test_monthly_run_continues_across_month_boundary():
+    alarm = recurring_alarm(date(2099, 1, 20), "MONTH", repeat_duration=20)
+    assert occurrence_on_or_after(alarm, date(2099, 2, 1)) == date(2099, 2, 1)
+    assert occurrence_on_or_after(alarm, date(2099, 2, 9)) == date(2099, 2, 20)
+
+
+def test_yearly_run_continues_before_anniversary():
+    alarm = recurring_alarm(date(2099, 12, 20), "YEAR", repeat_duration=2, repeat_duration_unit="MONTH")
+    assert occurrence_on_or_after(alarm, date(2100, 1, 1)) == date(2100, 1, 1)
+
+
+def test_fifth_weekday_run_continues_through_month_without_anchor():
+    alarm = recurring_alarm(date(2026, 1, 29), "MONTH", repeat_anchor="DAY_OF_WEEK", repeat_duration=40)
+    assert occurrence_on_or_after(alarm, date(2026, 2, 20)) == date(2026, 2, 20)
+    assert occurrence_on_or_after(alarm, date(2026, 3, 1)) == date(2026, 3, 1)

@@ -1,5 +1,6 @@
 package com.bnyro.clock.presentation.screens.alarm
 
+import androidx.core.os.UserManagerCompat
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -78,6 +79,7 @@ class AlarmActivity : RingingActivity() {
     }
 
     override fun onNewIntent(intent: Intent) {
+        setIntent(intent)
         handleIntent(intent)
         super.onNewIntent(intent)
     }
@@ -85,14 +87,17 @@ class AlarmActivity : RingingActivity() {
     private fun handleIntent(intent: Intent) {
         val id = intent.getLongExtra(AlarmHelper.EXTRA_ID, -1).takeIf { it != -1L } ?: return
         val alarmRepository = (application as App).container.alarmRepository
-        val socialRepository = (application as App).container.socialRepository
         this.alarm = runBlocking {
             alarmRepository.getAlarmById(id)
         } ?: return
-        groupName = runBlocking {
-            socialRepository.alarmGroupNames.first()
-                .firstOrNull { it.localAlarmId == id }
-                ?.groupName
+        groupName = if (UserManagerCompat.isUserUnlocked(this)) {
+            runBlocking {
+                (application as App).container.socialRepository.alarmGroupNames.first()
+                    .firstOrNull { it.localAlarmId == id }
+                    ?.groupName
+            }
+        } else {
+            null
         }
     }
 

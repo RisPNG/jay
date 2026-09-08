@@ -18,7 +18,7 @@ import com.bnyro.clock.social.domain.SocialMember
         SharedAlarmLink::class,
         DismissedSharedTimer::class
     ],
-    version = 5
+    version = 6
 )
 abstract class SocialDatabase : RoomDatabase() {
     abstract fun socialDao(): SocialDao
@@ -84,6 +84,14 @@ abstract class SocialDatabase : RoomDatabase() {
                         override fun migrate(db: SupportSQLiteDatabase) {
                             db.execSQL(
                                 "ALTER TABLE social_groups ADD COLUMN sharedAnswers " +
+                                    "INTEGER NOT NULL DEFAULT 0"
+                            )
+                        }
+                    },
+                    object : Migration(5, 6) {
+                        override fun migrate(db: SupportSQLiteDatabase) {
+                            db.execSQL(
+                                "ALTER TABLE dismissed_shared_timers ADD COLUMN timerExpiresAt " +
                                     "INTEGER NOT NULL DEFAULT 0"
                             )
                         }

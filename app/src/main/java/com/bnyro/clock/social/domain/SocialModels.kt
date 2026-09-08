@@ -100,7 +100,8 @@ data class AlarmGroupName(
 @Entity(tableName = "dismissed_shared_timers")
 data class DismissedSharedTimer(
     @androidx.room.PrimaryKey val timerId: String,
-    val expiresAt: Long
+    val expiresAt: Long,
+    @androidx.room.ColumnInfo(defaultValue = "0") val timerExpiresAt: Long
 )
 
 data class SocialChange(

@@ -945,11 +945,7 @@ def create_shared_alarm(
             },
         )
         schedule_alarm_occurrences(connection, alarm_id)
-        push_tokens = (
-            get_group_push_tokens(connection, alarm.group_id, device["id"])
-            if group["notify_alarm_changes"]
-            else []
-        )
+        push_tokens = get_group_push_tokens(connection, alarm.group_id, device["id"])
     send_group_sync(push_tokens)
     return {"id": alarm_id, "revision": 1}
 
@@ -1079,11 +1075,7 @@ def update_shared_alarm(
                 """,
                 (alarm["sound_id"],),
             )
-        push_tokens = (
-            get_group_push_tokens(connection, alarm["group_id"], device["id"])
-            if group["notify_alarm_changes"]
-            else []
-        )
+        push_tokens = get_group_push_tokens(connection, alarm["group_id"], device["id"])
     send_group_sync(push_tokens)
     return {"id": alarm_id, "revision": changed["revision"]}
 
@@ -1140,11 +1132,7 @@ def delete_shared_alarm(
                 """,
                 (alarm["sound_id"],),
             )
-        push_tokens = (
-            get_group_push_tokens(connection, alarm["group_id"], device["id"])
-            if group["notify_alarm_changes"]
-            else []
-        )
+        push_tokens = get_group_push_tokens(connection, alarm["group_id"], device["id"])
     send_group_sync(push_tokens)
     return {"id": alarm_id, "revision": changed["revision"]}
 
@@ -1622,7 +1610,7 @@ def adjust_shared_timer(
 ) -> dict:
     with transaction() as connection:
         timer = connection.execute(
-            "SELECT * FROM shared_timers WHERE id = %s", (timer_id,)
+            "SELECT * FROM shared_timers WHERE id = %s FOR UPDATE", (timer_id,)
         ).fetchone()
         if timer is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Shared timer not found")

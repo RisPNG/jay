@@ -366,13 +366,13 @@ class SocialRepository(
                 })
             }
 
-            Preferences.edit { putLong(SocialPreferences.syncCursorKey, response.cursor) }
-
             applySharedTimers(response.timers, synchronizedGroups, api)
             soundStore.prune(
                 response.alarms.mapNotNull { it.soundId }.toSet() +
                     response.timers.mapNotNull { it.soundId }.toSet()
             )
+
+            Preferences.edit { putLong(SocialPreferences.syncCursorKey, response.cursor) }
 
             SocialSyncResult(
                 if (previousCursor == 0L) emptyList() else response.changes.map {
@@ -871,8 +871,8 @@ class SocialRepository(
     /**
      * Hands the group timers the server still holds to the timer service, which materializes the
      * ones this device has not answered yet and drops the ones the group is done with. A timer
-     * this device dismissed is suppressed until the server forgets it, so answering a group timer
-     * stays everyone's own.
+     * this device dismissed is suppressed for that expiry, so another run can return while
+     * answering a group timer stays everyone's own.
      */
     private suspend fun applySharedTimers(
         timers: List<com.bnyro.clock.social.domain.SharedTimerDto>,
@@ -880,70 +880,67 @@ class SocialRepository(
         api: SocialApi
     ) {
         val now = System.currentTimeMillis()
-        socialDao.clearDismissedTimers(now - SUPPRESSED_TIMER_LIFETIME_MILLIS)
-        val suppressedTimerIds = socialDao.getDismissedTimers().map { it.timerId }.toSet()
+        socialDao.clearDismissedTimers(now)
+        val suppressedTimers = socialDao.getDismissedTimers().associateBy { it.timerId }
         val activeTimerIds = mutableListOf<String>()
         timers.forEach { remote ->
             val expiresAt = runCatching {
                 java.time.OffsetDateTime.parse(remote.expiresAt).toInstant().toEpochMilli()
             }.getOrNull() ?: return@forEach
             if (expiresAt < now - SHARED_TIMER_LINGER_MILLIS) return@forEach
-            if (remote.id in suppressedTimerIds) return@forEach
+            val dismissed = suppressedTimers[remote.id]
+            if (dismissed?.timerExpiresAt == expiresAt ||
+                (dismissed?.timerExpiresAt == 0L && expiresAt <= now)
+            ) return@forEach
             val group = groups.firstOrNull { it.id == remote.groupId } ?: return@forEach
             val soundMode = SharedSoundMode.valueOf(remote.soundMode.uppercase())
             val soundFile = remote.soundId?.takeIf { soundMode == SharedSoundMode.SHARED }
                 ?.let { runCatching { SharedSoundStore(context).cache(it, api) }.getOrNull() }
             activeTimerIds += remote.id
-            runCatching {
-                context.startService(
-                    Intent(context, TimerService::class.java)
-                        .setAction(TimerService.SYNC_SHARED_TIMER_ACTION)
-                        .putExtra(TimerService.SHARED_TIMER_ID_EXTRA_KEY, remote.id)
-                        .putExtra(TimerService.SHARED_TIMER_GROUP_NAME_EXTRA_KEY, group.name)
-                        .putExtra(TimerService.SHARED_TIMER_LABEL_EXTRA_KEY, remote.label)
-                        .putExtra(TimerService.SHARED_TIMER_DURATION_EXTRA_KEY, remote.durationSeconds)
-                        .putExtra(TimerService.SHARED_TIMER_INCREMENT_EXTRA_KEY, remote.incrementSeconds)
-                        .putExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, expiresAt)
-                        .putExtra(TimerService.SHARED_TIMER_CAN_EDIT_EXTRA_KEY, group.canEditAlarms)
-                        .putExtra(
-                            TimerService.SHARED_TIMER_ANSWER_AS_ONE_EXTRA_KEY,
-                            group.sharedAnswers
-                        )
-                        .putExtra(
-                            TimerService.SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY,
-                            soundMode != SharedSoundMode.OFF
-                        )
-                        .putExtra(
-                            TimerService.SHARED_TIMER_SOUND_NAME_EXTRA_KEY,
-                            remote.soundTitle
-                        )
-                        .putExtra(
-                            TimerService.SHARED_TIMER_SOUND_URI_EXTRA_KEY,
-                            soundFile?.takeIf { System.currentTimeMillis() < expiresAt }
-                                ?.toURI()?.toString()
-                        )
-                        .putExtra(TimerService.SHARED_TIMER_VIBRATE_EXTRA_KEY, remote.vibrate)
-                        .putExtra(
-                            TimerService.SHARED_TIMER_VIBRATION_PATTERN_EXTRA_KEY,
-                            remote.vibrationPattern.toIntArray()
-                        )
-                        .putExtra(
-                            TimerService.SHARED_TIMER_VIBRATION_PATTERN_NAME_EXTRA_KEY,
-                            remote.vibrationPatternName
-                        )
-                )
-            }
-        }
-        runCatching {
-            context.startService(
+            androidx.core.content.ContextCompat.startForegroundService(
+                context,
                 Intent(context, TimerService::class.java)
-                    .setAction(TimerService.PRUNE_SHARED_TIMERS_ACTION)
+                    .setAction(TimerService.SYNC_SHARED_TIMER_ACTION)
+                    .putExtra(TimerService.SHARED_TIMER_ID_EXTRA_KEY, remote.id)
+                    .putExtra(TimerService.SHARED_TIMER_GROUP_NAME_EXTRA_KEY, group.name)
+                    .putExtra(TimerService.SHARED_TIMER_LABEL_EXTRA_KEY, remote.label)
+                    .putExtra(TimerService.SHARED_TIMER_DURATION_EXTRA_KEY, remote.durationSeconds)
+                    .putExtra(TimerService.SHARED_TIMER_INCREMENT_EXTRA_KEY, remote.incrementSeconds)
+                    .putExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, expiresAt)
+                    .putExtra(TimerService.SHARED_TIMER_CAN_EDIT_EXTRA_KEY, group.canEditAlarms)
                     .putExtra(
-                        TimerService.ACTIVE_SHARED_TIMER_IDS_EXTRA_KEY,
-                        ArrayList(activeTimerIds)
+                        TimerService.SHARED_TIMER_ANSWER_AS_ONE_EXTRA_KEY,
+                        group.sharedAnswers
+                    )
+                    .putExtra(
+                        TimerService.SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY,
+                        soundMode != SharedSoundMode.OFF
+                    )
+                    .putExtra(
+                        TimerService.SHARED_TIMER_SOUND_NAME_EXTRA_KEY,
+                        remote.soundTitle
+                    )
+                    .putExtra(
+                        TimerService.SHARED_TIMER_SOUND_URI_EXTRA_KEY,
+                        soundFile?.takeIf { System.currentTimeMillis() < expiresAt }
+                            ?.toURI()?.toString()
+                    )
+                    .putExtra(TimerService.SHARED_TIMER_VIBRATE_EXTRA_KEY, remote.vibrate)
+                    .putExtra(
+                        TimerService.SHARED_TIMER_VIBRATION_PATTERN_EXTRA_KEY,
+                        remote.vibrationPattern.toIntArray()
+                    )
+                    .putExtra(
+                        TimerService.SHARED_TIMER_VIBRATION_PATTERN_NAME_EXTRA_KEY,
+                        remote.vibrationPatternName
                     )
             )
         }
+        context.sendBroadcast(
+            TimerService.updateStateIntent(TimerService.PRUNE_SHARED_TIMERS_ACTION, 0)
+                .setPackage(context.packageName)
+                .putExtra(TimerService.ACTIVE_SHARED_TIMER_IDS_EXTRA_KEY, ArrayList(activeTimerIds))
+        )
     }
 
     suspend fun startSharedTimer(
@@ -1040,11 +1037,12 @@ class SocialRepository(
         synchronize()
     }
 
-    suspend fun suppressSharedTimer(timerId: String) = withContext(Dispatchers.IO) {
+    suspend fun suppressSharedTimer(timerId: String, timerExpiresAt: Long) = withContext(Dispatchers.IO) {
         socialDao.putDismissedTimer(
             com.bnyro.clock.social.domain.DismissedSharedTimer(
                 timerId,
-                System.currentTimeMillis() + SUPPRESSED_TIMER_LIFETIME_MILLIS
+                System.currentTimeMillis() + SUPPRESSED_TIMER_LIFETIME_MILLIS,
+                timerExpiresAt
             )
         )
     }

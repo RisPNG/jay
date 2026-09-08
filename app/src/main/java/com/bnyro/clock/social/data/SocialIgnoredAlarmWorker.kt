@@ -1,6 +1,7 @@
 package com.bnyro.clock.social.data
 
 import android.content.Context
+import androidx.core.os.UserManagerCompat
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -71,6 +72,7 @@ class SocialIgnoredAlarmWorker(context: Context, parameters: WorkerParameters) :
                 Preferences.alarmTimeoutMinutesKey,
                 AlarmService.ALARM_TIMEOUT_MINUTES
             ) * 60_000L
+            if (!UserManagerCompat.isUserUnlocked(context)) return
             WorkManager.getInstance(context).enqueueUniqueWork(
                 "jay_ignored_alarm_$alarmId",
                 ExistingWorkPolicy.REPLACE,

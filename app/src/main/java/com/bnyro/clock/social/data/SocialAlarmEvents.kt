@@ -1,13 +1,16 @@
 package com.bnyro.clock.social.data
 
 import android.content.Context
+import androidx.core.os.UserManagerCompat
 import androidx.work.WorkManager
 import com.bnyro.clock.social.domain.AlarmActivityKind
 
 object SocialAlarmEvents {
     fun dismiss(context: Context, alarmId: Long, occurrenceId: String? = null) {
         SocialActivityWorker.enqueue(context, alarmId, AlarmActivityKind.DISMISSED, occurrenceId)
-        WorkManager.getInstance(context).cancelUniqueWork("jay_ignored_alarm_$alarmId")
+        if (UserManagerCompat.isUserUnlocked(context)) {
+            WorkManager.getInstance(context).cancelUniqueWork("jay_ignored_alarm_$alarmId")
+        }
     }
 
     fun snooze(

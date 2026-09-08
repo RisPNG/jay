@@ -798,7 +798,8 @@ def test_play_entitlement_is_bound_to_the_authenticated_device(monkeypatch) -> N
         assert stored["play_entitlement_expires_at"] is None
 
 
-def test_three_whole_group_cycles_without_activity_delete_the_alarm() -> None:
+@pytest.mark.parametrize("shared_answers", [False, True])
+def test_three_whole_group_cycles_without_activity_delete_the_alarm(shared_answers) -> None:
     with TestClient(app) as client:
         with transaction() as connection:
             connection.execute(
@@ -809,7 +810,7 @@ def test_three_whole_group_cycles_without_activity_delete_the_alarm() -> None:
         group_id = client.post(
             "/v1/groups",
             headers=leader,
-            json={"name": "Sleepers", "alarm_permission": "everyone"},
+            json={"name": "Sleepers", "alarm_permission": "everyone", "shared_answers": shared_answers},
         ).json()["id"]
         alarm_id = client.post(
             "/v1/alarms",
@@ -818,6 +819,16 @@ def test_three_whole_group_cycles_without_activity_delete_the_alarm() -> None:
         ).json()["id"]
         with transaction() as connection:
             connection.execute("DELETE FROM alarm_occurrences WHERE alarm_id = %s", (alarm_id,))
+            connection.execute(
+                """
+                INSERT INTO alarm_activity (
+                    id, alarm_id, group_id, alarm_revision, device_id, kind,
+                    occurred_at, occurrence_id
+                ) VALUES (%s, %s, %s, 1, %s, 'dismissed', %s, 'old-cycle')
+                """,
+                (uuid4(), alarm_id, group_id, leader["X-Jay-Device-ID"],
+                 datetime(2026, 8, 1, tzinfo=UTC)),
+            )
             for cycle_number, cycle_date in enumerate(
                 (date(2026, 9, 1), date(2026, 9, 3), date(2027, 9, 1)),
                 start=1,
@@ -1456,3 +1467,36 @@ def test_shared_sound_access_environment_is_validated(monkeypatch) -> None:
     monkeypatch.setenv("SHARED_SOUND_ACCESS", "invalid")
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+def test_muted_alarm_changes_still_send_sync_pushes(monkeypatch):
+    sent = []
+    monkeypatch.setattr("jay_server.main.send_group_sync", lambda tokens: sent.append(tokens))
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_deliveries, alarm_occurrences, "
+                "shared_alarms, shared_timers, group_invites, group_members, groups, "
+                "devices CASCADE"
+            )
+        leader = register_device(client, "Quiet Mango", "leader-secret-that-is-long-enough")
+        member = register_device(client, "Cozy Otter", "member-secret-that-is-long-enough")
+        group_id = client.post("/v1/groups", headers=leader, json={
+            "name": "Muted", "alarm_permission": "everyone", "notify_alarm_changes": False,
+        }).json()["id"]
+        invitation = client.post(f"/v1/groups/{group_id}/invites", headers=leader, json={}).json()
+        assert client.post("/v1/groups/join", headers=member, json={"token": invitation["token"]}).status_code == 200
+        assert client.put("/v1/device/push-token", headers=member, json={"token": "muted-recipient"}).status_code == 204
+        sent.clear()
+        payload = alarm_payload(group_id)
+        created = client.post("/v1/alarms", headers=leader, json=payload)
+        assert created.status_code == 201
+        alarm_id = created.json()["id"]
+        assert sent[-1] == ["muted-recipient"]
+        updated = client.put(f"/v1/alarms/{alarm_id}", headers=leader, json=payload | {"expected_revision": 1, "label": "Changed"})
+        assert updated.status_code == 200
+        assert sent[-1] == ["muted-recipient"]
+        deleted = client.request("DELETE", f"/v1/alarms/{alarm_id}", headers=leader, json={"expected_revision": 2})
+        assert deleted.status_code == 200
+        assert len(sent) == 3
+        assert sent[-1] == ["muted-recipient"]

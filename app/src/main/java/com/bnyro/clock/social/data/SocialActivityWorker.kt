@@ -1,6 +1,10 @@
 package com.bnyro.clock.social.data
 
 import android.content.Context
+import androidx.core.os.UserManagerCompat
+import androidx.work.ExistingWorkPolicy
+import com.bnyro.clock.util.Preferences
+import org.json.JSONObject
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -51,25 +55,54 @@ class SocialActivityWorker(context: Context, parameters: WorkerParameters) :
             occurrenceId: String? = null,
             reason: String? = null
         ) {
-            WorkManager.getInstance(context).enqueue(
-                OneTimeWorkRequestBuilder<SocialActivityWorker>()
-                    .setConstraints(
-                        Constraints.Builder()
-                            .setRequiredNetworkType(NetworkType.CONNECTED)
+            val eventId = UUID.randomUUID().toString()
+            val event = JSONObject()
+                .put(ALARM_ID, alarmId)
+                .put(ACTIVITY_KIND, kind.name)
+                .put(EVENT_ID, eventId)
+                .put(OCCURRED_AT, Instant.now().toString())
+                .put(OCCURRENCE_ID, occurrenceId)
+                .put(REASON, reason)
+            Preferences.instance.edit()
+                .putString("jayPendingAlarmActivity:$eventId", event.toString())
+                .commit()
+            enqueuePending(context)
+        }
+
+        @Synchronized
+        fun enqueuePending(context: Context) {
+            if (!UserManagerCompat.isUserUnlocked(context)) return
+            Preferences.instance.all.filterKeys { it.startsWith("jayPendingAlarmActivity:") }
+                .forEach { (key, value) ->
+                    val event = JSONObject(value as String)
+                    if (event.getString(ACTIVITY_KIND) in listOf("DISMISSED", "SNOOZED")) {
+                        WorkManager.getInstance(context).cancelUniqueWork(
+                            "jay_ignored_alarm_${event.getLong(ALARM_ID)}"
+                        )
+                    }
+                    WorkManager.getInstance(context).enqueueUniqueWork(
+                        key,
+                        ExistingWorkPolicy.KEEP,
+                        OneTimeWorkRequestBuilder<SocialActivityWorker>()
+                            .setConstraints(
+                                Constraints.Builder()
+                                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                                    .build()
+                            )
+                            .setInputData(
+                                Data.Builder()
+                                    .putLong(ALARM_ID, event.getLong(ALARM_ID))
+                                    .apply {
+                                        event.keys().forEach { field ->
+                                            if (field != ALARM_ID) putString(field, event.getString(field))
+                                        }
+                                    }
+                                    .build()
+                            )
                             .build()
-                    )
-                    .setInputData(
-                        Data.Builder()
-                            .putLong(ALARM_ID, alarmId)
-                            .putString(ACTIVITY_KIND, kind.name)
-                            .putString(EVENT_ID, UUID.randomUUID().toString())
-                            .putString(OCCURRED_AT, Instant.now().toString())
-                            .putString(OCCURRENCE_ID, occurrenceId)
-                            .putString(REASON, reason)
-                            .build()
-                    )
-                    .build()
-            )
+                    ).result.get()
+                    Preferences.instance.edit().remove(key).commit()
+                }
         }
     }
 }

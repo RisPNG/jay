@@ -137,6 +137,10 @@ class TimerService : Service() {
         @RequiresApi(Build.VERSION_CODES.N)
         override fun onReceive(context: Context, intent: Intent) {
             Log.e("receive", intent.toString())
+            if (intent.getStringExtra(ACTION_EXTRA_KEY) == PRUNE_SHARED_TIMERS_ACTION) {
+                pruneSharedTimers(intent)
+                return
+            }
             val id = intent.getIntExtra(ID_EXTRA_KEY, 0)
             val obj = timerObjects.find { it.id == id } ?: return
             when (val action = intent.getStringExtra(ACTION_EXTRA_KEY)) {
@@ -151,7 +155,7 @@ class TimerService : Service() {
                         if (answersForEveryone) {
                             SocialTimerActions.cancel(applicationContext, sharedId)
                         } else {
-                            SocialTimerActions.dismissed(applicationContext, sharedId)
+                            SocialTimerActions.dismissed(applicationContext, sharedId, obj.sharedExpiresAt)
                         }
                     }
                     stop(obj, cancelled = true)
@@ -365,10 +369,10 @@ class TimerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == SYNC_SHARED_TIMER_ACTION) {
             syncSharedTimer(intent)
-            return START_STICKY
-        }
-        if (intent?.action == PRUNE_SHARED_TIMERS_ACTION) {
-            pruneSharedTimers(intent)
+            if (ringingTimerId == null && timerObjects.none { it.state.value == WatchState.RUNNING }) {
+                stopSelf(startId)
+                return START_NOT_STICKY
+            }
             return START_STICKY
         }
         if (intent?.action == ACTION_TIMER_EXPIRED) {
@@ -528,6 +532,7 @@ class TimerService : Service() {
                 state = mutableStateOf(WatchState.RUNNING),
                 incrementSeconds = incrementSeconds,
                 sharedTimerId = sharedId,
+                sharedExpiresAt = expiresAt,
                 sharedGroupName = groupName,
                 sharedCanEdit = canEdit,
                 sharedAnswerAsOne = answerAsOne,
@@ -552,6 +557,7 @@ class TimerService : Service() {
             return
         }
 
+        existing.sharedExpiresAt = expiresAt
         existing.sharedGroupName = groupName
         existing.sharedCanEdit = canEdit
         existing.sharedAnswerAsOne = answerAsOne

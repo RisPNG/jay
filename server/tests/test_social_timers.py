@@ -1,4 +1,6 @@
 import hashlib
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -199,3 +201,33 @@ def test_shared_timer_lingering_after_expiry_is_swept() -> None:
 
         timers = sync_timers(client, member)
         assert [timer["label"] for timer in timers] == ["Pasta"]
+
+
+def test_concurrent_additions_preserve_both_increments():
+    with TestClient(app) as client:
+        with transaction() as connection:
+            connection.execute(
+                "TRUNCATE changes, alarm_activity, alarm_deliveries, alarm_occurrences, "
+                "shared_alarms, shared_timers, group_invites, group_members, groups, "
+                "devices CASCADE"
+            )
+        leader = register_device(client, "Lively Wren", "leader-secret-that-is-long-enough")
+        group_id = client.post("/v1/groups", headers=leader, json={"name": "Concurrent kitchen"}).json()["id"]
+        timer_id = client.post(f"/v1/groups/{group_id}/timers", headers=leader, json=timer_payload()).json()["id"]
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            with transaction() as connection:
+                before = connection.execute("SELECT expires_at FROM shared_timers WHERE id = %s FOR UPDATE", (timer_id,)).fetchone()["expires_at"]
+                requests = [executor.submit(client.patch, f"/v1/timers/{timer_id}", headers=leader, json={"action": "add"}) for _ in range(2)]
+                deadline = time.monotonic() + 10
+                waiting = 0
+                while time.monotonic() < deadline:
+                    with transaction() as observer:
+                        waiting = observer.execute("SELECT count(*) AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%%shared_timers%%'").fetchone()["count"]
+                    if waiting >= 2:
+                        break
+                    time.sleep(0.01)
+            assert waiting >= 2
+            assert all(request.result(timeout=10).status_code == 200 for request in requests)
+        with transaction() as connection:
+            after = connection.execute("SELECT expires_at FROM shared_timers WHERE id = %s", (timer_id,)).fetchone()["expires_at"]
+        assert (after - before).total_seconds() == 120

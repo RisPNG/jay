@@ -11,7 +11,7 @@ object SocialTimerActions {
         SocialTimerWorker.cancel(context, timerId)
     }
 
-    fun dismissed(context: Context, timerId: String) {
-        SocialTimerWorker.dismissed(context, timerId)
+    fun dismissed(context: Context, timerId: String, expiresAt: Long) {
+        SocialTimerWorker.dismissed(context, timerId, expiresAt)
     }
 }
