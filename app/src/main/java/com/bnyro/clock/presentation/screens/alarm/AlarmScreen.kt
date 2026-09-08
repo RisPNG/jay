@@ -1,6 +1,7 @@
 package com.bnyro.clock.presentation.screens.alarm
 
 import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalConfiguration
 import com.bnyro.clock.presentation.screens.clock.components.DigitalClockDisplay
 import androidx.compose.foundation.layout.Column
@@ -88,6 +89,11 @@ fun AlarmScreen(
     var showToggleConfirmation by remember { mutableStateOf(false) }
     var wannadeletequestion by remember { mutableStateOf(false) }
     var showAlarmKinds by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = alarmModel.showFilter) {
+        alarmModel.showFilter = false
+        alarmModel.resetFilters()
+    }
 
     TopBarScaffold(
         title = if (isSelectionMode) {
