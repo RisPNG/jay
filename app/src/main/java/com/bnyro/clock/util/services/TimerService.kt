@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -383,7 +384,7 @@ class TimerService : Service() {
                 Log.e("TimerService", "error D:D:D:DD:D:D:D:D:D:")
                 NotificationManagerCompat.from(this).cancel(id)
                 if (timerObjects.isEmpty()) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
                     stopSelf()
                 }
                 return START_STICKY
@@ -703,7 +704,7 @@ class TimerService : Service() {
         if (counting != null) {
             startForeground(counting.id, getNotification(counting))
         } else {
-            stopForeground(STOP_FOREGROUND_REMOVE)
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         }
     }
 
