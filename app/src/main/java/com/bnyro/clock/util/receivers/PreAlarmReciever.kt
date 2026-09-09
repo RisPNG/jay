@@ -73,7 +73,7 @@ class PreAlarmReceiver : BroadcastReceiver() {
 
                     withContext(Dispatchers.Main) {
                         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                            .setSmallIcon(R.drawable.ic_alarm)
+                            .setSmallIcon(R.drawable.ic_notification)
                             .setContentTitle(
                                 alarm.label?.takeIf { it.isNotBlank() }?.let {
                                     context.getString(
@@ -85,7 +85,7 @@ class PreAlarmReceiver : BroadcastReceiver() {
                             .setContentText("$formattedDay $formattedTime")
                             .setContentIntent(contentPendingIntent)
                             .setPriority(NotificationCompat.PRIORITY_LOW)
-                            .addAction(R.drawable.ic_alarm, context.getString(R.string.dismiss), dismissPendingIntent)
+                            .addAction(R.drawable.ic_notification, context.getString(R.string.dismiss), dismissPendingIntent)
 
                             .setOngoing(true)
                             .build()

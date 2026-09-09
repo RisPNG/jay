@@ -455,7 +455,7 @@ class TimerService : Service() {
                 }
                 addAction(stopAction(timerObject))
             }
-            .setSmallIcon(R.drawable.ic_timer).setOngoing(true).build()
+            .setSmallIcon(R.drawable.ic_notification).setOngoing(true).build()
     }
 
     fun invokeChangeListener() {
@@ -822,7 +822,7 @@ class TimerService : Service() {
         )
 
         return NotificationCompat.Builder(this, notificationChannelId)
-            .setSmallIcon(R.drawable.ic_timer)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(
                 if (ringing) "-" + DateUtils.formatElapsedTime(ringDuration / 1000) else null
             )

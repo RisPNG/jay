@@ -93,6 +93,6 @@ fun PermissionRequestPagePreview() {
         subtitle = "To wake you up on time, Clock You needs permission to schedule alarms.",
         onClickConfirm = {},
         onClickCancel = {},
-        icon = R.drawable.ic_alarm
+        icon = R.drawable.ic_notification
     )
 }

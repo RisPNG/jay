@@ -47,7 +47,7 @@ fun AlarmAlertScreen(
     snoozeTime: Int,
     alarmTimeMillis: Long
 ) {
-    RingingAlert(painterResource(id = R.drawable.ic_alarm)) {
+    RingingAlert(painterResource(id = R.drawable.ic_notification)) {
         AlarmControls(label, groupName, alarmTimeMillis, snoozeTime, snoozeEnabled, onSnooze, onDismiss)
     }
 }

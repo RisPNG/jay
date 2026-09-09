@@ -55,7 +55,7 @@ sealed class Permission(
     object FullScreenAlarmPermission : Permission(
         titleRes = R.string.full_screen_alarm_permission_title,
         descriptionRes = R.string.full_screen_alarm_permission_description,
-        iconRes = R.drawable.ic_alarm
+        iconRes = R.drawable.ic_notification
     ) {
         override fun hasPermission(context: Context): Boolean {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true
@@ -76,7 +76,7 @@ sealed class Permission(
     object BatteryOptimizationPermission : Permission(
         titleRes = R.string.battery_optimization_title,
         descriptionRes = R.string.battery_optimization_description,
-        iconRes = R.drawable.ic_alarm
+        iconRes = R.drawable.ic_notification
     ) {
         override fun hasPermission(context: Context): Boolean {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
@@ -97,7 +97,7 @@ sealed class Permission(
     object AllDonePermission : Permission(
         titleRes = R.string.all_done_permission,
         descriptionRes = R.string.all_done_description,
-        iconRes = R.drawable.ic_alarm
+        iconRes = R.drawable.ic_notification
     ) {
         override fun hasPermission(context: Context): Boolean {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
@@ -119,7 +119,7 @@ sealed class Permission(
     object AlarmPermission : Permission(
         titleRes = R.string.alarm_permission_title,
         descriptionRes = R.string.alarm_permission_description,
-        iconRes = R.drawable.ic_alarm
+        iconRes = R.drawable.ic_notification
     ) {
 
         override fun hasPermission(context: Context): Boolean {
