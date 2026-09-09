@@ -141,6 +141,7 @@ class SoundSelection(CommandSerializer):
 class AlarmPayload(MemberCommand):
     local_time_ms = serializers.IntegerField(min_value=0, max_value=86399999)
     label = serializers.CharField(allow_null=True, allow_blank=True, max_length=200)
+    label_color = serializers.IntegerField(min_value=-16777216, max_value=-1, required=False)
     enabled = serializers.BooleanField()
     days = serializers.ListField(child=serializers.IntegerField(min_value=0, max_value=6), max_length=7)
     vibrate = serializers.BooleanField()
@@ -174,6 +175,7 @@ class AlarmCreate(AlarmPayload):
 
 class TimerPayload(MemberCommand):
     label = serializers.CharField(max_length=120, allow_null=True, allow_blank=True)
+    label_color = serializers.IntegerField(min_value=-16777216, max_value=-1, required=False)
     duration_seconds = serializers.IntegerField(min_value=1, max_value=86400)
     increment_seconds = serializers.IntegerField(min_value=1, max_value=3600)
     expires_at = serializers.DateTimeField()

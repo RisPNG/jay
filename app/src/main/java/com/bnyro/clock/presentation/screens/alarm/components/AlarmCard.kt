@@ -22,6 +22,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,7 +98,7 @@ fun AlarmCard(
                         )
                     }
                     alarm.label?.let {
-                        Icon(Icons.AutoMirrored.Filled.Label, null)
+                        Icon(Icons.AutoMirrored.Filled.Label, null, tint = Color(alarm.labelColor))
                         Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = it,

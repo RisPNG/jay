@@ -1905,6 +1905,11 @@
                         "nullable": true,
                         "maxLength": 200
                     },
+                    "label_color": {
+                        "type": "integer",
+                        "maximum": -1,
+                        "minimum": -16777216
+                    },
                     "enabled": {
                         "type": "boolean"
                     },
@@ -2038,6 +2043,11 @@
                         "type": "string",
                         "nullable": true,
                         "maxLength": 200
+                    },
+                    "label_color": {
+                        "type": "integer",
+                        "maximum": -1,
+                        "minimum": -16777216
                     },
                     "enabled": {
                         "type": "boolean"
@@ -2176,6 +2186,10 @@
                         "readOnly": true,
                         "nullable": true
                     },
+                    "label_color": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "enabled": {
                         "type": "boolean",
                         "readOnly": true
@@ -2301,6 +2315,7 @@
                     "group_id",
                     "id",
                     "label",
+                    "label_color",
                     "local_time_ms",
                     "repeat_anchor",
                     "repeat_duration",
@@ -3382,6 +3397,11 @@
                         "nullable": true,
                         "maxLength": 120
                     },
+                    "label_color": {
+                        "type": "integer",
+                        "maximum": -1,
+                        "minimum": -16777216
+                    },
                     "duration_seconds": {
                         "type": "integer",
                         "maximum": 86400,
@@ -3451,6 +3471,11 @@
                         "nullable": true,
                         "maxLength": 120
                     },
+                    "label_color": {
+                        "type": "integer",
+                        "maximum": -1,
+                        "minimum": -16777216
+                    },
                     "duration_seconds": {
                         "type": "integer",
                         "maximum": 86400,
@@ -3517,6 +3542,10 @@
                         "readOnly": true,
                         "nullable": true
                     },
+                    "label_color": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "duration_seconds": {
                         "type": "integer",
                         "readOnly": true
@@ -3579,6 +3608,7 @@
                     "id",
                     "increment_seconds",
                     "label",
+                    "label_color",
                     "save_id",
                     "saved_at",
                     "sound_id",

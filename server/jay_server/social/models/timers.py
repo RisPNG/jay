@@ -10,6 +10,7 @@ class SharedTimer(SavedState):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     group = models.ForeignKey("Group", on_delete=models.CASCADE, related_name="timers")
     label = models.CharField(max_length=120, null=True)
+    label_color = models.IntegerField(default=-1)
     duration_seconds = models.PositiveIntegerField()
     increment_seconds = models.PositiveIntegerField()
     expires_at = models.DateTimeField()

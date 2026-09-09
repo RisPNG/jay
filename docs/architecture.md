@@ -20,6 +20,8 @@ Groups own memberships, invitations, shared alarms, timers and sounds. A members
 
 Client-created resources have UUID keys so dependent offline operations can refer to them. Django uses conventional table and foreign-key names, explicit choices, check constraints and uniqueness constraints. Internal append-only IDs are not synchronization cursors. Historical actor references can become null while their recorded labels remain available.
 
+Shared alarms and timers carry `label_color` as an opaque signed ARGB integer. Snow (`-1`) is the default for existing items and payloads without a color. Updates from older clients that omit the field preserve the stored color. Saved timer templates retain the same value, and timer adjustments forward it with the rest of the shared configuration.
+
 Shared alarms retain recurrence, date bounds, member-local or group-time-zone interpretation, revision and sound selection. Occurrences track scheduled delivery and each member's response deadline. A delivery acknowledgement means metadata has been applied locally. Dismissal, snooze and ignored outcomes follow occurrence transitions and shared-answer rules, separately from configuration ordering. An earlier actual response can correct a server-inferred ignored outcome.
 
 Deleting a resource permanently reserves its identifier. Payload cleanup cannot allow a stale edit or create to resurrect it. Group deletion immediately denies access and schedules bounded cleanup. Storage deletion is recorded transactionally by a PostgreSQL trigger, including cascade and bulk sound deletion, so removing a database row cannot lose the obligation to delete its object.

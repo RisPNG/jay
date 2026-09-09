@@ -290,6 +290,7 @@ class SocialRepository(
                     Alarm(
                         time = remote.time,
                         label = remote.label,
+                        labelColor = remote.labelColor,
                         enabled = remote.enabled,
                         days = remote.days,
                         vibrate = remote.vibrate,
@@ -341,6 +342,7 @@ class SocialRepository(
                         local.copy(
                             time = remote.time,
                             label = remote.label,
+                            labelColor = remote.labelColor,
                             enabled = remote.enabled,
                             days = remote.days,
                             vibrate = remote.vibrate,
@@ -737,7 +739,7 @@ class SocialRepository(
         val soundId = if (soundMode == SharedSoundMode.SHARED) UUID.randomUUID().toString() else null
         val alarmId = UUID.randomUUID().toString()
         val payload = json.encodeToJsonElement(SharedAlarmRequest(
-            groupId = groupId, time = alarm.time, label = alarm.label, enabled = alarm.enabled,
+            groupId = groupId, time = alarm.time, label = alarm.label, labelColor = alarm.labelColor, enabled = alarm.enabled,
             days = alarm.days, vibrate = alarm.vibrate, startDate = LocalDate.ofEpochDay(alarm.startDate).toString(),
             repeatInterval = alarm.repeatInterval, repeatUnit = alarm.repeatUnit.name, repeatAnchor = alarm.repeatAnchor.name,
             repeatDuration = alarm.repeatDuration, repeatDurationUnit = alarm.repeatDurationUnit.name,
@@ -773,7 +775,7 @@ class SocialRepository(
             }
             val soundId = if (keepSound) link.soundId else if (soundMode == SharedSoundMode.SHARED) UUID.randomUUID().toString() else null
             val payload = JsonObject(json.encodeToJsonElement(SharedAlarmRequest(
-                time = alarm.time, label = alarm.label, enabled = alarm.enabled, days = alarm.days,
+                time = alarm.time, label = alarm.label, labelColor = alarm.labelColor, enabled = alarm.enabled, days = alarm.days,
                 vibrate = alarm.vibrate, startDate = LocalDate.ofEpochDay(alarm.startDate).toString(),
                 repeatInterval = alarm.repeatInterval, repeatUnit = alarm.repeatUnit.name, repeatAnchor = alarm.repeatAnchor.name,
                 repeatDuration = alarm.repeatDuration, repeatDurationUnit = alarm.repeatDurationUnit.name,
@@ -857,6 +859,7 @@ class SocialRepository(
                     .putExtra(TimerService.SHARED_TIMER_ID_EXTRA_KEY, remote.id)
                     .putExtra(TimerService.SHARED_TIMER_GROUP_NAME_EXTRA_KEY, group.name)
                     .putExtra(TimerService.SHARED_TIMER_LABEL_EXTRA_KEY, remote.label)
+                    .putExtra(TimerService.SHARED_TIMER_LABEL_COLOR_EXTRA_KEY, remote.labelColor)
                     .putExtra(TimerService.SHARED_TIMER_DURATION_EXTRA_KEY, remote.durationSeconds)
                     .putExtra(TimerService.SHARED_TIMER_INCREMENT_EXTRA_KEY, remote.incrementSeconds)
                     .putExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, expiresAt)
@@ -911,7 +914,7 @@ class SocialRepository(
         val soundId = if (soundMode == SharedSoundMode.SHARED) UUID.randomUUID().toString() else null
         val timerId = UUID.randomUUID().toString()
         val payload = json.encodeToJsonElement(SharedTimerRequest(
-            label = label, durationSeconds = settings.seconds,
+            label = label, labelColor = settings.labelColor, durationSeconds = settings.seconds,
             incrementSeconds = settings.incrementSeconds ?: Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60),
             vibrate = settings.vibrate, vibrationPattern = settings.vibrationPattern,
             vibrationPatternName = settings.vibrationPatternName,
@@ -934,7 +937,7 @@ class SocialRepository(
         val timer = json.decodeFromString<SharedTimerDto>(resource.representation)
         val group = groups.first().first { it.id == timer.groupId }
         val payload = JsonObject(json.encodeToJsonElement(SharedTimerRequest(
-            label = timer.label, durationSeconds = timer.durationSeconds, incrementSeconds = timer.incrementSeconds,
+            label = timer.label, labelColor = timer.labelColor, durationSeconds = timer.durationSeconds, incrementSeconds = timer.incrementSeconds,
             vibrate = timer.vibrate, vibrationPattern = timer.vibrationPattern, vibrationPatternName = timer.vibrationPatternName,
             sound = SharedSoundSelection(timer.soundMode, timer.soundId), expiresAt = Instant.ofEpochMilli(expiresAt).toString(),
             membershipId = group.membershipId

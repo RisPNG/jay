@@ -39,7 +39,7 @@ class SharedTimerSyncTest {
             if (exchange.requestURI.path == "/v1/identities/register") registrations++
             val items = when (exchange.requestURI.path) {
                 "/v1/sync" -> """[{"kind":"membership","key":"membership","action":"upsert","revision":$cursor,"ordinal":0,"data":{"id":"membership","group_id":"group","scope_id":"group","role":"leader","notify_membership":true,"notify_administrative":true}}]"""
-                "/v1/groups/group/sync" -> """[{"kind":"group","key":"group","action":"upsert","revision":$cursor,"ordinal":0,"data":{"id":"group","name":"Kitchen","alarm_permission":"everyone","notify_alarm_changes":true,"notify_snoozed":true,"notify_dismissed":true,"notify_ignored":true}},{"kind":"timer","key":"timer","action":"upsert","revision":$cursor,"ordinal":1,"data":{"id":"timer","group_id":"group","label":"Pasta","duration_seconds":600,"increment_seconds":60,"expires_at":"${Instant.ofEpochMilli(expiresAt)}","sound_mode":"off"}}]"""
+                "/v1/groups/group/sync" -> """[{"kind":"group","key":"group","action":"upsert","revision":$cursor,"ordinal":0,"data":{"id":"group","name":"Kitchen","alarm_permission":"everyone","notify_alarm_changes":true,"notify_snoozed":true,"notify_dismissed":true,"notify_ignored":true}},{"kind":"timer","key":"timer","action":"upsert","revision":$cursor,"ordinal":1,"data":{"id":"timer","group_id":"group","label":"Pasta","label_color":-15584170,"duration_seconds":600,"increment_seconds":60,"expires_at":"${Instant.ofEpochMilli(expiresAt)}","sound_mode":"off"}}]"""
                 else -> null
             }
             val body = if (items != null) {
@@ -66,6 +66,7 @@ class SharedTimerSyncTest {
             val start = shadowOf(context).nextStartedService
             assertNotNull(start)
             assertEquals(TimerService.SYNC_SHARED_TIMER_ACTION, start.action)
+            assertEquals(-15584170, start.getIntExtra(TimerService.SHARED_TIMER_LABEL_COLOR_EXTRA_KEY, -1))
             assertEquals(expiresAt, start.getLongExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, 0))
             assertEquals(1, registrations)
             cursor = 3L

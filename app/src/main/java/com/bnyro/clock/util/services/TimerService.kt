@@ -42,6 +42,7 @@ import com.bnyro.clock.presentation.screens.ringing.RingingActivity
 import com.bnyro.clock.presentation.screens.timer.TimerAlertActivity
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.NotificationHelper
+import com.bnyro.clock.ui.theme.SnowLabelColor
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.social.data.SocialTimerActions
 import com.bnyro.clock.util.widgets.TextColor
@@ -507,6 +508,7 @@ class TimerService : Service() {
         val sharedId = intent.getStringExtra(SHARED_TIMER_ID_EXTRA_KEY) ?: return
         val groupName = intent.getStringExtra(SHARED_TIMER_GROUP_NAME_EXTRA_KEY)
         val label = intent.getStringExtra(SHARED_TIMER_LABEL_EXTRA_KEY)
+        val labelColor = intent.getIntExtra(SHARED_TIMER_LABEL_COLOR_EXTRA_KEY, SnowLabelColor)
         val durationSeconds = intent.getIntExtra(SHARED_TIMER_DURATION_EXTRA_KEY, 0)
         val incrementSeconds = intent.getIntExtra(SHARED_TIMER_INCREMENT_EXTRA_KEY, 60)
         val expiresAt = intent.getLongExtra(SHARED_TIMER_EXPIRES_EXTRA_KEY, 0L)
@@ -530,6 +532,7 @@ class TimerService : Service() {
             val obj = TimerObject(
                 id = sharedId.hashCode(),
                 label = mutableStateOf(label ?: TimeHelper.durationToName(durationSeconds)),
+                labelColor = mutableStateOf(labelColor),
                 currentPosition = mutableStateOf(remaining.coerceAtLeast(0L).toInt()),
                 initialPosition = mutableStateOf(durationSeconds * 1000),
                 state = mutableStateOf(WatchState.RUNNING),
@@ -560,6 +563,8 @@ class TimerService : Service() {
             return
         }
 
+        existing.label.value = label ?: TimeHelper.durationToName(durationSeconds)
+        existing.labelColor.value = labelColor
         existing.sharedExpiresAt = expiresAt
         existing.sharedGroupName = groupName
         existing.sharedCanEdit = canEdit
@@ -904,6 +909,7 @@ class TimerService : Service() {
                 (it.currentPosition.value.toLong() * duration / it.initialPosition.value).toInt()
             if (running) cancelAlarm(it)
             it.label.value = settings.label
+            it.labelColor.value = settings.labelColor
             it.initialPosition.value = duration
             it.soundName = settings.soundName
             it.soundUri = settings.soundUri
@@ -956,6 +962,7 @@ class TimerService : Service() {
         const val SHARED_TIMER_ID_EXTRA_KEY = "shared_timer_id"
         const val SHARED_TIMER_GROUP_NAME_EXTRA_KEY = "shared_timer_group_name"
         const val SHARED_TIMER_LABEL_EXTRA_KEY = "shared_timer_label"
+        const val SHARED_TIMER_LABEL_COLOR_EXTRA_KEY = "shared_timer_label_color"
         const val SHARED_TIMER_DURATION_EXTRA_KEY = "shared_timer_duration"
         const val SHARED_TIMER_INCREMENT_EXTRA_KEY = "shared_timer_increment"
         const val SHARED_TIMER_EXPIRES_EXTRA_KEY = "shared_timer_expires"
