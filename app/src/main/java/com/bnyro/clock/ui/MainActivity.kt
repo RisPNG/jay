@@ -84,7 +84,7 @@ class MainActivity : ComponentActivity() {
         override fun onServiceDisconnected(p0: ComponentName?) {
             timerService.onChangeTimers = {}
             timerModel.onEnqueue = null
-            timerModel.updateLabel = { _, _ -> }
+            timerModel.updateLabel = { _, _, _ -> }
             timerModel.updateRingtone = { _, _ -> }
             timerModel.updateVibrate = { _, _ -> }
         }

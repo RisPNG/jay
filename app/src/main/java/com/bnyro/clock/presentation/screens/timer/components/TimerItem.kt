@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
@@ -27,17 +28,21 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -50,6 +55,7 @@ import com.bnyro.clock.domain.model.WatchState
 import com.bnyro.clock.presentation.components.ClickableIcon
 import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
+import com.bnyro.clock.presentation.components.LabelColorPreference
 import com.bnyro.clock.presentation.features.RingtonePickerDialog
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import com.bnyro.clock.util.TimeHelper
@@ -84,14 +90,20 @@ fun TimerItem(obj: TimerObject, timerModel: TimerModel) {
                 Column(modifier = Modifier.weight(1f)) {
                     val titleText = obj.label.value ?: if (isFinished) stringResource(R.string.timer_finished) else null
                     titleText?.let { label ->
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Normal,
-                            color = mutedContentColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (!obj.label.value.isNullOrBlank()) {
+                                Icon(Icons.AutoMirrored.Filled.Label, null, tint = Color(obj.labelColor.value))
+                                Spacer(Modifier.width(5.dp))
+                            }
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Normal,
+                                color = mutedContentColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
                     Text(
@@ -210,11 +222,12 @@ fun TimerItem(obj: TimerObject, timerModel: TimerModel) {
 
     if (showLabelEditor) {
         var newLabel by remember { mutableStateOf(obj.label.value.orEmpty()) }
+        var newLabelColor by remember { mutableIntStateOf(obj.labelColor.value) }
         AlertDialog(
             onDismissRequest = { showLabelEditor = false },
             confirmButton = {
                 DialogButton(R.string.save, DialogButtonStyle.PRIMARY) {
-                    timerModel.updateLabel(obj.id, newLabel)
+                    timerModel.updateLabel(obj.id, newLabel, newLabelColor)
                     showLabelEditor = false
                 }
             },
@@ -225,11 +238,23 @@ fun TimerItem(obj: TimerObject, timerModel: TimerModel) {
             },
             title = { Text(stringResource(R.string.label)) },
             text = {
-                OutlinedTextField(
-                    value = newLabel,
-                    onValueChange = { newLabel = it },
-                    label = { Text(stringResource(R.string.label)) }
-                )
+                Column {
+                    OutlinedTextField(
+                        value = newLabel,
+                        onValueChange = { newLabel = it },
+                        label = { Text(stringResource(R.string.label)) },
+                        leadingIcon = {
+                            Icon(Icons.AutoMirrored.Filled.Label, null, tint = Color(newLabelColor))
+                        }
+                    )
+                    LabelColorPreference(color = newLabelColor, onColorSelected = { newLabelColor = it })
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.sound)) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        leadingContent = { Icon(Icons.Default.Notifications, null) },
+                        modifier = Modifier.clickable { showRingtoneEditor = true }
+                    )
+                }
             }
         )
     }

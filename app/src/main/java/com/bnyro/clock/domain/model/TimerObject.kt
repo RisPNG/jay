@@ -3,10 +3,12 @@ package com.bnyro.clock.domain.model
 import android.net.Uri
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import com.bnyro.clock.ui.theme.SnowLabelColor
 
 data class TimerObject(
     var id: Int = 0,
     var label: MutableState<String?> = mutableStateOf(null),
+    var labelColor: MutableState<Int> = mutableStateOf(SnowLabelColor),
     var currentPosition: MutableState<Int> = mutableStateOf(0),
     val initialPosition: Int = currentPosition.value,
     var state: MutableState<WatchState> = mutableStateOf(WatchState.IDLE),

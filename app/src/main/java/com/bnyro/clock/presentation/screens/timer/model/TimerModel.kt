@@ -20,7 +20,7 @@ class TimerModel : ViewModel() {
     val scheduledObjects = _timerObjects.asStateFlow()
 
     var onEnqueue: ((timer: TimerObject) -> Unit)? = null
-    var updateLabel: (id: Int, newLabel: String) -> Unit = { _, _ -> }
+    var updateLabel: (id: Int, newLabel: String, labelColor: Int) -> Unit = { _, _, _ -> }
     var updateRingtone: (id: Int, newRingtoneUri: Uri?) -> Unit = { _, _ -> }
     var updateVibrate: (id: Int, vibrate: Boolean) -> Unit = { _, _ -> }
 

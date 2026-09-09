@@ -35,7 +35,6 @@ import com.bnyro.clock.domain.model.TimerObject
 import com.bnyro.clock.domain.model.WatchState
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.NotificationHelper
-
 import java.util.Timer
 import java.util.TimerTask
 
@@ -515,9 +514,10 @@ class TimerService : Service() {
         R.string.add_5_minutes, ACTION_ADD_5_MIN, 6, timerObject.id
     )
 
-    fun updateLabel(id: Int, newLabel: String) {
+    fun updateLabel(id: Int, newLabel: String, labelColor: Int) {
         timerObjects.firstOrNull { it.id == id }?.let {
             it.label.value = newLabel
+            it.labelColor.value = labelColor
             updateNotification(it)
         }
     }
