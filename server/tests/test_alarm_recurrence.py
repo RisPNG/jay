@@ -1,6 +1,6 @@
 from datetime import UTC, date, datetime, timedelta
 
-from jay_server.occurrences import EPOCH, next_alarm_trigger, occurrence_on_or_after
+from jay_server.social.recurrence import next_alarm_trigger, occurrence_on_or_after
 
 
 def recurring_alarm(
@@ -15,22 +15,22 @@ def recurring_alarm(
     end_occurrences: int | None = None,
 ) -> dict:
     return {
-        "time": 8 * 3_600_000,
+        "local_time_ms": 8 * 3_600_000,
         "days": days if days is not None else [0, 1, 2, 3, 4, 5, 6],
-        "start_date": (start - EPOCH).days,
+        "start_date": start,
         "repeat_interval": repeat_interval,
         "repeat_unit": repeat_unit,
         "repeat_anchor": repeat_anchor,
         "repeat_duration": repeat_duration,
         "repeat_duration_unit": repeat_duration_unit,
-        "end_date": (end_date - EPOCH).days if end_date is not None else None,
+        "end_date": end_date,
         "end_occurrences": end_occurrences,
     }
 
 
 def occurrences(alarm: dict, count: int) -> list[date]:
     found: list[date] = []
-    day = EPOCH + timedelta(days=alarm["start_date"])
+    day = alarm["start_date"]
     for _ in range(count):
         occurrence = occurrence_on_or_after(alarm, day)
         if occurrence is None:

@@ -39,3 +39,7 @@ The production APK and AAB both use `com.rispng.jay`. Publishing a stable releas
 ## Signing material
 
 Keep signing stores and passwords in local secure configuration or GitHub Actions secrets. They must not appear in source control, logs, fixtures, screenshots, or generated artifacts.
+
+## Server releases
+
+The API release workflow deploys web and worker instances at one commit after CI, with migrations owned by the web pre-deploy phase. Follow [server deployment](../server/README.md#deployment) for configuration, readiness checks and recovery. Android and server builds must implement compatible API contracts.

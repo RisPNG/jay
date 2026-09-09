@@ -35,6 +35,14 @@ The existing clock behaviour is the foundation for these connections. For exampl
 
 For changes that are useful to Clock You on its own, the starting point is a focused contribution branch from `main`, with the work submitted upstream. This includes alarms, clocks, timers, the stopwatch, settings, onboarding, notifications, and pickers. Social groups, shared alarms, membership, synchronisation, social notifications, entitlements, and the server are developed directly on `jay`.
 
+The [architecture guide](docs/architecture.md) describes the social protocol, persistence and worker boundaries. [Server deployment](server/README.md#deployment) and [performance guidance](server/README.md#performance) cover operations and release acceptance.
+
+## Building shared audio
+
+The Android build uses NDK 29.0.14206865 and CMake 3.31.6, pinned in `app/build.gradle.kts`. Install these through Android SDK Manager before building, or allow Android Gradle Plugin to install them after accepting the SDK licenses. CMake fetches the official libFLAC 1.5.0 source archive and verifies its pinned SHA-256. Initial native configuration requires network access; subsequent builds reuse the source in the build cache.
+
+`app/src/main/cpp/social/flac_encoder.c` implements the shared-audio encoder using libFLAC. It builds for armeabi-v7a, arm64-v8a, x86 and x86_64, retaining API 23 support. The library is statically linked into `libjay_audio.so`; command-line programs, C++ bindings, Ogg support and background encoding threads are disabled. The Xiph BSD license is included in the APK at `assets/licenses/libFLAC.txt`. Keep its version, source hash and license synchronized when updating the library.
+
 ## How the branches fit together
 
 There are three long-lived branches, with merges flowing in one direction: `main` -> `main-canary` -> `jay`. Contribution branches join that flow while their work is waiting upstream.

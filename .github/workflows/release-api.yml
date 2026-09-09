@@ -1,0 +1,48 @@
+name: Release API
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jay-production-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          tool_versions: python 3.11.14
+      - name: Install runtime
+        working-directory: server
+        run: |
+          mise exec -- python -m venv .venv
+          mise exec -- .venv/bin/pip install --require-hashes -r requirements.lock
+          mise exec -- .venv/bin/pip install --no-deps .
+      - name: Deploy matching web and worker commits
+        working-directory: server
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_WEB_SERVICE_ID: ${{ vars.RENDER_WEB_SERVICE_ID }}
+          RENDER_WORKER_SERVICE_ID: ${{ vars.RENDER_WORKER_SERVICE_ID }}
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: mise exec -- .venv/bin/python -m jay_server.deployment
+      - name: Verify worker progress
+        working-directory: server
+        env:
+          LOAD_ENV_FILE: "false"
+          SECRET_KEY: ${{ secrets.JAY_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.JAY_DATABASE_URL }}
+        run: mise exec -- .venv/bin/python manage.py check_worker --instances 2

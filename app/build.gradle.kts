@@ -13,6 +13,14 @@ ksp {
 android {
     namespace = "com.bnyro.clock"
     compileSdk = 37
+    ndkVersion = "29.0.14206865"
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.31.6"
+        }
+    }
 
     val signingStoreFile = providers.gradleProperty("jaySigningStoreFile").orNull
     val signingStorePassword = providers.gradleProperty("jaySigningStorePassword").orNull

@@ -1,9 +1,10 @@
 import hashlib
 
 import pytest
-from fastapi import HTTPException
+from types import SimpleNamespace
+from jay_server.social.errors import DomainError
 
-from jay_server import object_storage
+from jay_server.social import providers as object_storage
 
 
 class StoredBody:
@@ -52,7 +53,7 @@ def test_uploaded_sound_must_be_canonical_mono_flac(monkeypatch) -> None:
         lambda: StoredObject(content, sha256),
     )
 
-    object_storage.validate_sound_upload("sound", sha256, len(content), 1000)
+    object_storage.validate_sound_object(SimpleNamespace(object_key="sound", sha256=sha256, byte_length=len(content), duration_ms=1000))
 
 
 def test_uploaded_sound_rejects_the_wrong_sample_rate(monkeypatch) -> None:
@@ -64,7 +65,7 @@ def test_uploaded_sound_rejects_the_wrong_sample_rate(monkeypatch) -> None:
         lambda: StoredObject(content, sha256),
     )
 
-    with pytest.raises(HTTPException) as error:
-        object_storage.validate_sound_upload("sound", sha256, len(content), 1088)
+    with pytest.raises(DomainError) as error:
+        object_storage.validate_sound_object(SimpleNamespace(object_key="sound", sha256=sha256, byte_length=len(content), duration_ms=1088))
 
     assert error.value.status_code == 409

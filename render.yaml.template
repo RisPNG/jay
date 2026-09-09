@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: jay-server
+    runtime: python
+    region: __EXISTING_RENDER_REGION__
+    plan: 0.5c-512mb
+    numInstances: 2
+    repo: https://github.com/RisPNG/jay
+    branch: jay
+    rootDir: server
+    autoDeployTrigger: "off"
+    buildCommand: pip install --require-hashes -r requirements.lock && pip install --no-deps .
+    preDeployCommand: python manage.py migrate --noinput
+    startCommand: uvicorn jay_server.asgi:application --host 0.0.0.0 --port $PORT --workers 1 --timeout-graceful-shutdown 25
+    healthCheckPath: /health/ready
+    envVars:
+      - fromGroup: jay-runtime
+      - key: DATABASE_POOL_SIZE
+        value: "8"
+  - type: worker
+    name: jay-worker
+    runtime: python
+    region: __EXISTING_RENDER_REGION__
+    plan: 0.5c-512mb
+    numInstances: 2
+    repo: https://github.com/RisPNG/jay
+    branch: jay
+    rootDir: server
+    autoDeployTrigger: "off"
+    buildCommand: pip install --require-hashes -r requirements.lock && pip install --no-deps .
+    startCommand: python manage.py run_worker
+    envVars:
+      - fromGroup: jay-runtime
+      - key: DATABASE_POOL_SIZE
+        value: "6"

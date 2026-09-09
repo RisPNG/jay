@@ -39,7 +39,7 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
     var showSortOrder by mutableStateOf(false)
     var alarmActivity by mutableStateOf<List<SocialChange>>(emptyList())
         private set
-    var alarmActivityNextBefore by mutableStateOf<Long?>(null)
+    var alarmActivityNextBefore by mutableStateOf<String?>(null)
         private set
     var selectedActivityAlarmId by mutableStateOf<String?>(null)
     val filters = MutableStateFlow(AlarmFilters())

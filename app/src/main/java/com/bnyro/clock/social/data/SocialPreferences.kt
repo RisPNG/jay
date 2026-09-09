@@ -4,7 +4,6 @@ object SocialPreferences {
     const val serverUrlKey = "jayServerUrl"
     const val deviceSecretKey = "jayDeviceSecret"
     const val deviceNameKey = "jayDeviceName"
-    const val syncCursorKey = "jaySyncCursor"
     const val pendingProfileKey = "jayPendingProfile"
     const val pendingInvitationKey = "jayPendingInvitation"
     const val alarmOccurrencePrefix = "jayAlarmOccurrence:"

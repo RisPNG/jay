@@ -17,7 +17,7 @@ class PlayEntitlementWorker(context: Context, parameters: WorkerParameters) :
         val capabilities = (applicationContext as App).container.socialRepository.deviceCapabilities
         val expiresAt = capabilities.expiresAt
         if (capabilities.requiresPlayEntitlement && expiresAt != null &&
-            !Instant.now().isBefore(Instant.parse(expiresAt))
+            !Instant.now().isBefore(java.time.OffsetDateTime.parse(expiresAt).toInstant())
         ) {
             SocialNotificationHelper.notifyDeviceIssue(
                 applicationContext,

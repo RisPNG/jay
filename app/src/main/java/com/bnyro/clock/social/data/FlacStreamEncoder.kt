@@ -1,162 +1,51 @@
 package com.bnyro.clock.social.data
 
-import android.media.AudioFormat
-import android.media.MediaCodec
-import android.media.MediaCodecList
-import android.media.MediaFormat
 import com.bnyro.clock.social.domain.SHARED_SOUND_SAMPLE_RATE
 import java.io.Closeable
 import java.io.File
-import java.io.FileOutputStream
-import java.io.RandomAccessFile
-import java.nio.ByteOrder
+import java.io.IOException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-class FlacStreamEncoder(private val outputFile: File) : Closeable {
-    private val codec: MediaCodec
-    private val output: FileOutputStream
-    private var closed = false
-    private var inputEnded = false
-    private var outputEnded = false
-    private var stalls = 0
-    private var queuedFrames = 0L
-
-    init {
-        check(isSupported()) { "This device cannot encode FLAC audio" }
-        output = FileOutputStream(outputFile)
-        codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_FLAC)
-        codec.configure(
-            MediaFormat.createAudioFormat(
-                MediaFormat.MIMETYPE_AUDIO_FLAC,
-                SHARED_SOUND_SAMPLE_RATE,
-                1
-            ).apply {
-                setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
-                setInteger(MediaFormat.KEY_FLAC_COMPRESSION_LEVEL, COMPRESSION_LEVEL)
-            },
-            null,
-            null,
-            MediaCodec.CONFIGURE_FLAG_ENCODE
-        )
-        codec.start()
-    }
+class FlacStreamEncoder(outputFile: File) : Closeable {
+    private var handle = createEncoder(outputFile.absolutePath, SHARED_SOUND_SAMPLE_RATE)
+    private var finished = false
 
     suspend fun write(samples: ShortArray, frames: Int) {
+        check(handle != 0L && !finished) { "The FLAC encoder is not writable" }
+        require(frames in 0..samples.size)
         var offset = 0
         while (offset < frames) {
             currentCoroutineContext().ensureActive()
-            var progressed = false
-            val index = codec.dequeueInputBuffer(0)
-            if (index >= 0) {
-                val buffer = codec.getInputBuffer(index)!!
-                val capacityFrames = buffer.remaining() / 2
-                if (capacityFrames > 0) {
-                    val count = minOf(frames - offset, capacityFrames)
-                    buffer.order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(samples, offset, count)
-                    codec.queueInputBuffer(
-                        index,
-                        0,
-                        count * 2,
-                        presentationTimeUs(queuedFrames),
-                        0
-                    )
-                    queuedFrames += count
-                    offset += count
-                    progressed = true
-                }
+            val count = minOf(frames - offset, 4096)
+            if (!encodeSamples(handle, samples, offset, count)) {
+                throw IOException("Cannot encode shared audio")
             }
-            if (drain(if (progressed) 0 else CODEC_TIMEOUT_US)) progressed = true
-            if (progressed) stalls = 0 else if (++stalls > MAX_CODEC_STALLS) {
-                error("The device audio encoder stalled")
-            }
+            offset += count
         }
     }
 
     suspend fun finish() {
-        while (!outputEnded) {
-            currentCoroutineContext().ensureActive()
-            var progressed = false
-            if (!inputEnded) {
-                val index = codec.dequeueInputBuffer(0)
-                if (index >= 0) {
-                    codec.queueInputBuffer(
-                        index,
-                        0,
-                        0,
-                        presentationTimeUs(queuedFrames),
-                        MediaCodec.BUFFER_FLAG_END_OF_STREAM
-                    )
-                    inputEnded = true
-                    progressed = true
-                }
-            }
-            if (drain(if (progressed) 0 else CODEC_TIMEOUT_US)) progressed = true
-            if (progressed) stalls = 0 else if (++stalls > MAX_CODEC_STALLS) {
-                error("The device audio encoder stalled")
-            }
-        }
-        writeTotalSamples()
-    }
-
-    private fun writeTotalSamples() {
-        RandomAccessFile(outputFile, "rw").use { file ->
-            val streamInfo = ByteArray(8)
-            file.seek(STREAM_INFO_OFFSET)
-            file.readFully(streamInfo)
-            var value = 0L
-            streamInfo.forEach { value = value shl 8 or (it.toLong() and 0xFF) }
-            value = (value ushr 36 shl 36) or queuedFrames
-            file.seek(STREAM_INFO_OFFSET)
-            for (index in 0 until 8) {
-                file.write(((value shr ((7 - index) * 8)) and 0xFF).toInt())
-            }
-        }
+        check(handle != 0L && !finished) { "The FLAC encoder is not writable" }
+        currentCoroutineContext().ensureActive()
+        finished = true
+        if (!finishEncoder(handle)) throw IOException("Cannot finalize shared audio")
     }
 
     override fun close() {
-        if (closed) return
-        closed = true
-        runCatching { codec.stop() }
-        codec.release()
-        output.close()
+        if (handle == 0L) return
+        deleteEncoder(handle)
+        handle = 0L
     }
 
-    private fun drain(timeoutUs: Long): Boolean {
-        var progressed = false
-        var waitUs = timeoutUs
-        val info = MediaCodec.BufferInfo()
-        while (true) {
-            val index = codec.dequeueOutputBuffer(info, waitUs)
-            if (index >= 0) {
-                val buffer = codec.getOutputBuffer(index)!!
-                val bytes = ByteArray(info.size)
-                buffer.position(info.offset)
-                buffer.get(bytes)
-                output.write(bytes)
-                outputEnded = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
-                codec.releaseOutputBuffer(index, false)
-                progressed = true
-                waitUs = 0
-            } else if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                progressed = true
-                waitUs = 0
-            } else {
-                return progressed
-            }
-        }
-    }
-
-    private fun presentationTimeUs(frames: Long): Long = frames * 1_000_000 / SHARED_SOUND_SAMPLE_RATE
+    private external fun createEncoder(path: String, sampleRate: Int): Long
+    private external fun encodeSamples(handle: Long, samples: ShortArray, offset: Int, count: Int): Boolean
+    private external fun finishEncoder(handle: Long): Boolean
+    private external fun deleteEncoder(handle: Long)
 
     companion object {
-        private const val CODEC_TIMEOUT_US = 10_000L
-        private const val MAX_CODEC_STALLS = 1_000
-        private const val COMPRESSION_LEVEL = 5
-        private const val STREAM_INFO_OFFSET = 18L
-
-        fun isSupported(): Boolean = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.any {
-            it.isEncoder && it.supportedTypes.contains(MediaFormat.MIMETYPE_AUDIO_FLAC)
+        init {
+            System.loadLibrary("jay_audio")
         }
     }
 }

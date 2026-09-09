@@ -17,7 +17,6 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,12 +25,11 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SharedSoundStoreTest {
     @Test
-    fun sharedSoundRemainsLosslessAndPlayableAfterCacheMigration() = runBlocking {
+    fun sharedSoundIsDecodedLosslesslyCachedAndPlayable() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val soundId = UUID.randomUUID().toString()
         val source = File(context.cacheDir, "$soundId.flac")
         val directory = File(context.filesDir, "shared-sounds").apply { mkdirs() }
-        val legacy = File(directory, "$soundId.flac")
         val playback = File(directory, "$soundId.wav")
         val samples = ShortArray(96_000) { (sin(it * 0.05) * 3_000).roundToInt().toShort() }
         val store = SharedSoundStore(context)
@@ -49,10 +47,7 @@ class SharedSoundStoreTest {
             ByteBuffer.wrap(prepared, 44, prepared.size - 44)
                 .order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(decoded)
             assertTrue(samples.contentEquals(decoded))
-            playback.delete()
-            source.copyTo(legacy)
             assertNotNull(store.cache(soundId, api))
-            assertFalse(legacy.exists())
             assertTrue(prepared.contentEquals(playback.readBytes()))
             assertEquals(playback, store.cache(soundId, api))
             val completed = CountDownLatch(1)
@@ -79,7 +74,6 @@ class SharedSoundStoreTest {
             }
         } finally {
             source.delete()
-            legacy.delete()
             playback.delete()
         }
         Unit

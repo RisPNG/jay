@@ -61,7 +61,8 @@ data class SocialGroup(
     val role: MemberRole,
     val alarmTimeBasis: AlarmTimeBasis = AlarmTimeBasis.MEMBER_LOCAL,
     val alarmTimeZone: String = "UTC",
-    val sharedAnswers: Boolean = false
+    val sharedAnswers: Boolean = false,
+    val membershipId: String = ""
 )
 
 val SocialGroup.canEditAlarms: Boolean
@@ -87,7 +88,8 @@ data class SharedAlarmLink(
     val soundMode: SharedSoundMode,
     val soundId: String?,
     val soundTitle: String?,
-    val timeZone: String?
+    val timeZone: String?,
+    val saveId: String = ""
 )
 
 data class AlarmGroupName(
@@ -105,7 +107,7 @@ data class DismissedSharedTimer(
 )
 
 data class SocialChange(
-    val sequence: Long,
+    val sequence: String,
     val groupId: String,
     val groupName: String,
     val entityType: String,
@@ -124,7 +126,7 @@ data class SocialChange(
 
 data class SocialActivityPage(
     val items: List<SocialChange>,
-    val nextBefore: Long?
+    val nextBefore: String?
 )
 
 @Serializable
@@ -160,7 +162,7 @@ data class DeviceCapabilities(
 ) {
     fun canUploadSharedSounds(now: java.time.Instant = java.time.Instant.now()): Boolean =
         sharedSoundUpload && (!requiresPlayEntitlement ||
-            expiresAt?.let { now.isBefore(java.time.Instant.parse(it)) } == true)
+            expiresAt?.let { now.isBefore(java.time.OffsetDateTime.parse(it).toInstant()) } == true)
 }
 
 @Serializable
@@ -172,7 +174,10 @@ data class GroupCreate(
     @SerialName("notify_dismissed") val notifyDismissed: Boolean,
     @SerialName("notify_ignored") val notifyIgnored: Boolean,
     @SerialName("alarm_time_basis") val alarmTimeBasis: String = "member_local",
-    @SerialName("alarm_time_zone") val alarmTimeZone: String = "UTC"
+    @SerialName("alarm_time_zone") val alarmTimeZone: String = "UTC",
+    @SerialName("shared_answers") val sharedAnswers: Boolean = false,
+    val id: String,
+    @SerialName("membership_id") val membershipId: String
 )
 
 @Serializable
@@ -191,7 +196,8 @@ data class GroupUpdate(
 @Serializable
 data class SharedSoundSelection(
     val mode: String,
-    @SerialName("sound_id") val soundId: String? = null
+    @SerialName("sound_id") val soundId: String? = null,
+    val title: String? = null
 )
 
 @Serializable
@@ -201,41 +207,33 @@ data class MemberNotificationUpdate(
 )
 
 @Serializable
-data class InviteCreate(@SerialName("expires_in_hours") val expiresInHours: Int? = null)
-
-@Serializable
 data class InviteJoin(val token: String)
-
-@Serializable
-data class MemberUpdate(val role: String)
 
 @Serializable
 data class SharedAlarmRequest(
     @SerialName("group_id") val groupId: String? = null,
-    val time: Long,
+    @SerialName("local_time_ms") val time: Long,
     val label: String?,
     val enabled: Boolean,
     val days: List<Int>,
     val vibrate: Boolean,
-    @SerialName("start_date") val startDate: Long,
+    @SerialName("start_date") val startDate: String,
     @SerialName("repeat_interval") val repeatInterval: Int,
     @SerialName("repeat_unit") val repeatUnit: String,
     @SerialName("repeat_anchor") val repeatAnchor: String,
     @SerialName("repeat_duration") val repeatDuration: Int? = null,
     @SerialName("repeat_duration_unit") val repeatDurationUnit: String,
-    @SerialName("end_date") val endDate: Long? = null,
+    @SerialName("end_date") val endDate: String? = null,
     @SerialName("end_occurrences") val endOccurrences: Int? = null,
     val advanced: Boolean = false,
     @SerialName("snooze_enabled") val snoozeEnabled: Boolean,
     @SerialName("snooze_minutes") val snoozeMinutes: Int,
     @SerialName("vibration_pattern") val vibrationPattern: List<Int>,
     @SerialName("vibration_pattern_name") val vibrationPatternName: String,
-    @SerialName("sound_change") val soundChange: SharedSoundSelection? = null,
-    @SerialName("expected_revision") val expectedRevision: Int? = null
+    val sound: SharedSoundSelection,
+    @SerialName("membership_id") val membershipId: String,
+    val id: String? = null
 )
-
-@Serializable
-data class SharedAlarmDelete(@SerialName("expected_revision") val expectedRevision: Int)
 
 @Serializable
 data class AlarmActivityRequest(
@@ -243,17 +241,19 @@ data class AlarmActivityRequest(
     @SerialName("alarm_revision") val alarmRevision: Int,
     val kind: String,
     @SerialName("occurred_at") val occurredAt: String,
-    @SerialName("occurrence_id") val occurrenceId: String? = null,
-    val reason: String? = null
+    @SerialName("occurrence_key") val occurrenceId: String? = null,
+    val reason: String? = null,
+    @SerialName("membership_id") val membershipId: String
 )
 
 @Serializable
 data class AlarmOccurrenceSchedule(
     @SerialName("alarm_revision") val alarmRevision: Int,
-    @SerialName("occurrence_id") val occurrenceId: String,
+    @SerialName("occurrence_key") val occurrenceId: String,
     @SerialName("trigger_at") val triggerAt: String,
     @SerialName("deadline_at") val deadlineAt: String,
-    @SerialName("cycle_date") val cycleDate: String
+    @SerialName("cycle_date") val cycleDate: String,
+    @SerialName("membership_id") val membershipId: String
 )
 
 @Serializable
@@ -261,7 +261,9 @@ data class SharedSoundUploadRequest(
     val title: String,
     val sha256: String,
     @SerialName("byte_length") val byteLength: Long,
-    @SerialName("duration_ms") val durationMs: Int
+    @SerialName("duration_ms") val durationMs: Int,
+    val id: String,
+    @SerialName("membership_id") val membershipId: String
 )
 
 @Serializable
@@ -276,13 +278,6 @@ data class SharedSoundDownloadResponse(
     val url: String,
     val sha256: String,
     @SerialName("byte_length") val byteLength: Long
-)
-
-@Serializable
-data class IdResponse(
-    val id: String,
-    val revision: Int? = null,
-    @SerialName("group_id") val groupId: String? = null
 )
 
 @Serializable
@@ -302,9 +297,6 @@ data class SocialGroupDto(
     @SerialName("notify_snoozed") val notifySnoozed: Boolean,
     @SerialName("notify_dismissed") val notifyDismissed: Boolean,
     @SerialName("notify_ignored") val notifyIgnored: Boolean,
-    @SerialName("notify_membership") val notifyMembership: Boolean,
-    @SerialName("notify_administrative") val notifyAdministrative: Boolean,
-    val role: String,
     @SerialName("alarm_time_basis") val alarmTimeBasis: String = "member_local",
     @SerialName("alarm_time_zone") val alarmTimeZone: String = "UTC",
     @SerialName("shared_answers") val sharedAnswers: Boolean = false
@@ -313,7 +305,7 @@ data class SocialGroupDto(
 @Serializable
 data class SocialMemberDto(
     @SerialName("group_id") val groupId: String,
-    @SerialName("device_id") val deviceId: String,
+    @SerialName("identity_id") val deviceId: String,
     val name: String,
     val role: String
 )
@@ -323,18 +315,19 @@ data class SharedAlarmDto(
     val id: String,
     @SerialName("group_id") val groupId: String,
     val revision: Int,
-    val time: Long,
+    @SerialName("save_id") val saveId: String,
+    @SerialName("local_time_ms") val time: Long,
     val label: String?,
     val enabled: Boolean,
     val days: List<Int>,
     val vibrate: Boolean,
-    @SerialName("start_date") val startDate: Long,
+    @SerialName("start_date") val startDate: String,
     @SerialName("repeat_interval") val repeatInterval: Int,
     @SerialName("repeat_unit") val repeatUnit: String,
     @SerialName("repeat_anchor") val repeatAnchor: String,
     @SerialName("repeat_duration") val repeatDuration: Int? = null,
     @SerialName("repeat_duration_unit") val repeatDurationUnit: String,
-    @SerialName("end_date") val endDate: Long? = null,
+    @SerialName("end_date") val endDate: String? = null,
     @SerialName("end_occurrences") val endOccurrences: Int? = null,
     val advanced: Boolean = false,
     @SerialName("snooze_enabled") val snoozeEnabled: Boolean,
@@ -343,25 +336,24 @@ data class SharedAlarmDto(
     @SerialName("vibration_pattern_name") val vibrationPatternName: String,
     @SerialName("sound_mode") val soundMode: String = "member_default",
     @SerialName("sound_id") val soundId: String? = null,
-    @SerialName("sound_title") val soundTitle: String? = null,
-    val deleted: Boolean
+    @SerialName("sound_title") val soundTitle: String? = null
 )
 
 @Serializable
 data class SocialChangeDto(
-    val sequence: Long,
+    @SerialName("id") val sequence: String,
     @SerialName("group_id") val groupId: String,
-    @SerialName("group_name") val groupName: String,
+    @SerialName("group_label") val groupName: String,
     @SerialName("entity_type") val entityType: String,
     @SerialName("entity_id") val entityId: String,
     val action: String,
     @SerialName("entity_label") val entityLabel: String? = null,
     @SerialName("entity_time") val entityTime: Long? = null,
-    @SerialName("actor_device_id") val actorDeviceId: String? = null,
-    @SerialName("actor_name") val actorName: String? = null,
-    @SerialName("subject_device_id") val subjectDeviceId: String? = null,
-    @SerialName("subject_name") val subjectName: String? = null,
-    @SerialName("recipient_device_id") val recipientDeviceId: String? = null,
+    @SerialName("actor_id") val actorDeviceId: String? = null,
+    @SerialName("actor_label") val actorName: String? = null,
+    @SerialName("subject_id") val subjectDeviceId: String? = null,
+    @SerialName("subject_label") val subjectName: String? = null,
+    @SerialName("recipient_id") val recipientDeviceId: String? = null,
     val details: JsonObject? = null,
     @SerialName("occurred_at") val occurredAt: String
 )
@@ -369,7 +361,7 @@ data class SocialChangeDto(
 @Serializable
 data class ActivityPageDto(
     val items: List<SocialChangeDto>,
-    @SerialName("next_before") val nextBefore: Long? = null
+    @SerialName("next_before") val nextBefore: String? = null
 )
 
 @Serializable
@@ -380,11 +372,11 @@ data class SharedTimerRequest(
     val vibrate: Boolean = true,
     @SerialName("vibration_pattern") val vibrationPattern: List<Int>,
     @SerialName("vibration_pattern_name") val vibrationPatternName: String,
-    val sound: SharedSoundSelection
+    val sound: SharedSoundSelection,
+    @SerialName("expires_at") val expiresAt: String,
+    @SerialName("membership_id") val membershipId: String,
+    val id: String? = null
 )
-
-@Serializable
-data class SharedTimerActionRequest(val action: String)
 
 @Serializable
 data class SharedTimerDto(
@@ -406,18 +398,7 @@ data class SharedTimerDto(
 @Serializable
 data class SocialOccurrenceDto(
     @SerialName("alarm_id") val alarmId: String,
-    @SerialName("occurrence_id") val occurrenceId: String,
-    val status: String
-)
-
-@Serializable
-data class SyncResponse(
-    val cursor: Long,
-    val capabilities: DeviceCapabilities,
-    val groups: List<SocialGroupDto>,
-    val members: List<SocialMemberDto>,
-    val alarms: List<SharedAlarmDto>,
-    val timers: List<SharedTimerDto> = emptyList(),
-    val occurrences: List<SocialOccurrenceDto> = emptyList(),
-    val changes: List<SocialChangeDto> = emptyList()
+    @SerialName("occurrence_key") val occurrenceId: String,
+    @SerialName("state") val status: String,
+    @SerialName("alarm_revision") val alarmRevision: Int
 )

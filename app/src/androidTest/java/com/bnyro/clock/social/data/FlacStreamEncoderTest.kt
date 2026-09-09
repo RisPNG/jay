@@ -45,6 +45,52 @@ class FlacStreamEncoderTest {
         Unit
     }
 
+    @Test
+    fun shortSoundsRetainTheirExactSampleCount() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val file = File(context.cacheDir, "short-flac-encoder-test.flac")
+        try {
+            for (frames in listOf(1, 16, 480, 4095, 4096, 4097)) {
+                val samples = ShortArray(frames) { (it % 100).toShort() }
+                FlacStreamEncoder(file).use { encoder ->
+                    encoder.write(samples, frames)
+                    encoder.finish()
+                }
+                val info = file.inputStream().use(::readFlacStreamInfo)
+                assertEquals(frames.toLong(), info.totalSamples)
+                assertTrue(samples.contentEquals(decodePcm(file)))
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun streamedChunksPreserveSampleExtremesAndTheFinalPartialBlock() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val file = File(context.cacheDir, "chunked-flac-encoder-test.flac")
+        val samples = ShortArray(48_123) { (it * 997).toShort() }
+        samples[0] = Short.MIN_VALUE
+        samples[1] = Short.MAX_VALUE
+        try {
+            FlacStreamEncoder(file).use { encoder ->
+                var offset = 0
+                val chunk = ShortArray(777)
+                while (offset < samples.size) {
+                    val count = minOf(chunk.size, samples.size - offset)
+                    samples.copyInto(chunk, 0, offset, offset + count)
+                    encoder.write(chunk, count)
+                    offset += count
+                }
+                encoder.finish()
+            }
+            assertEquals(samples.size.toLong(), file.inputStream().use(::readFlacStreamInfo).totalSamples)
+            assertTrue(samples.contentEquals(decodePcm(file)))
+        } finally {
+            file.delete()
+        }
+    }
+
     private fun decodePcm(file: File): ShortArray {
         val extractor = MediaExtractor()
         var decoder: MediaCodec? = null

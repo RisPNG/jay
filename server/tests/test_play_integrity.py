@@ -5,9 +5,10 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
+from contextlib import nullcontext
+from jay_server.social.errors import DomainError
 
-from jay_server import play_integrity
+from jay_server.social import providers as play_integrity
 
 
 def test_play_entitlement_verdict_validation(monkeypatch) -> None:
@@ -32,7 +33,7 @@ def test_play_entitlement_verdict_validation(monkeypatch) -> None:
 
     monkeypatch.setattr(
         play_integrity.settings,
-        "google_play_credentials_json",
+        "GOOGLE_PLAY_CREDENTIALS_JSON",
         json.dumps({"type": "service_account"}),
     )
     monkeypatch.setattr(
@@ -43,16 +44,16 @@ def test_play_entitlement_verdict_validation(monkeypatch) -> None:
     monkeypatch.setattr(
         play_integrity,
         "AuthorizedSession",
-        lambda credentials: SimpleNamespace(
+        lambda credentials: nullcontext(SimpleNamespace(
             post=lambda url, json, timeout: SimpleNamespace(
                 ok=True,
                 json=lambda: payload,
             )
-        ),
+        )),
     )
 
     assert play_integrity.verify_play_entitlement("token", device_id) is True
     payload["tokenPayloadExternal"]["requestDetails"]["requestHash"] = "wrong"
-    with pytest.raises(HTTPException) as exception:
+    with pytest.raises(DomainError) as exception:
         play_integrity.verify_play_entitlement("token", device_id)
     assert exception.value.status_code == 403

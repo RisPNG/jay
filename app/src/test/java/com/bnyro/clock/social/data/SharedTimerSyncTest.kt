@@ -27,16 +27,24 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35], application = Application::class)
 class SharedTimerSyncTest {
     @Test
-    fun restartingADismissedRunReturnsItAndRejectedStartsDoNotAdvanceSync() = runBlocking {
+    fun restartingADismissedRunReturnsItAndRejectedStartsRemainDurablyRecoverable() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Application>()
         Preferences.init(context)
         Preferences.instance.edit().clear().commit()
         var expiresAt = System.currentTimeMillis() + 600_000L
         var cursor = 1L
+        var registrations = 0
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/") { exchange ->
-            val body = if (exchange.requestURI.path == "/v1/sync") {
-                """{"cursor":$cursor,"capabilities":{},"groups":[{"id":"group","name":"Kitchen","alarm_permission":"everyone","notify_alarm_changes":true,"notify_snoozed":true,"notify_dismissed":true,"notify_ignored":true,"notify_membership":true,"notify_administrative":true,"role":"leader"}],"members":[],"alarms":[],"timers":[{"id":"timer","group_id":"group","label":"Pasta","duration_seconds":600,"increment_seconds":60,"expires_at":"${Instant.ofEpochMilli(expiresAt)}","sound_mode":"off"}]}"""
+            if (exchange.requestURI.path == "/v1/identities/register") registrations++
+            val items = when (exchange.requestURI.path) {
+                "/v1/sync" -> """[{"kind":"membership","key":"membership","action":"upsert","revision":$cursor,"ordinal":0,"data":{"id":"membership","group_id":"group","scope_id":"group","role":"leader","notify_membership":true,"notify_administrative":true}}]"""
+                "/v1/groups/group/sync" -> """[{"kind":"group","key":"group","action":"upsert","revision":$cursor,"ordinal":0,"data":{"id":"group","name":"Kitchen","alarm_permission":"everyone","notify_alarm_changes":true,"notify_snoozed":true,"notify_dismissed":true,"notify_ignored":true}},{"kind":"timer","key":"timer","action":"upsert","revision":$cursor,"ordinal":1,"data":{"id":"timer","group_id":"group","label":"Pasta","duration_seconds":600,"increment_seconds":60,"expires_at":"${Instant.ofEpochMilli(expiresAt)}","sound_mode":"off"}}]"""
+                else -> null
+            }
+            val body = if (items != null) {
+                val scope = if (exchange.requestURI.path == "/v1/sync") "identity" else "group"
+                """{"scope_id":"$scope","mode":"snapshot","from_revision":0,"through_revision":$cursor,"next_cursor":"$cursor","has_more":false,"server_time":"${Instant.now()}","items":$items}"""
             } else "{}"
             exchange.requestBody.close()
             val bytes = body.toByteArray()
@@ -59,6 +67,7 @@ class SharedTimerSyncTest {
             assertNotNull(start)
             assertEquals(TimerService.SYNC_SHARED_TIMER_ACTION, start.action)
             assertEquals(expiresAt, start.getLongExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, 0))
+            assertEquals(1, registrations)
             cursor = 3L
             val rejecting = object : ContextWrapper(context) {
                 override fun startForegroundService(service: Intent): android.content.ComponentName? {
@@ -69,10 +78,13 @@ class SharedTimerSyncTest {
                 SocialRepository(rejecting, social, AlarmRepository(alarms.alarmsDao())).synchronize()
             }
             assertTrue(rejected.exceptionOrNull() is IllegalStateException)
-            assertEquals(2L, Preferences.instance.getLong(SocialPreferences.syncCursorKey, 0))
+            assertEquals("3", social.socialDao().getScope("/v1/groups/group/sync")?.cursor)
+            repository.refreshSharedState()
+            assertNotNull(shadowOf(context).nextStartedService)
             val dismissed = social.socialDao().getDismissedTimers().single()
             social.socialDao().clearDismissedTimers(dismissed.expiresAt + 1)
             assertTrue(social.socialDao().getDismissedTimers().isEmpty())
+            assertEquals(2, registrations)
         } finally {
             server.stop(0)
             social.close()

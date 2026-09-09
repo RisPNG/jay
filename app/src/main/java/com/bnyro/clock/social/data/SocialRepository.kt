@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.util.Base64
 import androidx.core.content.edit
-import androidx.core.net.toUri
 import androidx.room.withTransaction
 import androidx.work.WorkManager
 import com.bnyro.clock.BuildConfig
@@ -15,50 +14,72 @@ import com.bnyro.clock.domain.model.RepeatUnit
 import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
-import com.bnyro.clock.social.domain.DeviceCapabilities
-import com.bnyro.clock.social.presentation.SocialNotificationHelper
 import com.bnyro.clock.social.domain.AlarmActivityKind
 import com.bnyro.clock.social.domain.AlarmActivityRequest
 import com.bnyro.clock.social.domain.AlarmOccurrenceSchedule
 import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.social.domain.AlarmTimeBasis
-import com.bnyro.clock.social.domain.SocialActivityPage
+import com.bnyro.clock.social.domain.DeviceCapabilities
+import com.bnyro.clock.social.domain.DeviceUpdate
+import com.bnyro.clock.social.domain.DismissedSharedTimer
 import com.bnyro.clock.social.domain.GroupCreate
 import com.bnyro.clock.social.domain.GroupUpdate
-import com.bnyro.clock.social.domain.MemberRole
+import com.bnyro.clock.social.domain.InviteJoin
+import com.bnyro.clock.social.domain.InviteResponse
 import com.bnyro.clock.social.domain.MemberNotificationUpdate
+import com.bnyro.clock.social.domain.MemberRole
+import com.bnyro.clock.social.domain.MembershipAccessDto
+import com.bnyro.clock.social.domain.PendingOperation
+import com.bnyro.clock.social.domain.PushTokenUpdate
+import com.bnyro.clock.social.domain.ScopeSyncItem
+import com.bnyro.clock.social.domain.SharedAlarmDto
 import com.bnyro.clock.social.domain.SharedAlarmLink
 import com.bnyro.clock.social.domain.SharedAlarmRequest
+import com.bnyro.clock.social.domain.SharedSoundDto
 import com.bnyro.clock.social.domain.SharedSoundMode
 import com.bnyro.clock.social.domain.SharedSoundProgress
 import com.bnyro.clock.social.domain.SharedSoundSelection
-import com.bnyro.clock.social.domain.SharedSoundUploadRequest
-import com.bnyro.clock.social.domain.SocialChange
+import com.bnyro.clock.social.domain.SharedTimerDto
 import com.bnyro.clock.social.domain.SharedTimerRequest
+import com.bnyro.clock.social.domain.SocialActivityPage
+import com.bnyro.clock.social.domain.SocialChange
+import com.bnyro.clock.social.domain.SocialChangeDto
 import com.bnyro.clock.social.domain.SocialGroup
+import com.bnyro.clock.social.domain.SocialGroupDto
 import com.bnyro.clock.social.domain.SocialMember
+import com.bnyro.clock.social.domain.SocialMemberDto
+import com.bnyro.clock.social.domain.SocialOccurrenceDto
 import com.bnyro.clock.social.domain.canEditAlarms
+import com.bnyro.clock.social.presentation.SocialNotificationHelper
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.AlarmService
 import com.bnyro.clock.util.services.TimerService
+import com.google.android.gms.tasks.Tasks
+import com.google.android.play.core.integrity.IntegrityManagerFactory
+import com.google.android.play.core.integrity.StandardIntegrityManager
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import java.net.URI
+import java.security.MessageDigest
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import com.google.android.gms.tasks.Tasks
-import com.google.android.play.core.integrity.IntegrityManagerFactory
-import com.google.android.play.core.integrity.StandardIntegrityManager
-import java.net.URI
-import java.security.MessageDigest
-import java.time.Instant
-import java.time.ZoneId
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 data class SocialSyncResult(
     val changes: List<SocialChange>,
@@ -74,10 +95,19 @@ class SocialRepository(
     private val socialDao = socialDatabase.socialDao()
     private val alarmUseCase = CreateUpdateDeleteAlarmUseCase(context, alarmRepository)
     private val synchronizationMutex = Mutex()
+    private val synchronization = SocialSynchronization(context, socialDatabase)
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private var registeredIdentity: Pair<String, String>? = null
 
     val groups: Flow<List<SocialGroup>> = socialDao.getGroupsStream()
     val members: Flow<List<SocialMember>> = socialDao.getMembersStream()
     val alarmGroupNames = socialDao.getAlarmGroupNamesStream()
+    val rejectedOperations = socialDao.getRejectedOperationsStream()
+    val readyInvitations = socialDao.getReadyInvitationsStream()
+
+    suspend fun acknowledgeOperation(operation: PendingOperation) {
+        socialDao.resolveOperation(operation.operationId, "reviewed", operation.rejectionCode, operation.response)
+    }
 
     val deviceCapabilities: DeviceCapabilities
         get() {
@@ -128,76 +158,199 @@ class SocialRepository(
         }
     }
 
-    suspend fun synchronize(): SocialSyncResult = synchronizationMutex.withLock {
+    suspend fun synchronize(dirtyScopes: Set<String>? = null): SocialSyncResult = synchronizationMutex.withLock {
         withContext(Dispatchers.IO) {
             val serverUrl = Preferences.instance.getString(
                 SocialPreferences.serverUrlKey,
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
-            var identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            var api = SocialApi(serverUrl, identity)
-            try {
+            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+            val api = SocialApi(serverUrl, identity)
+            if (registeredIdentity != (serverUrl to identity.id)) {
                 api.register()
-            } catch (removed: SocialApiException) {
-                if (removed.status != 409) throw removed
-                discardLocalIdentity()
-                identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-                api = SocialApi(serverUrl, identity)
-                api.register()
+                registeredIdentity = serverUrl to identity.id
             }
-            val previousCursor = Preferences.instance.getLong(SocialPreferences.syncCursorKey, 0)
+            val hadCheckpoint = socialDao.getScope("/v1/sync")?.cursor != null
             val knownGroupIds = groups.first().map { it.id }.toSet()
-            val response = api.synchronize(previousCursor)
-            applyDeviceCapabilities(response.capabilities, serverUrl, identity.id)
-            val remoteGroups = response.groups.associateBy { it.id }
-            val soundStore = SharedSoundStore(context)
-            val remoteGroupIds = response.groups.map { it.id }.toSet()
-            val remoteAlarmIds = response.alarms.map { it.id }.toSet()
-
-            socialDao.getAlarmLinks().filter {
-                it.groupId !in remoteGroupIds || it.remoteAlarmId !in remoteAlarmIds
-            }.forEach { deleteSharedAlarmLink(it) }
-
-            response.alarms.forEach { remote ->
-                val link = socialDao.getAlarmLinkByRemoteId(remote.id)
-                val soundMode = SharedSoundMode.valueOf(remote.soundMode.uppercase())
-                val soundFile = remote.soundId?.takeIf { soundMode == SharedSoundMode.SHARED }
-                    ?.let { runCatching { soundStore.cache(it, api) }.getOrNull() }
-                val soundUri = soundFile?.toURI()?.toString()
-                val timeZone = remoteGroups[remote.groupId]?.takeIf {
-                    it.alarmTimeBasis == "group_time_zone"
-                }?.alarmTimeZone
-                if (remote.deleted) {
-                    link?.let {
-                        alarmRepository.getAlarmById(it.localAlarmId)?.let { alarm ->
-                            context.sendBroadcast(
-                                Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
-                                    .setPackage(context.packageName)
-                                    .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
-                            )
-                            alarmUseCase.deleteAlarm(alarm)
-                        }
-                        socialDao.deleteAlarmLink(remote.id)
-                        SocialAlarmSchedule.setTimeZone(it.localAlarmId, null)
-                        WorkManager.getInstance(context).cancelUniqueWork(
-                            "jay_ignored_alarm_${it.localAlarmId}"
-                        )
+            val pending = socialDao.getPendingOperations()
+            synchronization.flushOperations(api)
+            val identityScope = socialDao.getScope("/v1/sync")?.scopeId
+            if (dirtyScopes == null || identityScope == null || identityScope in dirtyScopes || pending.isNotEmpty())
+                synchronization.synchronizeScope(api, "/v1/sync")
+            val memberships = socialDao.getResources().filter { it.kind == "membership" }
+                .map { json.decodeFromString<MembershipAccessDto>(it.representation) }
+            for (scope in socialDao.getScopes().filter { it.route != "/v1/sync" && memberships.none { member -> member.scopeId == it.scopeId } }) {
+                socialDatabase.withTransaction {
+                    socialDao.clearScopeResources(scope.scopeId)
+                    socialDao.clearStaging(scope.scopeId)
+                    socialDao.deleteScope(scope.route)
+                }
+            }
+            for (membership in memberships) {
+                if (dirtyScopes != null && membership.scopeId !in dirtyScopes &&
+                    pending.none { it.scopeId == membership.scopeId } &&
+                    socialDao.getScope("/v1/groups/${membership.groupId}/sync")?.cursor != null) continue
+                try {
+                    synchronization.synchronizeScope(api, "/v1/groups/${membership.groupId}/sync")
+                } catch (error: SocialApiException) {
+                    if (error.status != 404 && error.status != 403) throw error
+                    socialDatabase.withTransaction {
+                        socialDao.clearScopeResources(membership.scopeId)
+                        socialDao.clearStaging(membership.scopeId)
+                        socialDao.deleteScope("/v1/groups/${membership.groupId}/sync")
                     }
-                } else if (link == null) {
-                    val localId = alarmUseCase.createAlarm(
-                        Alarm(
+                }
+            }
+            applyDeviceCapabilities(api.deviceCapabilities(), serverUrl, identity.id)
+            socialDao.confirmAcceptedOperations()
+            val changes = socialDao.getPendingActivity().map {
+                ScopeSyncItem("activity", it.key, "upsert", Json.parseToJsonElement(it.representation).jsonObject, 0, 0)
+            }
+            val result = applySharedState(identity.id, changes, hadCheckpoint, knownGroupIds)
+            SocialNotificationHelper.notifySocialChanges(context, result)
+            socialDao.clearPendingActivity()
+            result
+        }
+    }
+
+    private suspend fun applySharedState(
+        identityId: String,
+        changes: List<ScopeSyncItem> = emptyList(),
+        hadCheckpoint: Boolean = false,
+        knownGroupIds: Set<String> = emptySet()
+    ): SocialSyncResult {
+        val resources = synchronization.projectedResources()
+        if (socialDao.getProjectedOperations().none { it.kind == "identity" && it.method == "PATCH" }) {
+            resources.firstOrNull { it.kind == "identity" }?.let {
+                val name = Json.parseToJsonElement(it.representation).jsonObject.getValue("name").jsonPrimitive.content
+                Preferences.edit { putString(SocialPreferences.deviceNameKey, name) }
+            }
+        }
+        val sounds = resources.filter { it.kind == "sound" }
+            .associate { val sound = json.decodeFromString<SharedSoundDto>(it.representation); sound.id to sound }
+        val access = resources.filter { it.kind == "membership" }.map { json.decodeFromString<MembershipAccessDto>(it.representation) }.associateBy { it.groupId }
+        val synchronizedGroups = resources.filter { it.kind == "group" }.mapNotNull {
+            val group = json.decodeFromString<SocialGroupDto>(it.representation)
+            val membership = access[group.id] ?: return@mapNotNull null
+            SocialGroup(
+                group.id, group.name, AlarmPermission.valueOf(group.alarmPermission.uppercase()),
+                group.notifyAlarmChanges, group.notifySnoozed, group.notifyDismissed, group.notifyIgnored,
+                membership.notifyMembership, membership.notifyAdministrative, MemberRole.valueOf(membership.role.uppercase()),
+                AlarmTimeBasis.valueOf(group.alarmTimeBasis.uppercase()), group.alarmTimeZone, group.sharedAnswers,
+                membership.id
+            )
+        }
+        val remoteGroups = synchronizedGroups.associateBy { it.id }
+        val remoteGroupIds = remoteGroups.keys
+        val remoteAlarms = resources.filter { it.kind == "alarm" }.map {
+            json.decodeFromString<SharedAlarmDto>(it.representation)
+        }.filter { it.groupId in remoteGroupIds }.map { it.copy(soundTitle = sounds[it.soundId]?.title ?: it.soundTitle) }
+        val remoteTimers = resources.filter { it.kind == "timer" }.map {
+            json.decodeFromString<SharedTimerDto>(it.representation)
+        }.filter { it.groupId in remoteGroupIds }.map { it.copy(soundTitle = sounds[it.soundId]?.title ?: it.soundTitle) }
+        val remoteOccurrences = resources.filter { it.kind == "occurrence" }.map {
+            json.decodeFromString<SocialOccurrenceDto>(it.representation)
+        }
+        val remoteMembers = resources.filter { it.kind == "member" }.map {
+            json.decodeFromString<SocialMemberDto>(it.representation)
+        }.filter { it.groupId in remoteGroupIds }
+        val remoteChanges = changes.map { json.decodeFromJsonElement<SocialChangeDto>(it.data) }
+        val soundStore = SharedSoundStore(context)
+        val remoteAlarmIds = remoteAlarms.map { it.id }.toSet()
+
+        socialDatabase.withTransaction {
+            socialDao.clearMembers()
+            socialDao.clearGroups()
+            socialDao.putGroups(synchronizedGroups)
+            socialDao.putMembers(remoteMembers.map {
+                SocialMember(
+                    it.groupId,
+                    it.deviceId,
+                    it.name,
+                    MemberRole.valueOf(it.role.uppercase())
+                )
+            })
+        }
+
+        socialDao.getAlarmLinks().filter {
+            it.groupId !in remoteGroupIds || it.remoteAlarmId !in remoteAlarmIds
+        }.forEach { deleteSharedAlarmLink(it) }
+
+        remoteAlarms.forEach { remote ->
+            val link = socialDao.getAlarmLinkByRemoteId(remote.id)
+            val soundMode = SharedSoundMode.valueOf(remote.soundMode.uppercase())
+            val soundFile = remote.soundId?.takeIf { soundMode == SharedSoundMode.SHARED }
+                ?.let(soundStore::cached)
+            val soundUri = soundFile?.toURI()?.toString()
+            val timeZone = remoteGroups[remote.groupId]?.takeIf {
+                it.alarmTimeBasis == AlarmTimeBasis.GROUP_TIME_ZONE
+            }?.alarmTimeZone
+            if (link == null) {
+                val localId = alarmUseCase.createAlarm(
+                    Alarm(
+                        time = remote.time,
+                        label = remote.label,
+                        enabled = remote.enabled,
+                        days = remote.days,
+                        vibrate = remote.vibrate,
+                        startDate = LocalDate.parse(remote.startDate).toEpochDay(),
+                        repeatInterval = remote.repeatInterval,
+                        repeatUnit = RepeatUnit.valueOf(remote.repeatUnit),
+                        repeatAnchor = RepeatAnchor.valueOf(remote.repeatAnchor),
+                        repeatDuration = remote.repeatDuration,
+                        repeatDurationUnit = RepeatUnit.valueOf(remote.repeatDurationUnit),
+                        endDate = remote.endDate?.let { LocalDate.parse(it).toEpochDay() },
+                        endOccurrences = remote.endOccurrences,
+                        advanced = remote.advanced,
+                        snoozeEnabled = remote.snoozeEnabled,
+                        snoozeMinutes = remote.snoozeMinutes,
+                        soundEnabled = soundMode != SharedSoundMode.OFF,
+                        soundName = remote.soundTitle,
+                        soundUri = soundUri,
+                        vibrationPattern = remote.vibrationPattern,
+                        vibrationPatternName = remote.vibrationPatternName
+                    ),
+                    timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault()
+                )
+                socialDao.putAlarmLink(
+                    SharedAlarmLink(
+                        remote.id,
+                        localId,
+                        remote.groupId,
+                        remote.revision,
+                        soundMode,
+                        remote.soundId,
+                        remote.soundTitle,
+                        timeZone,
+                        remote.saveId
+                    )
+                )
+                SocialAlarmSchedule.setTimeZone(localId, timeZone)
+                alarmRepository.getAlarmById(localId)?.let {
+                    scheduleIgnoredOutcome(it, remote.id, remote.revision)
+                }
+            } else if (remote.revision != link.revision || remote.saveId != link.saveId || link.timeZone != timeZone) {
+                alarmRepository.getAlarmById(link.localAlarmId)?.let { local ->
+                    SocialAlarmSchedule.setTimeZone(local.id, timeZone)
+                    context.sendBroadcast(
+                        Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
+                            .setPackage(context.packageName)
+                            .putExtra(AlarmHelper.EXTRA_ID, local.id)
+                    )
+                    alarmUseCase.updateAlarm(
+                        local.copy(
                             time = remote.time,
                             label = remote.label,
                             enabled = remote.enabled,
                             days = remote.days,
                             vibrate = remote.vibrate,
-                            startDate = remote.startDate,
+                            startDate = LocalDate.parse(remote.startDate).toEpochDay(),
                             repeatInterval = remote.repeatInterval,
                             repeatUnit = RepeatUnit.valueOf(remote.repeatUnit),
                             repeatAnchor = RepeatAnchor.valueOf(remote.repeatAnchor),
                             repeatDuration = remote.repeatDuration,
                             repeatDurationUnit = RepeatUnit.valueOf(remote.repeatDurationUnit),
-                            endDate = remote.endDate,
+                            endDate = remote.endDate?.let { LocalDate.parse(it).toEpochDay() },
                             endOccurrences = remote.endOccurrences,
                             advanced = remote.advanced,
                             snoozeEnabled = remote.snoozeEnabled,
@@ -210,215 +363,192 @@ class SocialRepository(
                         ),
                         timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault()
                     )
-                    socialDao.putAlarmLink(
-                        SharedAlarmLink(
-                            remote.id,
-                            localId,
-                            remote.groupId,
-                            remote.revision,
-                            soundMode,
-                            remote.soundId,
-                            remote.soundTitle,
-                            timeZone
-                        )
+                }
+                socialDao.putAlarmLink(
+                    link.copy(
+                        revision = remote.revision,
+                        soundMode = soundMode,
+                        soundId = remote.soundId,
+                        soundTitle = remote.soundTitle,
+                        timeZone = timeZone,
+                        saveId = remote.saveId
                     )
-                    SocialAlarmSchedule.setTimeZone(localId, timeZone)
-                    alarmRepository.getAlarmById(localId)?.let {
-                        scheduleIgnoredOutcome(it, remote.id, remote.revision)
-                    }
-                } else if (remote.revision > link.revision ||
-                    alarmRepository.getAlarmById(link.localAlarmId)?.soundUri != soundUri
-                ) {
-                    alarmRepository.getAlarmById(link.localAlarmId)?.let { local ->
-                        SocialAlarmSchedule.setTimeZone(local.id, timeZone)
-                        context.sendBroadcast(
-                            Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
-                                .setPackage(context.packageName)
-                                .putExtra(AlarmHelper.EXTRA_ID, local.id)
-                        )
-                        alarmUseCase.updateAlarm(
-                            local.copy(
-                                time = remote.time,
-                                label = remote.label,
-                                enabled = remote.enabled,
-                                days = remote.days,
-                                vibrate = remote.vibrate,
-                                startDate = remote.startDate,
-                                repeatInterval = remote.repeatInterval,
-                                repeatUnit = RepeatUnit.valueOf(remote.repeatUnit),
-                                repeatAnchor = RepeatAnchor.valueOf(remote.repeatAnchor),
-                                repeatDuration = remote.repeatDuration,
-                                repeatDurationUnit = RepeatUnit.valueOf(remote.repeatDurationUnit),
-                                endDate = remote.endDate,
-                                endOccurrences = remote.endOccurrences,
-                                advanced = remote.advanced,
-                                snoozeEnabled = remote.snoozeEnabled,
-                                snoozeMinutes = remote.snoozeMinutes,
-                                soundEnabled = soundMode != SharedSoundMode.OFF,
-                                soundName = remote.soundTitle,
-                                soundUri = soundUri,
-                                vibrationPattern = remote.vibrationPattern,
-                                vibrationPatternName = remote.vibrationPatternName
-                            ),
-                            timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault()
-                        )
-                    }
-                    socialDao.putAlarmLink(
-                        link.copy(
-                            revision = remote.revision,
-                            soundMode = soundMode,
-                            soundId = remote.soundId,
-                            soundTitle = remote.soundTitle,
-                            timeZone = timeZone
-                        )
-                    )
-                    alarmRepository.getAlarmById(link.localAlarmId)?.let {
-                        scheduleIgnoredOutcome(it, remote.id, remote.revision)
-                    }
+                )
+                alarmRepository.getAlarmById(link.localAlarmId)?.let {
+                    scheduleIgnoredOutcome(it, remote.id, remote.revision)
+                }
+            } else {
+                alarmRepository.getAlarmById(link.localAlarmId)?.takeIf { it.soundUri != soundUri }?.let {
+                    alarmRepository.updateAlarm(it.copy(soundUri = soundUri))
                 }
             }
+        }
 
-            // an outcome the server holds for the occurrence this device is living in was
-            // answered elsewhere: stop the ring, move the local schedule past it, and arm the
-            // next occurrence, whether the answer came from another member or another device
-            // carrying this same profile
-            response.occurrences.groupBy { it.alarmId }.forEach { (remoteAlarmId, rows) ->
-                val link = socialDao.getAlarmLinkByRemoteId(remoteAlarmId) ?: return@forEach
-                val occurrenceId = Preferences.instance.getString(
-                    "${SocialPreferences.alarmOccurrencePrefix}${link.localAlarmId}",
-                    null
-                ) ?: return@forEach
-                if (
-                    rows.none {
-                        it.occurrenceId == occurrenceId &&
-                            it.status in RESOLVED_OCCURRENCE_STATUSES
-                    }
-                ) return@forEach
-                alarmRepository.getAlarmById(link.localAlarmId)?.let { alarm ->
+        // an outcome the server holds for the occurrence this device is living in was
+        // answered elsewhere: stop the ring, move the local schedule past it, and arm the
+        // next occurrence, whether the answer came from another member or another device
+        // carrying this same profile
+        remoteOccurrences.groupBy { it.alarmId }.forEach { (remoteAlarmId, rows) ->
+            val link = socialDao.getAlarmLinkByRemoteId(remoteAlarmId) ?: return@forEach
+            val occurrenceId = Preferences.instance.getString(
+                "${SocialPreferences.alarmOccurrencePrefix}${link.localAlarmId}",
+                null
+            ) ?: return@forEach
+            if (
+                rows.none {
+                    it.occurrenceId == occurrenceId && it.alarmRevision == link.revision &&
+                        it.status in RESOLVED_OCCURRENCE_STATUSES
+                }
+            ) return@forEach
+            alarmRepository.getAlarmById(link.localAlarmId)?.let { alarm ->
+                context.sendBroadcast(
+                    Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
+                        .setPackage(context.packageName)
+                        .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                )
+                WorkManager.getInstance(context).cancelUniqueWork(
+                    "jay_ignored_alarm_${alarm.id}"
+                )
+                Preferences.edit {
+                    remove("${SocialPreferences.alarmOccurrencePrefix}${alarm.id}")
+                }
+                if ((occurrenceId.toLongOrNull() ?: 0L) > System.currentTimeMillis()) {
+                    alarmUseCase.dismissUpcomingAlarm(alarm)
+                } else if (alarm.enabled) {
+                    AlarmHelper.enqueue(context, alarm, skipToday = true)
+                }
+                scheduleIgnoredOutcome(alarm, remoteAlarmId, link.revision)
+            }
+        }
+
+        // a snooze leaves the shared occurrence pending for the re-ring where it was
+        // answered, so the devices sharing this profile only stop ringing
+        if (hadCheckpoint) {
+            remoteChanges.filter {
+                it.entityType == "outcome" && it.action == "snoozed" &&
+                    it.subjectDeviceId == identityId
+            }.forEach { change ->
+                socialDao.getAlarmLinkByRemoteId(change.entityId)?.let { link ->
                     context.sendBroadcast(
                         Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
                             .setPackage(context.packageName)
-                            .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                            .putExtra(AlarmHelper.EXTRA_ID, link.localAlarmId)
                     )
                     WorkManager.getInstance(context).cancelUniqueWork(
-                        "jay_ignored_alarm_${alarm.id}"
+                        "jay_ignored_alarm_${link.localAlarmId}"
                     )
-                    Preferences.edit {
-                        remove("${SocialPreferences.alarmOccurrencePrefix}${alarm.id}")
-                    }
-                    if ((occurrenceId.toLongOrNull() ?: 0L) > System.currentTimeMillis()) {
-                        alarmUseCase.dismissUpcomingAlarm(alarm)
-                    } else if (alarm.enabled) {
-                        AlarmHelper.enqueue(context, alarm, skipToday = true)
-                    }
-                    scheduleIgnoredOutcome(alarm, remoteAlarmId, link.revision)
                 }
             }
+        }
 
-            // a snooze leaves the shared occurrence pending for the re-ring where it was
-            // answered, so the devices sharing this profile only stop ringing
-            if (previousCursor != 0L) {
-                response.changes.filter {
-                    it.entityType == "outcome" && it.action == "snoozed" &&
-                        it.subjectDeviceId == identity.id
-                }.forEach { change ->
-                    socialDao.getAlarmLinkByRemoteId(change.entityId)?.let { link ->
-                        context.sendBroadcast(
-                            Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
-                                .setPackage(context.packageName)
-                                .putExtra(AlarmHelper.EXTRA_ID, link.localAlarmId)
-                        )
-                        WorkManager.getInstance(context).cancelUniqueWork(
-                            "jay_ignored_alarm_${link.localAlarmId}"
-                        )
-                    }
-                }
-            }
+        applySharedTimers(remoteTimers, synchronizedGroups)
+        val provisionalAlarms = socialDao.getProjectedOperations().filter { it.kind == "alarm" }.map { it.targetId }.toSet()
+        for (alarm in remoteAlarms.filter { it.id !in provisionalAlarms }) {
+            val operationId = UUID.nameUUIDFromBytes("delivery:$identityId:${alarm.id}:${alarm.revision}".toByteArray()).toString()
+            synchronization.saveOperation(alarm.groupId, "delivery", alarm.id, "POST", "/v1/alarms/${alarm.id}/deliveries",
+                JsonObject(mapOf("revision" to JsonPrimitive(alarm.revision))), null, ordered = false, operationId = operationId)
+        }
+        if (socialDao.getPendingOperations().isNotEmpty()) SocialSyncWorker.enqueue(context)
+        soundStore.prune(
+            remoteAlarms.mapNotNull { it.soundId }.toSet() +
+                remoteTimers.mapNotNull { it.soundId }.toSet()
+        )
 
-            val synchronizedGroups = response.groups.map {
-                SocialGroup(
-                    it.id,
-                    it.name,
-                    AlarmPermission.valueOf(it.alarmPermission.uppercase()),
-                    it.notifyAlarmChanges,
-                    it.notifySnoozed,
-                    it.notifyDismissed,
-                    it.notifyIgnored,
-                    it.notifyMembership,
-                    it.notifyAdministrative,
-                    MemberRole.valueOf(it.role.uppercase()),
-                    AlarmTimeBasis.valueOf(it.alarmTimeBasis.uppercase()),
-                    it.alarmTimeZone,
-                    it.sharedAnswers
+        (remoteAlarms.mapNotNull { it.soundId } + remoteTimers.mapNotNull { it.soundId })
+            .distinct().filter { soundStore.cached(it) == null && sounds[it]?.status == "ready" }
+            .forEach { SharedSoundWorker.enqueue(context, it) }
+
+        socialDao.getAudioOperations().forEach { SharedSoundWorker.upload(context, it) }
+
+        return SocialSyncResult(
+            if (!hadCheckpoint) emptyList() else remoteChanges.map {
+                SocialChange(
+                    it.sequence,
+                    it.groupId,
+                    it.groupName,
+                    it.entityType,
+                    it.entityId,
+                    it.action,
+                    it.entityLabel,
+                    it.entityTime,
+                    it.actorDeviceId,
+                    it.actorName,
+                    it.subjectDeviceId,
+                    it.subjectName,
+                    it.recipientDeviceId,
+                    it.details,
+                    it.occurredAt
                 )
-            }
-            socialDatabase.withTransaction {
-                socialDao.clearMembers()
-                socialDao.clearGroups()
-                socialDao.putGroups(synchronizedGroups)
-                socialDao.putMembers(response.members.map {
-                    SocialMember(
-                        it.groupId,
-                        it.deviceId,
-                        it.name,
-                        MemberRole.valueOf(it.role.uppercase())
-                    )
-                })
-            }
+            }.filter { it.groupId in knownGroupIds },
+            synchronizedGroups.associateBy { it.id },
+            identityId
+        )
+    }
 
-            applySharedTimers(response.timers, synchronizedGroups, api)
-            soundStore.prune(
-                response.alarms.mapNotNull { it.soundId }.toSet() +
-                    response.timers.mapNotNull { it.soundId }.toSet()
-            )
-
-            Preferences.edit { putLong(SocialPreferences.syncCursorKey, response.cursor) }
-
-            SocialSyncResult(
-                if (previousCursor == 0L) emptyList() else response.changes.map {
-                    SocialChange(
-                        it.sequence,
-                        it.groupId,
-                        it.groupName,
-                        it.entityType,
-                        it.entityId,
-                        it.action,
-                        it.entityLabel,
-                        it.entityTime,
-                        it.actorDeviceId,
-                        it.actorName,
-                        it.subjectDeviceId,
-                        it.subjectName,
-                        it.recipientDeviceId,
-                        it.details,
-                        it.occurredAt
-                    )
-                }.filter { it.groupId in knownGroupIds },
-                synchronizedGroups.associateBy { it.id },
-                identity.id
-            )
+    suspend fun refreshSharedState() = synchronizationMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val server = Preferences.instance.getString(SocialPreferences.serverUrlKey, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
+            applySharedState(DeviceIdentityStore.loadOrCreate(context, server).id)
         }
     }
 
-    suspend fun followLiveChanges(onSynchronized: (SocialSyncResult) -> Unit) {
+    suspend fun followLiveChanges() = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
             SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
         SocialApi(serverUrl, identity).apply {
-            register()
+            synchronizationMutex.withLock {
+                if (registeredIdentity != (serverUrl to identity.id)) {
+                    register()
+                    registeredIdentity = serverUrl to identity.id
+                }
+            }
             listenForChanges(
                 shouldContinue = {
                     val configuredServer = Preferences.instance.getString(
                         SocialPreferences.serverUrlKey,
                         DEFAULT_SERVER_URL
                     ) ?: DEFAULT_SERVER_URL
-                    configuredServer.trimEnd('/') == serverUrl.trimEnd('/')
+                    configuredServer.trimEnd('/') == serverUrl.trimEnd('/') &&
+                        DeviceIdentityStore.loadOrCreate(context, configuredServer).id == identity.id
                 },
-                onChange = { onSynchronized(synchronize()) }
+                onChange = { synchronize(it) }
             )
         }
+    }
+
+    private suspend fun saveSharedChange(
+        scopeId: String,
+        kind: String,
+        targetId: String,
+        method: String,
+        path: String,
+        payload: JsonObject?,
+        optimisticState: JsonObject? = payload,
+        ordered: Boolean = true,
+        operationId: String = UUID.randomUUID().toString(),
+        audioSource: String? = null,
+        capturedSavedAt: Long? = null
+    ): PendingOperation = synchronizationMutex.withLock {
+        val serverUrl = Preferences.instance.getString(SocialPreferences.serverUrlKey, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+        val dependency = socialDao.getPendingOperations().firstOrNull {
+            it.kind == "group" && it.method == "POST" && it.targetId == scopeId
+        }?.operationId
+        val body = if (method == "DELETE" && scopeId != identity.id) {
+            val membershipId = groups.first().first { it.id == scopeId }.membershipId
+            JsonObject(mapOf("membership_id" to JsonPrimitive(membershipId)))
+        } else payload
+        val audioFile = audioSource?.let {
+            val soundId = (requireNotNull(payload)["sound"]!!.jsonObject["sound_id"] as JsonPrimitive).content
+            SharedSoundStore(context).prepareUpload(soundId, it)
+        }
+        val operation = synchronization.saveOperation(scopeId, kind, targetId, method, path, body, optimisticState, ordered, dependency, operationId, audioFile?.absolutePath, capturedSavedAt)
+        applySharedState(identity.id)
+        SocialSyncWorker.enqueue(context, expedited = true)
+        operation
     }
 
     suspend fun createGroup(
@@ -429,72 +559,50 @@ class SocialRepository(
         notifyDismissed: Boolean,
         notifyIgnored: Boolean
     ) = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
-        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).apply {
-            register()
-            createGroup(
-                GroupCreate(
-                    name,
-                    permission.name.lowercase(),
-                    notifyAlarmChanges,
-                    notifySnoozed,
-                    notifyDismissed,
-                    notifyIgnored,
-                    AlarmTimeBasis.MEMBER_LOCAL.name.lowercase(),
-                    ZoneId.systemDefault().id
-                )
-            )
-        }
-        synchronize()
+        val groupId = UUID.randomUUID().toString()
+        val payload = json.encodeToJsonElement(GroupCreate(
+            name, permission.name.lowercase(), notifyAlarmChanges, notifySnoozed,
+            notifyDismissed, notifyIgnored, AlarmTimeBasis.MEMBER_LOCAL.name.lowercase(),
+            ZoneId.systemDefault().id, false, groupId, UUID.randomUUID().toString()
+        )).jsonObject
+        saveSharedChange(groupId, "group", groupId, "POST", "/v1/groups", payload)
+        Unit
     }
 
     suspend fun saveGroupSettings(group: SocialGroup) = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
-        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).apply {
-            if (group.role == MemberRole.LEADER) {
-                updateGroup(
-                    group.id,
-                    GroupUpdate(
-                        group.name,
-                        group.alarmPermission.name.lowercase(),
-                        group.notifyAlarmChanges,
-                        group.notifySnoozed,
-                        group.notifyDismissed,
-                        group.notifyIgnored,
-                        group.alarmTimeBasis.name.lowercase(),
-                        group.alarmTimeZone,
-                        group.sharedAnswers
-                    )
-                )
-            }
-            updateMemberNotificationSettings(
-                group.id,
-                MemberNotificationUpdate(
-                    group.notifyMembership,
-                    group.notifyAdministrative
-                )
-            )
+        if (group.role == MemberRole.LEADER) {
+            val payload = JsonObject(json.encodeToJsonElement(GroupUpdate(
+                group.name, group.alarmPermission.name.lowercase(), group.notifyAlarmChanges,
+                group.notifySnoozed, group.notifyDismissed, group.notifyIgnored,
+                group.alarmTimeBasis.name.lowercase(), group.alarmTimeZone, group.sharedAnswers
+            )).jsonObject + ("membership_id" to JsonPrimitive(group.membershipId)))
+            saveSharedChange(group.id, "group", group.id, "PUT", "/v1/groups/${group.id}", payload,
+                JsonObject(payload + ("id" to JsonPrimitive(group.id))))
         }
-        synchronize()
+        val membership = synchronization.projectedResources().first { it.kind == "membership" &&
+            json.decodeFromString<MembershipAccessDto>(it.representation).id == group.membershipId }
+        val payload = JsonObject(json.encodeToJsonElement(MemberNotificationUpdate(
+            group.notifyMembership, group.notifyAdministrative
+        )).jsonObject + ("membership_id" to JsonPrimitive(group.membershipId)))
+        saveSharedChange(membership.scopeId, "membership", group.membershipId, "PUT",
+            "/v1/groups/${group.id}/notification-settings", payload,
+            JsonObject(Json.parseToJsonElement(membership.representation).jsonObject + payload))
+        Unit
     }
 
-    suspend fun createInvite(groupId: String): String = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
-        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        val invitation = SocialApi(serverUrl, identity).createInvite(groupId)
-        "${SocialLink.BASE_URL}/join?server=${java.net.URLEncoder.encode(serverUrl, Charsets.UTF_8.name())}" +
-                "&token=${java.net.URLEncoder.encode(invitation.token, Charsets.UTF_8.name())}"
+    suspend fun createInvite(groupId: String): String? = withContext(Dispatchers.IO) {
+        val group = groups.first().first { it.id == groupId }
+        val inviteId = UUID.randomUUID().toString()
+        val existing = socialDao.getPendingOperations().firstOrNull { it.kind == "invitation" && it.scopeId == groupId }
+        val operation = existing ?: saveSharedChange(groupId, "invitation", inviteId, "POST", "/v1/groups/$groupId/invites",
+            JsonObject(mapOf("id" to JsonPrimitive(inviteId), "membership_id" to JsonPrimitive(group.membershipId))),
+            optimisticState = null, ordered = false)
+        try {
+            synchronize()
+        } catch (_: java.io.IOException) {
+            return@withContext null
+        }
+        socialDao.getOperation(operation.operationId)?.response?.let { json.decodeFromString<InviteResponse>(it).url }
     }
 
     suspend fun joinGroup(invitation: String) = withContext(Dispatchers.IO) {
@@ -517,50 +625,32 @@ class SocialRepository(
         require(serverUrl.trimEnd('/') == configuredServer.trimEnd('/')) {
             "This invitation belongs to $serverUrl. Change your Jay server in settings first."
         }
-        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).apply {
-            register()
-            joinGroup(token)
-        }
-        synchronize()
+        saveSharedChange("identity", "join", token, "POST", "/v1/groups/join",
+            json.encodeToJsonElement(InviteJoin(token)).jsonObject, optimisticState = null, ordered = false)
+        Unit
     }
 
     suspend fun leaveGroup(groupId: String) = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
-        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).leaveGroup(groupId)
-        synchronize()
+        saveSharedChange(groupId, "group", groupId, "DELETE", "/v1/groups/$groupId/membership", null, ordered = false)
+        Unit
     }
 
     suspend fun deleteGroup(groupId: String) = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
-        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).deleteGroup(groupId)
-        synchronize()
+        saveSharedChange(groupId, "group", groupId, "DELETE", "/v1/groups/$groupId", null, ordered = false)
+        Unit
     }
 
-    suspend fun updateMember(groupId: String, deviceId: String, role: MemberRole) =
-        withContext(Dispatchers.IO) {
-            val serverUrl = Preferences.instance.getString(
-                SocialPreferences.serverUrlKey,
-                DEFAULT_SERVER_URL
-            ) ?: DEFAULT_SERVER_URL
-            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            SocialApi(serverUrl, identity).updateMember(
-                groupId,
-                deviceId,
-                role.name.lowercase()
-            )
-            synchronize()
-        }
+    suspend fun updateMember(groupId: String, deviceId: String, role: MemberRole) = withContext(Dispatchers.IO) {
+        val group = groups.first().first { it.id == groupId }
+        val resource = synchronization.projectedResources().first { it.scopeId == groupId && it.kind == "member" &&
+            json.decodeFromString<SocialMemberDto>(it.representation).deviceId == deviceId }
+        val payload = JsonObject(mapOf("role" to JsonPrimitive(role.name.lowercase()), "membership_id" to JsonPrimitive(group.membershipId)))
+        saveSharedChange(groupId, "member", resource.key, "PATCH", "/v1/groups/$groupId/members/$deviceId", payload,
+            JsonObject(Json.parseToJsonElement(resource.representation).jsonObject + payload))
+        Unit
+    }
 
-    suspend fun getGroupActivity(groupId: String, before: Long? = null): SocialActivityPage =
+    suspend fun getGroupActivity(groupId: String, before: String? = null): SocialActivityPage =
         withContext(Dispatchers.IO) {
             val serverUrl = Preferences.instance.getString(
                 SocialPreferences.serverUrlKey,
@@ -592,7 +682,7 @@ class SocialRepository(
             )
         }
 
-    suspend fun getAlarmActivity(alarmId: String, before: Long? = null): SocialActivityPage =
+    suspend fun getAlarmActivity(alarmId: String, before: String? = null): SocialActivityPage =
         withContext(Dispatchers.IO) {
             val serverUrl = Preferences.instance.getString(
                 SocialPreferences.serverUrlKey,
@@ -625,219 +715,89 @@ class SocialRepository(
         }
 
     suspend fun removeMember(groupId: String, deviceId: String) = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
-        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).removeMember(groupId, deviceId)
-        synchronize()
+        val resource = synchronization.projectedResources().first { it.scopeId == groupId && it.kind == "member" &&
+            json.decodeFromString<SocialMemberDto>(it.representation).deviceId == deviceId }
+        saveSharedChange(groupId, "member", resource.key, "DELETE", "/v1/groups/$groupId/members/$deviceId", null, ordered = false)
+        Unit
     }
 
     suspend fun createSharedAlarm(
         groupId: String,
         alarm: Alarm,
         onProgress: (SharedSoundProgress) -> Unit = {}
-    ): Long =
-        synchronizationMutex.withLock {
-            withContext(Dispatchers.IO) {
-                val serverUrl = Preferences.instance.getString(
-                    SocialPreferences.serverUrlKey,
-                    DEFAULT_SERVER_URL
-                ) ?: DEFAULT_SERVER_URL
-                val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-                val api = SocialApi(serverUrl, identity)
-                val timeZone = groups.first().firstOrNull { it.id == groupId }?.takeIf {
-                    it.alarmTimeBasis == AlarmTimeBasis.GROUP_TIME_ZONE
-                }?.alarmTimeZone
-                val schedulingTimeZone = timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault()
-                alarmUseCase.prepareForScheduling(alarm, schedulingTimeZone)
-                val soundMode = when {
-                    !alarm.soundEnabled -> SharedSoundMode.OFF
-                    alarm.soundUri != null && canUploadSharedSounds -> SharedSoundMode.SHARED
-                    else -> SharedSoundMode.MEMBER_DEFAULT
-                }
-                val soundId = if (soundMode == SharedSoundMode.SHARED) {
-                    uploadSharedSound(groupId, alarm.soundName, alarm.soundUri!!.toUri(), api, onProgress)
-                } else null
-                if (soundMode != SharedSoundMode.SHARED) {
-                    alarm.soundName = null
-                    alarm.soundUri = null
-                } else {
-                    alarm.soundUri = SharedSoundStore(context).cached(soundId!!)!!.toURI().toString()
-                }
-                val response = api.createAlarm(
-                    SharedAlarmRequest(
-                        groupId = groupId,
-                        time = alarm.time,
-                        label = alarm.label,
-                        enabled = alarm.enabled,
-                        days = alarm.days,
-                        vibrate = alarm.vibrate,
-                        startDate = alarm.startDate,
-                        repeatInterval = alarm.repeatInterval,
-                        repeatUnit = alarm.repeatUnit.name,
-                        repeatAnchor = alarm.repeatAnchor.name,
-                        repeatDuration = alarm.repeatDuration,
-                        repeatDurationUnit = alarm.repeatDurationUnit.name,
-                        endDate = alarm.endDate,
-                        endOccurrences = alarm.endOccurrences,
-                        advanced = alarm.advanced,
-                        snoozeEnabled = alarm.snoozeEnabled,
-                        snoozeMinutes = alarm.snoozeMinutes,
-                        vibrationPattern = alarm.vibrationPattern,
-                        vibrationPatternName = alarm.vibrationPatternName,
-                        soundChange = SharedSoundSelection(soundMode.name.lowercase(), soundId)
-                    )
-                )
-                val localId = alarmUseCase.createAlarm(
-                    alarm,
-                    schedulingTimeZone
-                )
-                socialDao.putAlarmLink(
-                    SharedAlarmLink(
-                        response.id,
-                        localId,
-                        groupId,
-                        response.revision ?: 1,
-                        soundMode,
-                        soundId,
-                        alarm.soundName,
-                        timeZone
-                    )
-                )
-                SocialAlarmSchedule.setTimeZone(localId, timeZone)
-                alarmRepository.getAlarmById(localId)?.let {
-                    scheduleIgnoredOutcome(it, response.id, response.revision ?: 1)
-                }
-                localId
-            }
+    ): Long = withContext(Dispatchers.IO) {
+        val group = groups.first().first { it.id == groupId }
+        val timeZone = if (group.alarmTimeBasis == AlarmTimeBasis.GROUP_TIME_ZONE) ZoneId.of(group.alarmTimeZone) else ZoneId.systemDefault()
+        alarmUseCase.prepareForScheduling(alarm, timeZone)
+        val soundMode = when {
+            !alarm.soundEnabled -> SharedSoundMode.OFF
+            alarm.soundUri != null && canUploadSharedSounds -> SharedSoundMode.SHARED
+            else -> SharedSoundMode.MEMBER_DEFAULT
         }
+        val soundId = if (soundMode == SharedSoundMode.SHARED) UUID.randomUUID().toString() else null
+        val alarmId = UUID.randomUUID().toString()
+        val payload = json.encodeToJsonElement(SharedAlarmRequest(
+            groupId = groupId, time = alarm.time, label = alarm.label, enabled = alarm.enabled,
+            days = alarm.days, vibrate = alarm.vibrate, startDate = LocalDate.ofEpochDay(alarm.startDate).toString(),
+            repeatInterval = alarm.repeatInterval, repeatUnit = alarm.repeatUnit.name, repeatAnchor = alarm.repeatAnchor.name,
+            repeatDuration = alarm.repeatDuration, repeatDurationUnit = alarm.repeatDurationUnit.name,
+            endDate = alarm.endDate?.let { LocalDate.ofEpochDay(it).toString() }, endOccurrences = alarm.endOccurrences,
+            advanced = alarm.advanced, snoozeEnabled = alarm.snoozeEnabled, snoozeMinutes = alarm.snoozeMinutes,
+            vibrationPattern = alarm.vibrationPattern, vibrationPatternName = alarm.vibrationPatternName,
+            sound = SharedSoundSelection(soundMode.name.lowercase(), soundId, alarm.soundName ?: "Shared sound"),
+            membershipId = group.membershipId, id = alarmId
+        )).jsonObject
+        val optimistic = JsonObject(payload + mapOf(
+            "sound_title" to JsonPrimitive(alarm.soundName ?: "Shared sound"),
+            "revision" to JsonPrimitive(1), "sound_mode" to JsonPrimitive(soundMode.name.lowercase()),
+            "sound_id" to (soundId?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
+        ))
+        saveSharedChange(groupId, "alarm", alarmId, "POST", "/v1/alarms", payload, optimistic, audioSource = alarm.soundUri.takeIf { soundId != null })
+        requireNotNull(socialDao.getAlarmLinkByRemoteId(alarmId)).localAlarmId
+    }
 
-    suspend fun updateAlarm(
-        alarm: Alarm,
-        onProgress: (SharedSoundProgress) -> Unit = {}
-    ) = synchronizationMutex.withLock {
-        withContext(Dispatchers.IO) {
-            val link = socialDao.getAlarmLinkByLocalId(alarm.id)
-            if (link == null) {
-                alarmUseCase.updateAlarm(alarm)
-            } else {
-                val serverUrl = Preferences.instance.getString(
-                    SocialPreferences.serverUrlKey,
-                    DEFAULT_SERVER_URL
-                ) ?: DEFAULT_SERVER_URL
-                val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-                val api = SocialApi(serverUrl, identity)
-                val schedulingTimeZone = link.timeZone?.let(ZoneId::of)
-                    ?: ZoneId.systemDefault()
-                alarmUseCase.prepareForScheduling(alarm, schedulingTimeZone)
-                var soundId = link.soundId
-                val soundChange = when {
-                    !alarm.soundEnabled && link.soundMode != SharedSoundMode.OFF ->
-                        SharedSoundSelection(SharedSoundMode.OFF.name.lowercase())
-                    !alarm.soundEnabled -> null
-                    alarm.soundUri == null &&
-                        link.soundMode == SharedSoundMode.SHARED &&
-                        alarm.soundName == link.soundTitle -> null
-                    alarm.soundUri == null && link.soundMode != SharedSoundMode.MEMBER_DEFAULT ->
-                        SharedSoundSelection(SharedSoundMode.MEMBER_DEFAULT.name.lowercase())
-                    alarm.soundUri == null -> null
-                    link.soundMode == SharedSoundMode.SHARED &&
-                        alarm.soundName == link.soundTitle &&
-                        alarm.soundUri == alarmRepository.getAlarmById(alarm.id)?.soundUri -> null
-                    !canUploadSharedSounds -> {
-                        alarm.soundName = null
-                        alarm.soundUri = null
-                        soundId = null
-                        SharedSoundSelection(SharedSoundMode.MEMBER_DEFAULT.name.lowercase())
-                    }
-                    else -> {
-                        soundId = uploadSharedSound(
-                            link.groupId,
-                            alarm.soundName,
-                            alarm.soundUri!!.toUri(),
-                            api,
-                            onProgress
-                        )
-                        SharedSoundSelection(SharedSoundMode.SHARED.name.lowercase(), soundId)
-                    }
-                }
-                val response = api.updateAlarm(
-                    link.remoteAlarmId,
-                    SharedAlarmRequest(
-                        time = alarm.time,
-                        label = alarm.label,
-                        enabled = alarm.enabled,
-                        days = alarm.days,
-                        vibrate = alarm.vibrate,
-                        startDate = alarm.startDate,
-                        repeatInterval = alarm.repeatInterval,
-                        repeatUnit = alarm.repeatUnit.name,
-                        repeatAnchor = alarm.repeatAnchor.name,
-                        repeatDuration = alarm.repeatDuration,
-                        repeatDurationUnit = alarm.repeatDurationUnit.name,
-                        endDate = alarm.endDate,
-                        endOccurrences = alarm.endOccurrences,
-                        advanced = alarm.advanced,
-                        snoozeEnabled = alarm.snoozeEnabled,
-                        snoozeMinutes = alarm.snoozeMinutes,
-                        vibrationPattern = alarm.vibrationPattern,
-                        vibrationPatternName = alarm.vibrationPatternName,
-                        soundChange = soundChange,
-                        expectedRevision = link.revision
-                    )
-                )
-                context.sendBroadcast(
-                    Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
-                        .setPackage(context.packageName)
-                        .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
-                )
-                SocialAlarmSchedule.setTimeZone(alarm.id, link.timeZone)
-                if ((soundChange?.mode ?: link.soundMode.name.lowercase()) == "shared") {
-                    alarm.soundUri = SharedSoundStore(context).cache(soundId!!, api)
-                        ?.toURI()?.toString()
-                }
-                alarmUseCase.updateAlarm(alarm, schedulingTimeZone)
-                val revision = response.revision ?: link.revision + 1
-                socialDao.putAlarmLink(
-                    link.copy(
-                        revision = revision,
-                        soundMode = soundChange?.mode?.let {
-                            SharedSoundMode.valueOf(it.uppercase())
-                        } ?: link.soundMode,
-                        soundId = if (soundChange == null) link.soundId else soundId,
-                        soundTitle = if (soundChange?.mode == "shared") alarm.soundName else {
-                            if (soundChange == null) link.soundTitle else null
-                        }
-                    )
-                )
-                scheduleIgnoredOutcome(alarm, link.remoteAlarmId, revision)
+    suspend fun updateAlarm(alarm: Alarm, onProgress: (SharedSoundProgress) -> Unit = {}) = withContext(Dispatchers.IO) {
+        val link = socialDao.getAlarmLinkByLocalId(alarm.id)
+        if (link == null) {
+            alarmUseCase.updateAlarm(alarm)
+        } else {
+            val group = groups.first().first { it.id == link.groupId }
+            alarmUseCase.prepareForScheduling(alarm, link.timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault())
+            val local = alarmRepository.getAlarmById(alarm.id)
+            val keepSound = alarm.soundEnabled && link.soundMode == SharedSoundMode.SHARED &&
+                alarm.soundName == link.soundTitle && (alarm.soundUri == null || alarm.soundUri == local?.soundUri)
+            val soundMode = when {
+                !alarm.soundEnabled -> SharedSoundMode.OFF
+                keepSound || alarm.soundUri != null && canUploadSharedSounds -> SharedSoundMode.SHARED
+                else -> SharedSoundMode.MEMBER_DEFAULT
             }
+            val soundId = if (keepSound) link.soundId else if (soundMode == SharedSoundMode.SHARED) UUID.randomUUID().toString() else null
+            val payload = JsonObject(json.encodeToJsonElement(SharedAlarmRequest(
+                time = alarm.time, label = alarm.label, enabled = alarm.enabled, days = alarm.days,
+                vibrate = alarm.vibrate, startDate = LocalDate.ofEpochDay(alarm.startDate).toString(),
+                repeatInterval = alarm.repeatInterval, repeatUnit = alarm.repeatUnit.name, repeatAnchor = alarm.repeatAnchor.name,
+                repeatDuration = alarm.repeatDuration, repeatDurationUnit = alarm.repeatDurationUnit.name,
+                endDate = alarm.endDate?.let { LocalDate.ofEpochDay(it).toString() }, endOccurrences = alarm.endOccurrences,
+                advanced = alarm.advanced, snoozeEnabled = alarm.snoozeEnabled, snoozeMinutes = alarm.snoozeMinutes,
+                vibrationPattern = alarm.vibrationPattern, vibrationPatternName = alarm.vibrationPatternName,
+                sound = SharedSoundSelection(soundMode.name.lowercase(), soundId, alarm.soundName ?: "Shared sound"),
+                membershipId = group.membershipId
+            )).jsonObject.filterKeys { it !in setOf("id", "group_id") })
+            val optimistic = JsonObject(payload + mapOf(
+                "id" to JsonPrimitive(link.remoteAlarmId), "group_id" to JsonPrimitive(link.groupId),
+                "sound_title" to JsonPrimitive(alarm.soundName ?: "Shared sound"),
+                "revision" to JsonPrimitive(link.revision + 1), "sound_mode" to JsonPrimitive(soundMode.name.lowercase()),
+                "sound_id" to (soundId?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
+            ))
+            saveSharedChange(link.groupId, "alarm", link.remoteAlarmId, "PUT", "/v1/alarms/${link.remoteAlarmId}", payload, optimistic, audioSource = alarm.soundUri.takeIf { soundId != null && !keepSound })
         }
     }
 
-    suspend fun deleteAlarm(alarm: Alarm) = synchronizationMutex.withLock {
-        withContext(Dispatchers.IO) {
-            val link = socialDao.getAlarmLinkByLocalId(alarm.id)
-            if (link != null) {
-                val serverUrl = Preferences.instance.getString(
-                    SocialPreferences.serverUrlKey,
-                    DEFAULT_SERVER_URL
-                ) ?: DEFAULT_SERVER_URL
-                val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-                SocialApi(serverUrl, identity).deleteAlarm(link.remoteAlarmId, link.revision)
-                context.sendBroadcast(
-                    Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
-                        .setPackage(context.packageName)
-                        .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
-                )
-                socialDao.deleteAlarmLink(link.remoteAlarmId)
-                SocialAlarmSchedule.setTimeZone(alarm.id, null)
-                WorkManager.getInstance(context).cancelUniqueWork("jay_ignored_alarm_${alarm.id}")
-            }
-            alarmUseCase.deleteAlarm(alarm)
-        }
+    suspend fun deleteAlarm(alarm: Alarm) = withContext(Dispatchers.IO) {
+        val link = socialDao.getAlarmLinkByLocalId(alarm.id)
+        if (link == null) alarmUseCase.deleteAlarm(alarm)
+        else saveSharedChange(link.groupId, "alarm", link.remoteAlarmId, "DELETE", "/v1/alarms/${link.remoteAlarmId}", null, ordered = false)
+        Unit
     }
 
     suspend fun recordActivity(
@@ -855,17 +815,11 @@ class SocialRepository(
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            SocialApi(serverUrl, identity).recordActivity(
-                link.remoteAlarmId,
-                AlarmActivityRequest(
-                    eventId,
-                    link.revision,
-                    kind.name.lowercase(),
-                    occurredAt,
-                    occurrenceId,
-                    reason
-                )
-            )
+            val group = groups.first().firstOrNull { it.id == link.groupId } ?: return@withContext
+            synchronization.saveOperation(link.groupId, "outcome", eventId, "POST", "/v1/alarms/${link.remoteAlarmId}/activity",
+                json.encodeToJsonElement(AlarmActivityRequest(eventId, link.revision, kind.name.lowercase(), occurredAt, occurrenceId, reason, group.membershipId)).jsonObject,
+                null, ordered = false, operationId = eventId)
+            SocialSyncWorker.enqueue(context, expedited = true)
         }
 
     /**
@@ -876,8 +830,7 @@ class SocialRepository(
      */
     private suspend fun applySharedTimers(
         timers: List<com.bnyro.clock.social.domain.SharedTimerDto>,
-        groups: List<SocialGroup>,
-        api: SocialApi
+        groups: List<SocialGroup>
     ) {
         val now = System.currentTimeMillis()
         socialDao.clearDismissedTimers(now)
@@ -895,7 +848,7 @@ class SocialRepository(
             val group = groups.firstOrNull { it.id == remote.groupId } ?: return@forEach
             val soundMode = SharedSoundMode.valueOf(remote.soundMode.uppercase())
             val soundFile = remote.soundId?.takeIf { soundMode == SharedSoundMode.SHARED }
-                ?.let { runCatching { SharedSoundStore(context).cache(it, api) }.getOrNull() }
+                ?.let { SharedSoundStore(context).cached(it) }
             activeTimerIds += remote.id
             androidx.core.content.ContextCompat.startForegroundService(
                 context,
@@ -948,93 +901,54 @@ class SocialRepository(
         label: String?,
         settings: TimerSettings,
         onProgress: (SharedSoundProgress) -> Unit = {}
-    ) =
-        withContext(Dispatchers.IO) {
-            val serverUrl = Preferences.instance.getString(
-                SocialPreferences.serverUrlKey,
-                DEFAULT_SERVER_URL
-            ) ?: DEFAULT_SERVER_URL
-            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            val api = SocialApi(serverUrl, identity)
-            val soundMode = when {
-                !settings.soundEnabled -> SharedSoundMode.OFF
-                settings.soundUri != null && canUploadSharedSounds -> SharedSoundMode.SHARED
-                else -> SharedSoundMode.MEMBER_DEFAULT
-            }
-            val soundId = if (soundMode == SharedSoundMode.SHARED) {
-                uploadSharedSound(groupId, settings.soundName, settings.soundUri!!.toUri(), api, onProgress)
-            } else null
-            api.startTimer(
-                groupId,
-                SharedTimerRequest(
-                    label = label,
-                    durationSeconds = settings.seconds,
-                    incrementSeconds = settings.incrementSeconds
-                        ?: Preferences.instance.getInt(
-                            Preferences.timerIncrementSecondsKey,
-                            60
-                        ),
-                    vibrate = settings.vibrate,
-                    vibrationPattern = settings.vibrationPattern,
-                    vibrationPatternName = settings.vibrationPatternName,
-                    sound = SharedSoundSelection(soundMode.name.lowercase(), soundId)
-                )
-            )
-            synchronize()
+    ) = withContext(Dispatchers.IO) {
+        val group = groups.first().first { it.id == groupId }
+        val soundMode = when {
+            !settings.soundEnabled -> SharedSoundMode.OFF
+            settings.soundUri != null && canUploadSharedSounds -> SharedSoundMode.SHARED
+            else -> SharedSoundMode.MEMBER_DEFAULT
         }
-
-    private suspend fun uploadSharedSound(
-        groupId: String,
-        title: String?,
-        source: android.net.Uri,
-        api: SocialApi,
-        onProgress: (SharedSoundProgress) -> Unit
-    ): String {
-        val processed = SharedSoundProcessor(context).process(source, onProgress)
-        try {
-            val upload = api.beginSoundUpload(
-                groupId,
-                SharedSoundUploadRequest(
-                    title?.takeIf(String::isNotBlank) ?: "Shared sound",
-                    processed.sha256,
-                    processed.file.length(),
-                    processed.durationMs
-                )
-            )
-            api.uploadSound(upload, processed.file) { uploaded ->
-                onProgress(
-                    SharedSoundProgress.Uploading(
-                        (uploaded.toFloat() / processed.file.length()).coerceAtMost(1f)
-                    )
-                )
-            }
-            api.completeSoundUpload(upload.id)
-            SharedSoundStore(context).keep(upload.id, processed.file)
-            return upload.id
-        } finally {
-            processed.file.delete()
-        }
+        val soundId = if (soundMode == SharedSoundMode.SHARED) UUID.randomUUID().toString() else null
+        val timerId = UUID.randomUUID().toString()
+        val payload = json.encodeToJsonElement(SharedTimerRequest(
+            label = label, durationSeconds = settings.seconds,
+            incrementSeconds = settings.incrementSeconds ?: Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60),
+            vibrate = settings.vibrate, vibrationPattern = settings.vibrationPattern,
+            vibrationPatternName = settings.vibrationPatternName,
+            sound = SharedSoundSelection(soundMode.name.lowercase(), soundId, settings.soundName ?: "Shared sound"),
+            expiresAt = Instant.ofEpochMilli(System.currentTimeMillis() + settings.seconds * 1000L).toString(),
+            membershipId = group.membershipId, id = timerId
+        )).jsonObject
+        val optimistic = JsonObject(payload + mapOf(
+            "sound_title" to JsonPrimitive(settings.soundName ?: "Shared sound"),
+            "group_id" to JsonPrimitive(groupId), "sound_mode" to JsonPrimitive(soundMode.name.lowercase()),
+            "sound_id" to (soundId?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
+        ))
+        saveSharedChange(groupId, "timer", timerId, "POST", "/v1/groups/$groupId/timers", payload, optimistic, audioSource = settings.soundUri.takeIf { soundId != null })
+        Unit
     }
 
-    suspend fun adjustSharedTimer(timerId: String, action: String) =
-        withContext(Dispatchers.IO) {
-            val serverUrl = Preferences.instance.getString(
-                SocialPreferences.serverUrlKey,
-                DEFAULT_SERVER_URL
-            ) ?: DEFAULT_SERVER_URL
-            val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            SocialApi(serverUrl, identity).adjustTimer(timerId, action)
-            synchronize()
-        }
+    suspend fun adjustSharedTimer(timerId: String, expiresAt: Long, operationId: String, savedAt: Long) = withContext(Dispatchers.IO) {
+        if (socialDao.getOperation(operationId) != null) return@withContext
+        val resource = synchronization.projectedResources().firstOrNull { it.kind == "timer" && it.key == timerId } ?: return@withContext
+        val timer = json.decodeFromString<SharedTimerDto>(resource.representation)
+        val group = groups.first().first { it.id == timer.groupId }
+        val payload = JsonObject(json.encodeToJsonElement(SharedTimerRequest(
+            label = timer.label, durationSeconds = timer.durationSeconds, incrementSeconds = timer.incrementSeconds,
+            vibrate = timer.vibrate, vibrationPattern = timer.vibrationPattern, vibrationPatternName = timer.vibrationPatternName,
+            sound = SharedSoundSelection(timer.soundMode, timer.soundId), expiresAt = Instant.ofEpochMilli(expiresAt).toString(),
+            membershipId = group.membershipId
+        )).jsonObject.filterKeys { it != "id" })
+        saveSharedChange(group.id, "timer", timerId, "PUT", "/v1/timers/$timerId", payload,
+            JsonObject(Json.parseToJsonElement(resource.representation).jsonObject + payload), operationId = operationId, capturedSavedAt = savedAt)
+        Unit
+    }
 
-    suspend fun cancelSharedTimer(timerId: String) = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
-        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).cancelTimer(timerId)
-        synchronize()
+    suspend fun cancelSharedTimer(timerId: String, operationId: String = UUID.randomUUID().toString()) = withContext(Dispatchers.IO) {
+        if (socialDao.getOperation(operationId) != null) return@withContext
+        val resource = synchronization.projectedResources().firstOrNull { it.kind == "timer" && it.key == timerId } ?: return@withContext
+        saveSharedChange(resource.scopeId, "timer", timerId, "DELETE", "/v1/timers/$timerId", null, ordered = false, operationId = operationId)
+        Unit
     }
 
     suspend fun suppressSharedTimer(timerId: String, timerExpiresAt: Long) = withContext(Dispatchers.IO) {
@@ -1048,29 +962,20 @@ class SocialRepository(
     }
 
     suspend fun renameDevice(name: String) = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
-        Preferences.edit { putString(SocialPreferences.deviceNameKey, name) }
+        val serverUrl = Preferences.instance.getString(SocialPreferences.serverUrlKey, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).apply {
-            register()
-            updateDevice(name)
-        }
-        synchronize()
+        Preferences.edit { putString(SocialPreferences.deviceNameKey, name) }
+        saveSharedChange(socialDao.getScope("/v1/sync")?.scopeId ?: identity.id, "identity", identity.id, "PATCH", "/v1/identity",
+            json.encodeToJsonElement(DeviceUpdate(name)).jsonObject, optimisticState = null)
+        Unit
     }
 
     suspend fun registerPushToken(token: String) = withContext(Dispatchers.IO) {
-        val serverUrl = Preferences.instance.getString(
-            SocialPreferences.serverUrlKey,
-            DEFAULT_SERVER_URL
-        ) ?: DEFAULT_SERVER_URL
+        val serverUrl = Preferences.instance.getString(SocialPreferences.serverUrlKey, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).apply {
-            register()
-            updatePushToken(token)
-        }
+        synchronization.saveOperation(identity.id, "push", identity.id, "PUT", "/v1/identity/push-token",
+            json.encodeToJsonElement(PushTokenUpdate(token)).jsonObject, null, ordered = false)
+        SocialSyncWorker.enqueue(context)
     }
 
     suspend fun refreshPlayEntitlement() = synchronizationMutex.withLock {
@@ -1136,11 +1041,13 @@ class SocialRepository(
         require(Base64.decode(secret, Base64.NO_WRAP or Base64.URL_SAFE).size == 32) {
             "The profile link is incomplete"
         }
-        discardLocalIdentityState()
-        context.getSharedPreferences("jay_identity", Context.MODE_PRIVATE).edit {
-            putString(SocialPreferences.deviceSecretKey, secret)
+        synchronizationMutex.withLock {
+            discardLocalIdentityState()
+            context.getSharedPreferences("jay_identity", Context.MODE_PRIVATE).edit {
+                putString(SocialPreferences.deviceSecretKey, secret)
+            }
+            Preferences.edit { putString(SocialPreferences.deviceNameKey, name) }
         }
-        Preferences.edit { putString(SocialPreferences.deviceNameKey, name) }
         if (FirebaseApp.getApps(context).isNotEmpty()) {
             runCatching { registerPushToken(Tasks.await(FirebaseMessaging.getInstance().token)) }
         }
@@ -1153,12 +1060,15 @@ class SocialRepository(
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        try {
-            SocialApi(serverUrl, identity).deleteDevice()
-        } catch (removed: SocialApiException) {
-            if (removed.status != 401) throw removed
+        synchronizationMutex.withLock {
+            try {
+                val operation = synchronization.saveOperation(identity.id, "identity", identity.id, "DELETE", "/v1/identity", null, null, ordered = false)
+                SocialApi(serverUrl, identity).executeOperation(operation)
+            } catch (removed: SocialApiException) {
+                if (removed.status != 401) throw removed
+            }
+            discardLocalIdentity()
         }
-        discardLocalIdentity()
         synchronize()
     }
 
@@ -1184,10 +1094,15 @@ class SocialRepository(
         socialDatabase.withTransaction {
             socialDao.clearMembers()
             socialDao.clearGroups()
+            socialDao.clearScopes()
+            socialDao.clearResources()
+            socialDao.clearAllStaging()
+            socialDao.clearOperations()
+            socialDao.clearPendingActivity()
+            socialDao.clearClock()
             socialDao.clearDismissedTimers(Long.MAX_VALUE)
         }
         Preferences.edit {
-            putLong(SocialPreferences.syncCursorKey, 0)
             remove(SocialPreferences.pendingInvitationKey)
             remove(SocialPreferences.pendingProfileKey)
             remove(SocialPreferences.capabilitiesKey)
@@ -1225,18 +1140,8 @@ class SocialRepository(
 
     suspend fun changeServer(serverUrl: String) = withContext(Dispatchers.IO) {
         URI(serverUrl).toURL()
-        socialDao.getAlarmLinks().forEach { deleteSharedAlarmLink(it) }
-        socialDatabase.withTransaction {
-            socialDao.clearMembers()
-            socialDao.clearGroups()
-        }
-        Preferences.edit {
-            putString(SocialPreferences.serverUrlKey, serverUrl.trimEnd('/'))
-            putLong(SocialPreferences.syncCursorKey, 0)
-            remove(SocialPreferences.capabilitiesKey)
-            remove(SocialPreferences.capabilitiesServerKey)
-            remove(SocialPreferences.capabilitiesDeviceKey)
-        }
+        discardLocalIdentityState()
+        Preferences.edit { putString(SocialPreferences.serverUrlKey, serverUrl.trimEnd('/')) }
     }
 
     private suspend fun scheduleIgnoredOutcome(
@@ -1261,24 +1166,18 @@ class SocialRepository(
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).registerAlarmOccurrence(
-            remoteAlarmId,
-            AlarmOccurrenceSchedule(
-                revision,
-                occurrenceId,
-                Instant.ofEpochMilli(triggerAt).toString(),
-                Instant.ofEpochMilli(
-                    triggerAt + Preferences.instance.getInt(
-                        Preferences.alarmTimeoutMinutesKey,
-                        AlarmService.ALARM_TIMEOUT_MINUTES
-                    ) * 60_000L
-                ).toString(),
-                Instant.ofEpochMilli(triggerAt)
-                    .atZone(SocialAlarmSchedule.timeZone(alarm.id))
-                    .toLocalDate()
-                    .toString()
-            )
-        )
+        val link = socialDao.getAlarmLinkByRemoteId(remoteAlarmId) ?: return
+        val group = groups.first().firstOrNull { it.id == link.groupId } ?: return
+        val payload = json.encodeToJsonElement(AlarmOccurrenceSchedule(
+            revision, occurrenceId, Instant.ofEpochMilli(triggerAt).toString(),
+            Instant.ofEpochMilli(triggerAt + Preferences.instance.getInt(Preferences.alarmTimeoutMinutesKey, AlarmService.ALARM_TIMEOUT_MINUTES) * 60_000L).toString(),
+            Instant.ofEpochMilli(triggerAt).atZone(SocialAlarmSchedule.timeZone(alarm.id)).toLocalDate().toString(),
+            group.membershipId
+        )).jsonObject
+        val operationId = UUID.nameUUIDFromBytes("occurrence:${identity.id}:$remoteAlarmId:$revision:$payload".toByteArray()).toString()
+        synchronization.saveOperation(link.groupId, "occurrence", occurrenceId, "PUT", "/v1/alarms/$remoteAlarmId/occurrence",
+            payload, null, ordered = false, operationId = operationId)
+        SocialSyncWorker.enqueue(context)
     }
 
     companion object {

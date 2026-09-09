@@ -1,9 +1,8 @@
-FROM python:3.11-slim
+FROM python:3.11.14-slim
 
 WORKDIR /app
-COPY pyproject.toml alembic.ini ./
+COPY pyproject.toml requirements.lock manage.py ./
 COPY jay_server ./jay_server
-COPY migrations ./migrations
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock && pip install --no-cache-dir --no-deps .
 
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn jay_server.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "exec uvicorn jay_server.asgi:application --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --timeout-graceful-shutdown 25"]

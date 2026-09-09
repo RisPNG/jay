@@ -15,21 +15,19 @@ Play access is only needed for uploading and selecting distributed sounds on a s
 
 For example, one member can choose an audio file for a shared alarm and everyone in the group can hear it. They do not all need to buy the app for that to work. Changing something unrelated, such as the alarm's label, also keeps the selected sound in place.
 
-Android prepares a selected file or readable system ringtone as mono 48 kHz 16-bit FLAC, with a five-minute limit. It uploads the result directly to private Backblaze B2 storage using a signed request issued by the server. The server checks the uploaded object before allowing it to be selected.
+Android prepares a selected file or readable system ringtone as mono 48 kHz 16-bit FLAC, with a five-minute limit. Encoding uses bundled libFLAC on all supported Android versions to produce complete, lossless FLAC files. It uploads the result directly to private Backblaze B2 storage using a signed request issued by the server. The shared item immediately references its pending sound. A worker verifies an immutable copy before members can download it; scheduling does not wait for that work.
 
-For playback, Android decodes each shared sound once and stores a lossless PCM/WAVE copy locally. This avoids device-specific FLAC playback problems and keeps the same playback file through alarm creation, edits, and synchronization. Existing cached FLAC sounds are converted on their next use without another download. A five-minute sound uses about 29 MB of local playback storage; uploads and downloads still use compressed FLAC.
+For playback, Android decodes each shared sound once and stores a lossless PCM/WAVE copy locally. This avoids device-specific FLAC playback problems and keeps the same playback file through alarm creation, edits, and synchronization. Download and decode run separately from metadata synchronization. The default ringtone plays if audio is unavailable when the item rings; sound disabled remains silent. A five-minute sound uses about 29 MB of local playback storage; uploads and downloads still use compressed FLAC.
 
 ## How the app knows what is available
 
-The app gets the device's effective capabilities through authenticated synchronisation and `/v1/device/capabilities`. It stores the result for that server and identity, so a grant from one server or profile cannot be reused by another.
+The app gets the device's effective capabilities through authenticated synchronisation and `/v1/identity/capabilities`. It stores the result for that server and identity, so a grant from one server or profile cannot be reused by another.
 
 On an `everyone` server, shared-sound access has no expiry and the app skips Play verification. Debug and prerelease builds get their access through normal synchronisation too; this does not require a special APK.
 
 On a `play` server, production builds refresh Play access immediately and every 24 hours when a connection is available. A successful verification grants access for 48 hours by default, controlled by `PLAY_ENTITLEMENT_LIFETIME_HOURS`. The API reports whether the device can upload through `shared_sound_upload`.
 
 Changing the server setting back to `play` restores the server-side checks immediately. The app learns about it on its next sync or refresh, but an old cached grant cannot get an upload past the server. Sounds already selected remain playable, and unrelated edits preserve them.
-
-For deployment, the server update comes before the Android client update, since the client expects the capability response to be available. This policy does not need a database migration.
 
 ## What Play verification checks
 

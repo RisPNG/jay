@@ -201,7 +201,8 @@ class TimerService : Service() {
                     updateNotification(obj)
 
                     obj.sharedTimerId?.takeIf { obj.sharedCanEdit }?.let { sharedId ->
-                        SocialTimerActions.adjust(applicationContext, sharedId, "add")
+                        obj.sharedExpiresAt = maxOf(obj.sharedExpiresAt, System.currentTimeMillis()) + obj.effectiveIncrementSeconds * 1000L
+                        SocialTimerActions.adjust(applicationContext, sharedId, obj.sharedExpiresAt)
                     }
                 }
 
@@ -229,7 +230,8 @@ class TimerService : Service() {
                     updateNotification(obj)
 
                     obj.sharedTimerId?.takeIf { obj.sharedCanEdit }?.let { sharedId ->
-                        SocialTimerActions.adjust(applicationContext, sharedId, "reset")
+                        obj.sharedExpiresAt = System.currentTimeMillis() + obj.initialPosition.value
+                        SocialTimerActions.adjust(applicationContext, sharedId, obj.sharedExpiresAt)
                     }
                 }
             }

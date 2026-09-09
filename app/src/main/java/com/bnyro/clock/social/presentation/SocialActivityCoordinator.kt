@@ -45,9 +45,7 @@ class SocialActivityCoordinator(private val activity: ComponentActivity) {
         liveSyncJob = activity.lifecycleScope.launch {
             while (isActive) {
                 runCatching {
-                    (activity.application as App).container.socialRepository.followLiveChanges {
-                        SocialNotificationHelper.notifySocialChanges(activity, it)
-                    }
+                    (activity.application as App).container.socialRepository.followLiveChanges()
                 }
                 if (isActive) delay(2_000)
             }

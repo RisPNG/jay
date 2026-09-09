@@ -8,26 +8,33 @@ version = "0.1.0"
 description = "Synchronization server for Jay social alarms"
 requires-python = ">=3.11"
 dependencies = [
-    "alembic==1.19.1",
-    "boto3==1.40.20",
-    "fastapi==0.141.1",
+    "Django==5.2.17",
+    "djangorestframework==3.18.1",
+    "drf-spectacular==0.30.0",
+    "django-environ==0.14.0",
+    "python-dotenv==1.2.2",
+    "channels==4.3.2",
+    "boto3==1.43.90",
     "firebase-admin==7.5.0",
-    "google-auth==2.56.3",
-    "psycopg[binary,pool]==3.3.4",
-    "pydantic-settings==2.15.0",
+    "google-auth==2.57.1",
+    "psycopg[binary,pool]==3.3.5",
     "requests==2.34.2",
-    "sqlalchemy==2.0.51",
-    "uvicorn==0.52.1",
+    "uvicorn==0.52.4",
 ]
 
 [project.optional-dependencies]
 test = [
     "httpx==0.28.1",
     "pytest==9.1.1",
+    "pytest-django==4.14.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+DJANGO_SETTINGS_MODULE = "jay_server.settings"
 
-[tool.setuptools]
-packages = ["jay_server"]
+[tool.setuptools.packages.find]
+include = ["jay_server*"]
+
+[tool.setuptools.package-data]
+jay_server = ["templates/*.html", "static/*"]

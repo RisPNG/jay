@@ -1,8 +1,7 @@
 import pytest
-from fastapi.testclient import TestClient
+from rest_framework.test import APIClient
 
-from jay_server.config import settings
-from jay_server.main import app
+from django.conf import settings
 
 
 def test_android_app_links_publish_configured_signing_certificates(monkeypatch) -> None:
@@ -11,8 +10,8 @@ def test_android_app_links_publish_configured_signing_certificates(monkeypatch) 
         "com.rispng.jay.debug": ["CC:" * 31 + "CC"],
         "unconfigured": [],
     }
-    monkeypatch.setattr(settings, "android_app_links", certificates)
-    response = TestClient(app).get("/.well-known/assetlinks.json")
+    monkeypatch.setattr(settings, "ANDROID_APP_LINKS", certificates)
+    response = APIClient().get("/.well-known/assetlinks.json")
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
     assert response.json() == [
@@ -30,16 +29,25 @@ def test_android_app_links_publish_configured_signing_certificates(monkeypatch) 
 
 
 def test_unconfigured_app_links_claim_no_apps(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "android_app_links", {})
-    assert TestClient(app).get("/.well-known/assetlinks.json").json() == []
+    monkeypatch.setattr(settings, "ANDROID_APP_LINKS", {})
+    assert APIClient().get("/.well-known/assetlinks.json").json() == []
 
 
 @pytest.mark.parametrize("path", ["/join?token=example", "/profile?key=example"])
 def test_browser_links_redirect_without_credentials_or_fragment_inheritance(path) -> None:
-    response = TestClient(app).get(path, follow_redirects=False)
+    response = APIClient().get(path, follow=False)
     assert response.status_code == 302
     assert response.headers["location"] == (
         "https://play.google.com/store/apps/details?id=com.rispng.jay#"
     )
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["referrer-policy"] == "no-referrer"
+
+
+def test_documentation_and_schema_are_public():
+    client = APIClient()
+    assert client.get("/docs").status_code == 200
+    assert client.get("/docs/init.js").status_code == 200
+    response = client.get("/openapi.json", HTTP_ACCEPT="application/json")
+    assert response.status_code == 200
+    assert response.json()["openapi"] == "3.0.3"

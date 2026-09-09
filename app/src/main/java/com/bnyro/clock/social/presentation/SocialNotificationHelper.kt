@@ -12,7 +12,7 @@ import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Permission
 import com.bnyro.clock.social.data.SocialSyncResult
 import com.bnyro.clock.ui.MainActivity
-import java.time.Instant
+import java.time.OffsetDateTime
 
 object SocialNotificationHelper {
     fun createNotificationChannel(context: Context) {
@@ -73,7 +73,7 @@ object SocialNotificationHelper {
         val notificationManager = NotificationManagerCompat.from(context)
 
         direct.forEach { change ->
-            val eventTime = Instant.parse(change.occurredAt).toEpochMilli()
+            val eventTime = OffsetDateTime.parse(change.occurredAt).toInstant().toEpochMilli()
             notificationManager.notify(
                 change.sequence.hashCode(),
                 NotificationCompat.Builder(context, SOCIAL_CHANNEL)
@@ -99,7 +99,7 @@ object SocialNotificationHelper {
 
         grouped.forEach { (groupId, groupChanges) ->
             val newest = groupChanges.last()
-            val eventTime = Instant.parse(newest.occurredAt).toEpochMilli()
+            val eventTime = OffsetDateTime.parse(newest.occurredAt).toInstant().toEpochMilli()
             val notificationId = groupId.hashCode()
             val accumulation = context.getSharedPreferences(
                 "jay_social_notification_accumulation",

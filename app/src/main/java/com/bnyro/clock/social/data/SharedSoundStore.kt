@@ -12,25 +12,31 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 
 class SharedSoundStore(private val context: Context) {
+    fun prepareUpload(soundId: String, sourceUri: String): File {
+        val directory = File(context.filesDir, "sound-uploads").apply { mkdirs() }
+        val source = File(directory, "$soundId.source")
+        requireNotNull(context.contentResolver.openInputStream(sourceUri.toUri())).use { input ->
+            java.io.FileOutputStream(source).use { output ->
+                input.copyTo(output)
+                output.fd.sync()
+            }
+        }
+        return source
+    }
+
     suspend fun cache(soundId: String, api: SocialApi): File? {
         cached(soundId)?.let { return it }
         val directory = sharedSoundDirectory()
-        val legacy = File(directory, "$soundId.flac")
         val temporary = File(directory, "$soundId.${UUID.randomUUID()}.part")
         try {
-            if (legacy.exists()) {
-                keep(soundId, legacy)
-                legacy.delete()
-            } else {
-                val download = api.getSoundDownload(soundId)
-                api.downloadSound(download, temporary)
-                SharedSoundFileVerifier.verify(
-                    temporary,
-                    sha256 = download.sha256,
-                    byteLength = download.byteLength
-                )
-                keep(soundId, temporary)
-            }
+            val download = api.getSoundDownload(soundId)
+            api.downloadSound(download, temporary)
+            SharedSoundFileVerifier.verify(
+                temporary,
+                sha256 = download.sha256,
+                byteLength = download.byteLength
+            )
+            keep(soundId, temporary)
             return cached(soundId)
         } catch (exception: CancellationException) {
             throw exception
@@ -96,8 +102,11 @@ class SharedSoundStore(private val context: Context) {
             if (it.extension in setOf("flac", "wav") && it.nameWithoutExtension !in activeSoundIds) {
                 it.delete()
             }
-            if (it.extension == "part") it.delete()
+            if (it.extension == "part" && it.lastModified() < System.currentTimeMillis() - 3_600_000) it.delete()
         }
+        File(context.filesDir, "sound-uploads").listFiles().orEmpty().filter {
+            it.name.substringBefore('.') !in activeSoundIds && it.lastModified() < System.currentTimeMillis() - 3_600_000
+        }.forEach { it.delete() }
     }
 
     private fun sharedSoundDirectory(): File =

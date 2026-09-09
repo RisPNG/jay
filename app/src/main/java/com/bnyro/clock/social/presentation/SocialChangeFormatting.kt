@@ -5,7 +5,7 @@ import android.text.format.DateUtils
 import com.bnyro.clock.R
 import com.bnyro.clock.social.domain.SocialChange
 import com.bnyro.clock.util.TimeHelper
-import java.time.Instant
+import java.time.OffsetDateTime
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
@@ -241,7 +241,7 @@ fun SocialChange.logDetails(context: Context): String? {
 }
 
 fun SocialChange.presentationTime(context: Context): String {
-    val eventTime = Instant.parse(occurredAt).toEpochMilli()
+    val eventTime = OffsetDateTime.parse(occurredAt).toInstant().toEpochMilli()
     return if (DateUtils.isToday(eventTime)) {
         DateUtils.formatDateTime(context, eventTime, DateUtils.FORMAT_SHOW_TIME)
     } else {

@@ -12,12 +12,18 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
+import androidx.work.WorkInfo
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class SocialSyncWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result = try {
-        val result = (applicationContext as App).container.socialRepository.synchronize()
-        SocialNotificationHelper.notifySocialChanges(applicationContext, result)
+        (applicationContext as App).container.socialRepository.synchronize()
         androidx.core.app.NotificationManagerCompat.from(applicationContext).cancel(
             SocialNotificationHelper.SYNC_FAILURE_NOTIFICATION_ID
         )
@@ -35,6 +41,9 @@ class SocialSyncWorker(context: Context, parameters: WorkerParameters) :
     }
 
     companion object {
+        private val schedulingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val schedulingMutex = Mutex()
+
         fun enqueue(context: Context, expedited: Boolean = false) {
             val request = OneTimeWorkRequestBuilder<SocialSyncWorker>()
                 .setConstraints(
@@ -45,9 +54,18 @@ class SocialSyncWorker(context: Context, parameters: WorkerParameters) :
             if (expedited && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 request.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             }
-            WorkManager.getInstance(context).enqueue(
-                request.build()
-            )
+            val manager = WorkManager.getInstance(context)
+            schedulingScope.launch {
+                schedulingMutex.withLock {
+                    val work = manager.getWorkInfosForUniqueWork("jay_social_sync").get()
+                    if (work.none { it.state in setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED) }) {
+                        manager.enqueueUniqueWork(
+                            "jay_social_sync", androidx.work.ExistingWorkPolicy.APPEND_OR_REPLACE,
+                            request.build()
+                        ).result.get()
+                    }
+                }
+            }
         }
     }
 }

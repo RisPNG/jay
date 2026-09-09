@@ -1,0 +1,3604 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "Jay API",
+        "version": "1.0.0",
+        "description": "Shared clock synchronization"
+    },
+    "paths": {
+        "/.well-known/assetlinks.json": {
+            "get": {
+                "operationId": ".well_known_assetlinks.json_retrieve",
+                "tags": [
+                    ".well-known"
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "operationId": "health_retrieve",
+                "tags": [
+                    "health"
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/health/live": {
+            "get": {
+                "operationId": "health_live_retrieve",
+                "tags": [
+                    "health"
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/health/ready": {
+            "get": {
+                "operationId": "health_ready_retrieve",
+                "tags": [
+                    "health"
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/alarms": {
+            "post": {
+                "operationId": "v1_alarms_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlarmCreateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlarmRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/alarms/{alarm_id}": {
+            "put": {
+                "operationId": "v1_alarms_update",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "alarm_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlarmPayloadRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlarmRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "v1_alarms_destroy",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "alarm_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/v1/alarms/{alarm_id}/activity": {
+            "get": {
+                "operationId": "v1_alarms_activity_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "alarm_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "before",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Page size from 1 through 100; default 50."
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ActivityPageRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "v1_alarms_activity_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "alarm_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ActivityCommandRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OutcomeRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/alarms/{alarm_id}/deliveries": {
+            "post": {
+                "operationId": "v1_alarms_deliveries_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "alarm_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeliveryCommandRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/v1/alarms/{alarm_id}/occurrence": {
+            "put": {
+                "operationId": "v1_alarms_occurrence_update",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "alarm_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OccurrenceCommandRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OccurrenceRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/groups": {
+            "post": {
+                "operationId": "v1_groups_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GroupCreateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GroupRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/groups/{group_id}": {
+            "put": {
+                "operationId": "v1_groups_update",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GroupUpdateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GroupRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "v1_groups_destroy",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/v1/groups/{group_id}/activity": {
+            "get": {
+                "operationId": "v1_groups_activity_retrieve",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "before",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Page size from 1 through 100; default 50."
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ActivityPageRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/groups/{group_id}/invites": {
+            "post": {
+                "operationId": "v1_groups_invites_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InvitationCreateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/groups/{group_id}/members/{member_id}": {
+            "patch": {
+                "operationId": "v1_groups_members_partial_update",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "member_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedRoleUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "v1_groups_members_destroy",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "member_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/v1/groups/{group_id}/membership": {
+            "delete": {
+                "operationId": "v1_groups_membership_destroy",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/v1/groups/{group_id}/notification-settings": {
+            "put": {
+                "operationId": "v1_groups_notification_settings_update",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipPreferencesRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipAccessRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/groups/{group_id}/sounds/uploads": {
+            "post": {
+                "operationId": "v1_groups_sounds_uploads_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SoundUploadRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SoundRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/groups/{group_id}/sync": {
+            "get": {
+                "operationId": "v1_groups_sync_retrieve",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "cursor",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Opaque cursor from the preceding page or completed checkpoint."
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ScopeSyncRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/groups/{group_id}/timers": {
+            "post": {
+                "operationId": "v1_groups_timers_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "group_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TimerCreateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TimerRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/groups/join": {
+            "post": {
+                "operationId": "v1_groups_join_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InvitationJoinRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MembershipAccessRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/identities/register": {
+            "post": {
+                "operationId": "v1_identities_register_create",
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/IdentityRegistrationRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/IdentityRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/identity": {
+            "patch": {
+                "operationId": "v1_identity_partial_update",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedIdentityUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/IdentityRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "v1_identity_destroy",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/v1/identity/capabilities": {
+            "get": {
+                "operationId": "v1_identity_capabilities_retrieve",
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "shared_sound_upload": {
+                                            "type": "boolean"
+                                        },
+                                        "requires_play_entitlement": {
+                                            "type": "boolean"
+                                        },
+                                        "expires_at": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "required": [
+                                        "shared_sound_upload",
+                                        "requires_play_entitlement",
+                                        "expires_at"
+                                    ]
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/identity/play-entitlement": {
+            "post": {
+                "operationId": "v1_identity_play_entitlement_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EntitlementRequestRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/identity/push-token": {
+            "put": {
+                "operationId": "v1_identity_push_token_update",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PushTokenUpdateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/v1/sounds/{sound_id}": {
+            "get": {
+                "operationId": "v1_sounds_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "sound_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SoundRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/sounds/{sound_id}/complete": {
+            "post": {
+                "operationId": "v1_sounds_complete_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "sound_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SoundRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/sounds/{sound_id}/download": {
+            "get": {
+                "operationId": "v1_sounds_download_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "sound_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "url": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "sha256": {
+                                            "type": "string"
+                                        },
+                                        "byte_length": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/sounds/{sound_id}/upload": {
+            "get": {
+                "operationId": "v1_sounds_upload_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "sound_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/sync": {
+            "get": {
+                "operationId": "v1_sync_retrieve",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "cursor",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Opaque cursor from the preceding page or completed checkpoint."
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ScopeSyncRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/v1/timers/{timer_id}": {
+            "put": {
+                "operationId": "v1_timers_update",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "timer_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TimerPayloadRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TimerRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "v1_timers_destroy",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "timer_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/v1/events": {
+            "get": {
+                "operationId": "v1_events_listen",
+                "tags": [
+                    "v1"
+                ],
+                "description": "Authenticated SSE invalidations. Sync frames contain all and scopes; heartbeats arrive every fifteen seconds. Fetch durable scope pages after each hint and reconnect. Frames are not durable events or acknowledgements.",
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Live invalidation stream",
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "type": "string"
+                                },
+                                "example": "event: sync\ndata: {\"all\":true,\"scopes\":[]}\n\n"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid identity credentials"
+                    },
+                    "503": {
+                        "description": "Capacity or database unavailable; retry"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ActivityCommandRequest": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "alarm_revision": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "kind": {
+                        "$ref": "#/components/schemas/ActivityKind"
+                    },
+                    "occurred_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "occurrence_key": {
+                        "type": "string",
+                        "nullable": true,
+                        "minLength": 1,
+                        "maxLength": 200
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "minLength": 1,
+                        "maxLength": 40
+                    }
+                },
+                "required": [
+                    "alarm_revision",
+                    "id",
+                    "kind",
+                    "membership_id",
+                    "occurred_at",
+                    "occurrence_key",
+                    "reason"
+                ]
+            },
+            "ActivityKind": {
+                "enum": [
+                    "snoozed",
+                    "dismissed",
+                    "ignored"
+                ],
+                "type": "string",
+                "description": "* `snoozed` - Snoozed\n* `dismissed` - Dismissed\n* `ignored` - Ignored"
+            },
+            "ActivityPageRepresentation": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ActivityRepresentation"
+                        }
+                    },
+                    "next_before": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "items",
+                    "next_before"
+                ]
+            },
+            "ActivityRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "revision": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "ordinal": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "entity_type": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "entity_id": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "action": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "actor_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "subject_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "recipient_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "group_label": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "actor_label": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "subject_label": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "entity_label": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "entity_time": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "details": {
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "occurred_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "action",
+                    "actor_id",
+                    "actor_label",
+                    "details",
+                    "entity_id",
+                    "entity_label",
+                    "entity_time",
+                    "entity_type",
+                    "group_id",
+                    "group_label",
+                    "id",
+                    "occurred_at",
+                    "ordinal",
+                    "recipient_id",
+                    "revision",
+                    "subject_id",
+                    "subject_label"
+                ]
+            },
+            "AlarmCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "local_time_ms": {
+                        "type": "integer",
+                        "maximum": 86399999,
+                        "minimum": 0
+                    },
+                    "label": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 200
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "days": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "maximum": 6,
+                            "minimum": 0
+                        },
+                        "maxItems": 7
+                    },
+                    "vibrate": {
+                        "type": "boolean"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "repeat_interval": {
+                        "type": "integer",
+                        "maximum": 999,
+                        "minimum": 1
+                    },
+                    "repeat_unit": {
+                        "$ref": "#/components/schemas/RepeatUnit"
+                    },
+                    "repeat_anchor": {
+                        "$ref": "#/components/schemas/RepeatAnchorEnum"
+                    },
+                    "repeat_duration": {
+                        "type": "integer",
+                        "maximum": 999,
+                        "minimum": 1,
+                        "nullable": true
+                    },
+                    "repeat_duration_unit": {
+                        "$ref": "#/components/schemas/RepeatUnit"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
+                    "end_occurrences": {
+                        "type": "integer",
+                        "maximum": 999,
+                        "minimum": 1,
+                        "nullable": true
+                    },
+                    "advanced": {
+                        "type": "boolean"
+                    },
+                    "snooze_enabled": {
+                        "type": "boolean"
+                    },
+                    "snooze_minutes": {
+                        "type": "integer",
+                        "maximum": 1440,
+                        "minimum": 1
+                    },
+                    "vibration_pattern": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "maxItems": 256,
+                        "minItems": 1
+                    },
+                    "vibration_pattern_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                    },
+                    "sound": {
+                        "$ref": "#/components/schemas/SoundSelectionRequest"
+                    },
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "group_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "advanced",
+                    "days",
+                    "enabled",
+                    "end_date",
+                    "end_occurrences",
+                    "group_id",
+                    "id",
+                    "label",
+                    "local_time_ms",
+                    "membership_id",
+                    "repeat_anchor",
+                    "repeat_duration",
+                    "repeat_duration_unit",
+                    "repeat_interval",
+                    "repeat_unit",
+                    "saved_at",
+                    "snooze_enabled",
+                    "snooze_minutes",
+                    "sound",
+                    "start_date",
+                    "vibrate",
+                    "vibration_pattern",
+                    "vibration_pattern_name"
+                ]
+            },
+            "AlarmPayloadRequest": {
+                "type": "object",
+                "properties": {
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "local_time_ms": {
+                        "type": "integer",
+                        "maximum": 86399999,
+                        "minimum": 0
+                    },
+                    "label": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 200
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "days": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "maximum": 6,
+                            "minimum": 0
+                        },
+                        "maxItems": 7
+                    },
+                    "vibrate": {
+                        "type": "boolean"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "repeat_interval": {
+                        "type": "integer",
+                        "maximum": 999,
+                        "minimum": 1
+                    },
+                    "repeat_unit": {
+                        "$ref": "#/components/schemas/RepeatUnit"
+                    },
+                    "repeat_anchor": {
+                        "$ref": "#/components/schemas/RepeatAnchorEnum"
+                    },
+                    "repeat_duration": {
+                        "type": "integer",
+                        "maximum": 999,
+                        "minimum": 1,
+                        "nullable": true
+                    },
+                    "repeat_duration_unit": {
+                        "$ref": "#/components/schemas/RepeatUnit"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
+                    "end_occurrences": {
+                        "type": "integer",
+                        "maximum": 999,
+                        "minimum": 1,
+                        "nullable": true
+                    },
+                    "advanced": {
+                        "type": "boolean"
+                    },
+                    "snooze_enabled": {
+                        "type": "boolean"
+                    },
+                    "snooze_minutes": {
+                        "type": "integer",
+                        "maximum": 1440,
+                        "minimum": 1
+                    },
+                    "vibration_pattern": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "maxItems": 256,
+                        "minItems": 1
+                    },
+                    "vibration_pattern_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                    },
+                    "sound": {
+                        "$ref": "#/components/schemas/SoundSelectionRequest"
+                    }
+                },
+                "required": [
+                    "advanced",
+                    "days",
+                    "enabled",
+                    "end_date",
+                    "end_occurrences",
+                    "label",
+                    "local_time_ms",
+                    "membership_id",
+                    "repeat_anchor",
+                    "repeat_duration",
+                    "repeat_duration_unit",
+                    "repeat_interval",
+                    "repeat_unit",
+                    "saved_at",
+                    "snooze_enabled",
+                    "snooze_minutes",
+                    "sound",
+                    "start_date",
+                    "vibrate",
+                    "vibration_pattern",
+                    "vibration_pattern_name"
+                ]
+            },
+            "AlarmPermissionEnum": {
+                "enum": [
+                    "everyone",
+                    "leaders"
+                ],
+                "type": "string",
+                "description": "* `everyone` - Everyone\n* `leaders` - Leaders"
+            },
+            "AlarmRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "revision": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "local_time_ms": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "label": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "days": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "maximum": 32767,
+                            "minimum": 0
+                        },
+                        "readOnly": true
+                    },
+                    "vibrate": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "format": "date",
+                        "readOnly": true
+                    },
+                    "repeat_interval": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "repeat_unit": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/RepeatUnit"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "repeat_anchor": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/RepeatAnchorEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "repeat_duration": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "repeat_duration_unit": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/RepeatUnit"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "format": "date",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "end_occurrences": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "advanced": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "snooze_enabled": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "snooze_minutes": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "vibration_pattern": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "maximum": 2147483647,
+                            "minimum": 0
+                        },
+                        "readOnly": true
+                    },
+                    "vibration_pattern_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "sound_mode": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SoundMode"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "sound_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "save_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "advanced",
+                    "days",
+                    "enabled",
+                    "end_date",
+                    "end_occurrences",
+                    "group_id",
+                    "id",
+                    "label",
+                    "local_time_ms",
+                    "repeat_anchor",
+                    "repeat_duration",
+                    "repeat_duration_unit",
+                    "repeat_interval",
+                    "repeat_unit",
+                    "revision",
+                    "save_id",
+                    "saved_at",
+                    "snooze_enabled",
+                    "snooze_minutes",
+                    "sound_id",
+                    "sound_mode",
+                    "start_date",
+                    "vibrate",
+                    "vibration_pattern",
+                    "vibration_pattern_name"
+                ]
+            },
+            "AlarmTimeBasisEnum": {
+                "enum": [
+                    "member_local",
+                    "group_time_zone"
+                ],
+                "type": "string",
+                "description": "* `member_local` - Member Local\n* `group_time_zone` - Group Time Zone"
+            },
+            "CapabilitiesRepresentation": {
+                "type": "object",
+                "properties": {
+                    "shared_sound_upload": {
+                        "type": "boolean"
+                    },
+                    "requires_play_entitlement": {
+                        "type": "boolean"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "expires_at",
+                    "requires_play_entitlement",
+                    "shared_sound_upload"
+                ]
+            },
+            "DeletedResourceRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id"
+                ],
+                "additionalProperties": false
+            },
+            "DeliveryCommandRequest": {
+                "type": "object",
+                "properties": {
+                    "revision": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "revision"
+                ]
+            },
+            "EntitlementRequestRequest": {
+                "type": "object",
+                "properties": {
+                    "integrity_token": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 65536
+                    }
+                },
+                "required": [
+                    "integrity_token"
+                ]
+            },
+            "GroupCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                    },
+                    "alarm_permission": {
+                        "$ref": "#/components/schemas/AlarmPermissionEnum"
+                    },
+                    "notify_alarm_changes": {
+                        "type": "boolean"
+                    },
+                    "notify_snoozed": {
+                        "type": "boolean"
+                    },
+                    "notify_dismissed": {
+                        "type": "boolean"
+                    },
+                    "notify_ignored": {
+                        "type": "boolean"
+                    },
+                    "alarm_time_basis": {
+                        "$ref": "#/components/schemas/AlarmTimeBasisEnum"
+                    },
+                    "alarm_time_zone": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                    },
+                    "shared_answers": {
+                        "type": "boolean"
+                    },
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "alarm_permission",
+                    "alarm_time_basis",
+                    "alarm_time_zone",
+                    "id",
+                    "membership_id",
+                    "name",
+                    "notify_alarm_changes",
+                    "notify_dismissed",
+                    "notify_ignored",
+                    "notify_snoozed",
+                    "saved_at",
+                    "shared_answers"
+                ]
+            },
+            "GroupRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "alarm_permission": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AlarmPermissionEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "notify_alarm_changes": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "notify_snoozed": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "notify_dismissed": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "notify_ignored": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "alarm_time_basis": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AlarmTimeBasisEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "alarm_time_zone": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "shared_answers": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "save_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "alarm_permission",
+                    "alarm_time_basis",
+                    "alarm_time_zone",
+                    "id",
+                    "name",
+                    "notify_alarm_changes",
+                    "notify_dismissed",
+                    "notify_ignored",
+                    "notify_snoozed",
+                    "save_id",
+                    "saved_at",
+                    "shared_answers"
+                ]
+            },
+            "GroupUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                    },
+                    "alarm_permission": {
+                        "$ref": "#/components/schemas/AlarmPermissionEnum"
+                    },
+                    "notify_alarm_changes": {
+                        "type": "boolean"
+                    },
+                    "notify_snoozed": {
+                        "type": "boolean"
+                    },
+                    "notify_dismissed": {
+                        "type": "boolean"
+                    },
+                    "notify_ignored": {
+                        "type": "boolean"
+                    },
+                    "alarm_time_basis": {
+                        "$ref": "#/components/schemas/AlarmTimeBasisEnum"
+                    },
+                    "alarm_time_zone": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                    },
+                    "shared_answers": {
+                        "type": "boolean"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "alarm_permission",
+                    "alarm_time_basis",
+                    "alarm_time_zone",
+                    "membership_id",
+                    "name",
+                    "notify_alarm_changes",
+                    "notify_dismissed",
+                    "notify_ignored",
+                    "notify_snoozed",
+                    "saved_at",
+                    "shared_answers"
+                ]
+            },
+            "IdentityRegistrationRequest": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                    },
+                    "token": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "minLength": 32,
+                        "maxLength": 256
+                    },
+                    "time_zone": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "time_zone",
+                    "token"
+                ]
+            },
+            "IdentityRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "time_zone": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "save_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "save_id",
+                    "saved_at",
+                    "time_zone"
+                ]
+            },
+            "InvitationCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "expires_in_hours": {
+                        "type": "integer",
+                        "maximum": 720,
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "id",
+                    "membership_id"
+                ]
+            },
+            "InvitationJoinRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "minLength": 32,
+                        "maxLength": 256
+                    }
+                },
+                "required": [
+                    "token"
+                ]
+            },
+            "MembershipAccessRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "scope_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "role": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/RoleEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "notify_membership": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "notify_administrative": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "preferences_saved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "preferences_save_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "group_id",
+                    "id",
+                    "notify_administrative",
+                    "notify_membership",
+                    "preferences_save_id",
+                    "preferences_saved_at",
+                    "role",
+                    "scope_id"
+                ]
+            },
+            "MembershipPreferencesRequest": {
+                "type": "object",
+                "properties": {
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "notify_membership": {
+                        "type": "boolean"
+                    },
+                    "notify_administrative": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "membership_id",
+                    "notify_administrative",
+                    "notify_membership",
+                    "saved_at"
+                ]
+            },
+            "MembershipRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "identity_id": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/RoleEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "joined_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "save_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "group_id",
+                    "id",
+                    "identity_id",
+                    "joined_at",
+                    "name",
+                    "role",
+                    "save_id",
+                    "saved_at"
+                ]
+            },
+            "OccurrenceCommandRequest": {
+                "type": "object",
+                "properties": {
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "alarm_revision": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "occurrence_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                    },
+                    "trigger_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "deadline_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "cycle_date": {
+                        "type": "string",
+                        "format": "date"
+                    }
+                },
+                "required": [
+                    "alarm_revision",
+                    "cycle_date",
+                    "deadline_at",
+                    "membership_id",
+                    "occurrence_key",
+                    "trigger_at"
+                ]
+            },
+            "OccurrenceRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "alarm_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "identity_id": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "alarm_revision": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "occurrence_key": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "cycle_date": {
+                        "type": "string",
+                        "format": "date",
+                        "readOnly": true
+                    },
+                    "trigger_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "deadline_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "state": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StateEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "resolved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "alarm_id",
+                    "alarm_revision",
+                    "cycle_date",
+                    "deadline_at",
+                    "group_id",
+                    "id",
+                    "identity_id",
+                    "occurrence_key",
+                    "resolved_at",
+                    "state",
+                    "trigger_at"
+                ]
+            },
+            "OutcomeRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "alarm_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "identity_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "alarm_revision": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "occurrence_key": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "kind": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ActivityKind"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "occurred_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "reason": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "alarm_id",
+                    "alarm_revision",
+                    "group_id",
+                    "id",
+                    "identity_id",
+                    "kind",
+                    "occurred_at",
+                    "occurrence_key",
+                    "reason"
+                ]
+            },
+            "PatchedIdentityUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                    }
+                }
+            },
+            "PatchedRoleUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "role": {
+                        "$ref": "#/components/schemas/RoleEnum"
+                    }
+                }
+            },
+            "PushTokenUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                    }
+                },
+                "required": [
+                    "token"
+                ]
+            },
+            "RepeatAnchorEnum": {
+                "enum": [
+                    "DAY_OF_MONTH",
+                    "DAY_OF_WEEK"
+                ],
+                "type": "string",
+                "description": "* `DAY_OF_MONTH` - Day Of Month\n* `DAY_OF_WEEK` - Day Of Week"
+            },
+            "RepeatUnit": {
+                "enum": [
+                    "DAY",
+                    "WEEK",
+                    "MONTH",
+                    "YEAR"
+                ],
+                "type": "string",
+                "description": "* `DAY` - Day\n* `WEEK` - Week\n* `MONTH` - Month\n* `YEAR` - Year"
+            },
+            "RoleEnum": {
+                "enum": [
+                    "member",
+                    "leader"
+                ],
+                "type": "string",
+                "description": "* `member` - Member\n* `leader` - Leader"
+            },
+            "ScopeSyncRepresentation": {
+                "type": "object",
+                "properties": {
+                    "scope_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "mode": {
+                        "$ref": "#/components/schemas/ScopeSyncRepresentationModeEnum"
+                    },
+                    "from_revision": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "through_revision": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "next_cursor": {
+                        "type": "string"
+                    },
+                    "has_more": {
+                        "type": "boolean"
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SyncItemRepresentation"
+                        }
+                    },
+                    "server_time": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "from_revision",
+                    "has_more",
+                    "items",
+                    "mode",
+                    "next_cursor",
+                    "scope_id",
+                    "server_time",
+                    "through_revision"
+                ]
+            },
+            "ScopeSyncRepresentationModeEnum": {
+                "enum": [
+                    "snapshot",
+                    "delta"
+                ],
+                "type": "string",
+                "description": "* `snapshot` - snapshot\n* `delta` - delta"
+            },
+            "SoundMode": {
+                "enum": [
+                    "off",
+                    "member_default",
+                    "shared"
+                ],
+                "type": "string",
+                "description": "* `off` - Off\n* `member_default` - Member Default\n* `shared` - Shared"
+            },
+            "SoundRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "sha256": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "byte_length": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "duration_ms": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "status": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/StatusEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "failure_code": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "ready_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "byte_length",
+                    "duration_ms",
+                    "failure_code",
+                    "group_id",
+                    "id",
+                    "ready_at",
+                    "sha256",
+                    "status",
+                    "title"
+                ]
+            },
+            "SoundSelectionRequest": {
+                "type": "object",
+                "properties": {
+                    "mode": {
+                        "$ref": "#/components/schemas/SoundMode"
+                    },
+                    "sound_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true,
+                        "minLength": 1,
+                        "maxLength": 200
+                    }
+                },
+                "required": [
+                    "mode",
+                    "sound_id"
+                ]
+            },
+            "SoundUploadRequest": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                    },
+                    "sha256": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "byte_length": {
+                        "type": "integer",
+                        "maximum": 33554432,
+                        "minimum": 1
+                    },
+                    "duration_ms": {
+                        "type": "integer",
+                        "maximum": 300000,
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "byte_length",
+                    "duration_ms",
+                    "id",
+                    "membership_id",
+                    "sha256",
+                    "title"
+                ]
+            },
+            "StateEnum": {
+                "enum": [
+                    "pending",
+                    "snoozed",
+                    "dismissed",
+                    "ignored",
+                    "canceled"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `snoozed` - Snoozed\n* `dismissed` - Dismissed\n* `ignored` - Ignored\n* `canceled` - Canceled"
+            },
+            "StatusEnum": {
+                "enum": [
+                    "pending",
+                    "verifying",
+                    "ready",
+                    "failed",
+                    "deleting"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `verifying` - Verifying\n* `ready` - Ready\n* `failed` - Failed\n* `deleting` - Deleting"
+            },
+            "SyncItemRepresentation": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "$ref": "#/components/schemas/SyncItemRepresentationKindEnum"
+                    },
+                    "key": {
+                        "type": "string"
+                    },
+                    "action": {
+                        "type": "string"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/SynchronizedResource"
+                    },
+                    "revision": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "ordinal": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "action",
+                    "data",
+                    "key",
+                    "kind",
+                    "ordinal",
+                    "revision"
+                ]
+            },
+            "SyncItemRepresentationKindEnum": {
+                "enum": [
+                    "identity",
+                    "capabilities",
+                    "membership",
+                    "group",
+                    "member",
+                    "alarm",
+                    "timer",
+                    "sound",
+                    "occurrence",
+                    "outcome",
+                    "activity"
+                ],
+                "type": "string",
+                "description": "* `identity` - identity\n* `capabilities` - capabilities\n* `membership` - membership\n* `group` - group\n* `member` - member\n* `alarm` - alarm\n* `timer` - timer\n* `sound` - sound\n* `occurrence` - occurrence\n* `outcome` - outcome\n* `activity` - activity"
+            },
+            "SynchronizedResource": {
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/IdentityRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/CapabilitiesRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/MembershipAccessRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/GroupRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/MembershipRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/AlarmRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/TimerRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/SoundRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/OccurrenceRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/OutcomeRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/ActivityRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/DeletedResourceRepresentation"
+                    }
+                ]
+            },
+            "TimerCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "label": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 120
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "maximum": 86400,
+                        "minimum": 1
+                    },
+                    "increment_seconds": {
+                        "type": "integer",
+                        "maximum": 3600,
+                        "minimum": 1
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "vibrate": {
+                        "type": "boolean"
+                    },
+                    "vibration_pattern": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "maxItems": 256,
+                        "minItems": 1
+                    },
+                    "vibration_pattern_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                    },
+                    "sound": {
+                        "$ref": "#/components/schemas/SoundSelectionRequest"
+                    },
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "duration_seconds",
+                    "expires_at",
+                    "id",
+                    "increment_seconds",
+                    "label",
+                    "membership_id",
+                    "saved_at",
+                    "sound",
+                    "vibrate",
+                    "vibration_pattern",
+                    "vibration_pattern_name"
+                ]
+            },
+            "TimerPayloadRequest": {
+                "type": "object",
+                "properties": {
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "label": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 120
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "maximum": 86400,
+                        "minimum": 1
+                    },
+                    "increment_seconds": {
+                        "type": "integer",
+                        "maximum": 3600,
+                        "minimum": 1
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "vibrate": {
+                        "type": "boolean"
+                    },
+                    "vibration_pattern": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "maxItems": 256,
+                        "minItems": 1
+                    },
+                    "vibration_pattern_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                    },
+                    "sound": {
+                        "$ref": "#/components/schemas/SoundSelectionRequest"
+                    }
+                },
+                "required": [
+                    "duration_seconds",
+                    "expires_at",
+                    "increment_seconds",
+                    "label",
+                    "membership_id",
+                    "saved_at",
+                    "sound",
+                    "vibrate",
+                    "vibration_pattern",
+                    "vibration_pattern_name"
+                ]
+            },
+            "TimerRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "label": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "increment_seconds": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "vibrate": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "vibration_pattern": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "maximum": 2147483647,
+                            "minimum": 0
+                        },
+                        "readOnly": true
+                    },
+                    "vibration_pattern_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "sound_mode": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SoundMode"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "sound_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "saved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "save_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "duration_seconds",
+                    "expires_at",
+                    "group_id",
+                    "id",
+                    "increment_seconds",
+                    "label",
+                    "save_id",
+                    "saved_at",
+                    "sound_id",
+                    "sound_mode",
+                    "vibrate",
+                    "vibration_pattern",
+                    "vibration_pattern_name"
+                ]
+            }
+        },
+        "securitySchemes": {
+            "bearerIdentity": {
+                "type": "http",
+                "scheme": "bearer"
+            },
+            "identityId": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Jay-Identity-ID"
+            }
+        }
+    }
+}

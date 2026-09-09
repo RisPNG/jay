@@ -22,6 +22,8 @@ import kotlinx.coroutines.launch
 
 class SocialModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as App).container.socialRepository
+    private var rejectedOperation: com.bnyro.clock.social.domain.PendingOperation? = null
+    private var invitationOperation: com.bnyro.clock.social.domain.PendingOperation? = null
 
     val canUploadSharedSounds: Boolean
         get() = repository.canUploadSharedSounds
@@ -46,11 +48,11 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         private set
     var groupActivity by mutableStateOf<List<SocialChange>>(emptyList())
         private set
-    var groupActivityNextBefore by mutableStateOf<Long?>(null)
+    var groupActivityNextBefore by mutableStateOf<String?>(null)
         private set
     var alarmActivity by mutableStateOf<List<SocialChange>>(emptyList())
         private set
-    var alarmActivityNextBefore by mutableStateOf<Long?>(null)
+    var alarmActivityNextBefore by mutableStateOf<String?>(null)
         private set
     var activityAlarmId by mutableStateOf<String?>(null)
     var deviceId by mutableStateOf<String?>(null)
@@ -69,6 +71,27 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
 
     init {
         synchronize()
+        viewModelScope.launch {
+            repository.rejectedOperations.collect { operations ->
+                operations.firstOrNull()?.let { operation ->
+                    rejectedOperation = operation
+                    message = when (operation.rejectionCode) {
+                        "superseded" -> "Your offline change was replaced by a newer saved change."
+                        "clock_invalid" -> "Your change could not be synchronized because its saved time is ahead of the server. Review it and save again."
+                        "not_found", "membership_changed", "editor_required", "leader_required" -> "Your change could not be applied because the item or your group access changed."
+                        else -> "Your change could not be applied. Current group information has been restored."
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            repository.readyInvitations.collect { operations ->
+                operations.firstOrNull()?.let { operation ->
+                    invitationOperation = operation
+                    invitation = kotlinx.serialization.json.Json.decodeFromString<com.bnyro.clock.social.domain.InviteResponse>(requireNotNull(operation.response)).url
+                }
+            }
+        }
     }
 
     fun synchronize() {
@@ -134,7 +157,7 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             busy = true
             runCatching { repository.createInvite(groupId) }
-                .onSuccess { invitation = it }
+                .onSuccess { if (it != null) invitation = it else message = "Invitation saved. Its link will be available after reconnecting." }
                 .onFailure { message = it.message ?: "Unable to create invitation" }
             busy = false
         }
@@ -287,10 +310,18 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
 
     fun consumeMessage() {
         message = null
+        rejectedOperation?.let { operation ->
+            rejectedOperation = null
+            viewModelScope.launch { repository.acknowledgeOperation(operation) }
+        }
     }
 
     fun consumeInvitation() {
         invitation = null
+        invitationOperation?.let { operation ->
+            invitationOperation = null
+            viewModelScope.launch { repository.acknowledgeOperation(operation) }
+        }
     }
 
     fun consumeProfile() {
