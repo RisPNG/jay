@@ -368,4 +368,5 @@
     <string name="label_color_cocoa">Cocoa</string>
     <string name="label_color_graphite">Graphite</string>
     <string name="label_color_birch">Birch</string>
+    <string name="upcoming">Upcoming</string>
 </resources>

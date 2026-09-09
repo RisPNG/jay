@@ -18,10 +18,12 @@ import com.bnyro.clock.social.domain.PERSONAL_ALARM_SOURCE_ID
 import com.bnyro.clock.social.domain.SocialChange
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.TimeHelper
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -46,11 +48,18 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
     val alarmSourceIds = MutableStateFlow<Set<String>?>(null)
     private val sortOrder = MutableStateFlow(AlarmSortOrder.HOUR_OF_DAY)
 
+    private val currentMinute = flow {
+        while (true) {
+            emit(System.currentTimeMillis() / 60_000L)
+            delay(60_000L - System.currentTimeMillis() % 60_000L)
+        }
+    }
+
     val alarms: StateFlow<List<Alarm>> =
         combine(
             alarmRepository.getAlarmsStream(),
             filters,
-            sortOrder,
+            combine(sortOrder, currentMinute) { order, _ -> order },
             socialRepository.alarmGroupNames,
             alarmSourceIds
         ) { items, filter, sortOrder, alarmGroups, sourceIds ->
@@ -67,11 +76,7 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
 
             }
 
-            when (sortOrder) {
-                AlarmSortOrder.LABEL -> filtered.sortedBy { it.label }
-                AlarmSortOrder.HOUR_OF_DAY -> filtered.sortedBy { it.time }
-                AlarmSortOrder.WEEKDAY -> filtered.sortedBy { it.days.firstOrNull() }
-            }
+            sortOrder.sort(filtered)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000L),
