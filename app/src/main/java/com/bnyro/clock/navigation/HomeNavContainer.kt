@@ -1,6 +1,7 @@
 package com.bnyro.clock.navigation
 
 import android.content.res.Configuration
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -16,6 +17,7 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -33,6 +35,7 @@ import com.bnyro.clock.presentation.screens.timer.TimerScreen
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import kotlinx.coroutines.launch
 import com.bnyro.clock.social.presentation.GroupsScreen
+import com.bnyro.clock.social.presentation.SocialNotificationHelper
 import com.bnyro.clock.social.presentation.SocialModel
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -47,13 +50,28 @@ fun HomeNavContainer(
     settingsModel: SettingsModel,
     socialModel: SocialModel
 ) {
+    val activity = LocalActivity.current
+    LaunchedEffect(Unit) {
+        val intent = activity?.intent
+        if (intent?.action == SocialNotificationHelper.SHOW_SOCIAL_ACTIVITY_ACTION) {
+            val groupId = intent.getStringExtra(SocialNotificationHelper.EXTRA_SOCIAL_GROUP_ID)
+            val entityId = intent.getStringExtra(SocialNotificationHelper.EXTRA_SOCIAL_ENTITY_ID)
+            val entityType = intent.getStringExtra(SocialNotificationHelper.EXTRA_SOCIAL_ENTITY_TYPE)
+            intent.action = null
+            if (entityType in setOf("alarm", "outcome") && entityId != null) {
+                alarmModel.loadAlarmActivity(entityId)
+            } else if (groupId != null) {
+                socialModel.loadGroupActivity(groupId)
+            }
+        }
+    }
     val orientation = LocalConfiguration.current.orientation
     val coroutineScope = rememberCoroutineScope()
 
     val filteredRoutes = remember(settingsModel.enabledTabs, initialTab) {
         homeRoutes.filter {
             it.route in settingsModel.enabledTabs ||
-                it == HomeRoutes.Groups && initialTab == HomeRoutes.Groups
+                it == initialTab
         }
     }
 

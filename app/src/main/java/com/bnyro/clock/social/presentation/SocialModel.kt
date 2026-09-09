@@ -54,6 +54,7 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         private set
     var alarmActivityNextBefore by mutableStateOf<String?>(null)
         private set
+    var activityGroupId by mutableStateOf<String?>(null)
     var activityAlarmId by mutableStateOf<String?>(null)
     var deviceId by mutableStateOf<String?>(null)
         private set
@@ -208,6 +209,7 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
                     if (more) groupActivityNextBefore else null
                 )
             }.onSuccess {
+                activityGroupId = groupId
                 groupActivity = if (more) groupActivity + it.items else it.items
                 groupActivityNextBefore = it.nextBefore
             }.onFailure { message = it.message ?: "Unable to load activity" }

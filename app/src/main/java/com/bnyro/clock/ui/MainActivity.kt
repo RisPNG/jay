@@ -28,6 +28,7 @@ import com.bnyro.clock.presentation.screens.permission.PermissionModel
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.presentation.screens.stopwatch.model.StopwatchModel
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
+import com.bnyro.clock.social.presentation.SocialNotificationHelper
 import com.bnyro.clock.social.presentation.SocialActivityCoordinator
 import com.bnyro.clock.social.data.SocialLink
 import com.bnyro.clock.ui.theme.ClockYouTheme
@@ -91,7 +92,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val receivedSocialLink = socialActivityCoordinator.receiveLink(intent)
-        super.onCreate(if (receivedSocialLink) null else savedInstanceState)
+        super.onCreate(
+            if (receivedSocialLink || intent?.action == SocialNotificationHelper.SHOW_SOCIAL_ACTIVITY_ACTION) {
+                null
+            } else savedInstanceState
+        )
 
         val allPermissions = PermissionModel.allPermissions
         val requiredPermissions = allPermissions.any {
@@ -161,7 +166,10 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.action == Intent.ACTION_VIEW && SocialLink.parse(intent.dataString.orEmpty()) != null) {
+        if (
+            intent.action == SocialNotificationHelper.SHOW_SOCIAL_ACTIVITY_ACTION ||
+            intent.action == Intent.ACTION_VIEW && SocialLink.parse(intent.dataString.orEmpty()) != null
+        ) {
             recreate()
         }
     }

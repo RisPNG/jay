@@ -86,7 +86,9 @@ object SocialNotificationHelper {
                             change.sequence.hashCode(),
                             Intent(context, MainActivity::class.java)
                                 .setAction(SHOW_SOCIAL_ACTIVITY_ACTION)
-                                .putExtra(EXTRA_SOCIAL_ENTITY_TYPE, change.entityType),
+                                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                .putExtra(EXTRA_SOCIAL_ENTITY_TYPE, change.entityType)
+                                .putExtra(EXTRA_SOCIAL_GROUP_ID, change.groupId),
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                         )
                     )
@@ -141,12 +143,15 @@ object SocialNotificationHelper {
                             groupId.hashCode(),
                             Intent(context, MainActivity::class.java)
                                 .setAction(SHOW_SOCIAL_ACTIVITY_ACTION)
+                                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                 .putExtra(
                                     EXTRA_SOCIAL_ENTITY_TYPE,
-                                    if (groupChanges.all {
-                                            it.entityType in setOf("alarm", "outcome")
-                                        }) "alarm" else "group"
-                                ),
+                                    if (updateCount == 1 && newest.entityType in
+                                        setOf("alarm", "outcome")
+                                    ) "alarm" else "group"
+                                )
+                                .putExtra(EXTRA_SOCIAL_GROUP_ID, groupId)
+                                .putExtra(EXTRA_SOCIAL_ENTITY_ID, newest.entityId),
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                         )
                     )
@@ -161,6 +166,8 @@ object SocialNotificationHelper {
 
     const val SHOW_SOCIAL_ACTIVITY_ACTION = "com.rispng.jay.SHOW_SOCIAL_ACTIVITY"
     const val EXTRA_SOCIAL_ENTITY_TYPE = "com.rispng.jay.SOCIAL_ENTITY_TYPE"
+    const val EXTRA_SOCIAL_GROUP_ID = "com.rispng.jay.SOCIAL_GROUP_ID"
+    const val EXTRA_SOCIAL_ENTITY_ID = "com.rispng.jay.SOCIAL_ENTITY_ID"
     const val SYNC_FAILURE_NOTIFICATION_ID = 190_001
     const val ENTITLEMENT_NOTIFICATION_ID = 190_002
     const val SOCIAL_CHANNEL = "social"

@@ -76,7 +76,6 @@ fun GroupsScreen(
     var showCreate by remember { mutableStateOf(false) }
     var showJoin by remember { mutableStateOf(false) }
     var selectedGroup by remember { mutableStateOf<SocialGroup?>(null) }
-    var activityGroup by remember { mutableStateOf<SocialGroup?>(null) }
 
     var pendingProfile by remember {
         mutableStateOf(Preferences.instance.getString(SocialPreferences.pendingProfileKey, null))
@@ -309,7 +308,6 @@ fun GroupsScreen(
                     Text(group.name, Modifier.weight(1f))
                     IconButton(onClick = {
                         socialModel.loadGroupActivity(group.id)
-                        activityGroup = group
                         selectedGroup = null
                     }) {
                         Icon(Icons.Rounded.History, stringResource(R.string.group_logs))
@@ -531,9 +529,9 @@ fun GroupsScreen(
         }
     }
 
-    activityGroup?.let { group ->
+    socialModel.activityGroupId?.let { groupId ->
         AlertDialog(
-            onDismissRequest = { activityGroup = null },
+            onDismissRequest = { socialModel.activityGroupId = null },
             title = { Text(stringResource(R.string.group_logs)) },
             text = {
                 Column(
@@ -547,13 +545,13 @@ fun GroupsScreen(
                     }
                     if (socialModel.groupActivityNextBefore != null) {
                         OutlinedButton(
-                            onClick = { socialModel.loadGroupActivity(group.id, more = true) }
+                            onClick = { socialModel.loadGroupActivity(groupId, more = true) }
                         ) { Text(stringResource(R.string.load_more)) }
                     }
                 }
             },
             confirmButton = {
-                Button(onClick = { activityGroup = null }) {
+                Button(onClick = { socialModel.activityGroupId = null }) {
                     Text(stringResource(R.string.close))
                 }
             }
