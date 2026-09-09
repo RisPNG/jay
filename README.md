@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="104" height="104" alt="Jay app icon">
+  <img src="app/src/main/res/drawable-nodpi/ic_launcher_artwork.png" width="104" height="104" alt="Jay app icon">
 </p>
 
 <h1 align="center">Jay</h1>
