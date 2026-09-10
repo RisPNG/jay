@@ -91,6 +91,9 @@
     <string name="analog_clock">Analog clock</string>
     <string name="digital_clock">Digital clock</string>
     <string name="vertical_clock">Vertical clock</string>
+    <string name="analog_clock_widget_name">Analog</string>
+    <string name="digital_clock_widget_name">Digital</string>
+    <string name="vertical_clock_widget_name">Stacked</string>
     <string name="timer_picker_style">Picker style</string>
     <string name="alarm_picker_style">Picker style</string>
     <string name="scroll">Scroll</string>
