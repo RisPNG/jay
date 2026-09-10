@@ -16,6 +16,14 @@ A profile name alone is not proof of ownership. We will arrange any additional v
 
 The request follows the same retirement and cleanup process as the in-app option after ownership has been verified. For a self-hosted server, contact that server's operator; RIS PENG cannot delete data on a server controlled by someone else.
 
+## Delete data without deleting your profile
+
+You can delete individual shared alarms and timers while keeping your Jay profile. Open the relevant group, select the alarm or timer, and use its delete action. You must have permission to edit that group's content. Synchronize to send the deletion to the server; it applies to the shared item for all group members. Do not use **Reset identity** if you want to keep your profile.
+
+To request this without the app, email **[ris@poppybit.com](mailto:ris@poppybit.com?subject=Jay%20data%20deletion)** with the subject **Jay data deletion**. Identify your server, profile and the group items you want deleted, and explicitly say that you want to keep your profile. We verify ownership and group permissions before acting. A profile name alone is not proof of ownership; do not post exported profile links publicly. For another operator's server, contact that operator.
+
+Your profile, memberships and other content remain. Deleted shared alarm and timer records become eligible for cleanup after 30 days. Unused shared sounds become eligible for cleanup after 24 hours; sounds still referenced by other shared items remain. Background cleanup, older audio versions, logs, backups and copies already downloaded by other members follow the [privacy policy's retention rules](privacy-policy.md#retention-and-deletion). This option does not erase all profile history or other members' data.
+
 ## What is removed and what may remain
 
 Profile access and server push subscriptions are disabled immediately when retirement starts. Profile details and associated personal history are cleaned up after the 30-day synchronization retention period and completion of membership removal. A minimal retired-profile record remains to prevent the old profile from being recreated by old credentials or offline requests.
