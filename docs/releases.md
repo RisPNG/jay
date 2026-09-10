@@ -34,7 +34,7 @@ The stable tag is `v<jayVersionName>`. Artifact names use `jayVersionName` from 
 - `jay-<version>.aab`: minified production AAB signed with the production key;
 - `jay-<version>-debug.apk`: debug APK signed with the prerelease key for debugging.
 
-The production APK and AAB both use `com.rispng.jay`. Publishing a stable release removes the prereleases before it and their tags. This keeps older testing builds from crowding the release list.
+The production APK and AAB both use `com.rispng.jay`. Add the release changelog to `fastlane/metadata/android/en-US/changelogs/<jayVersionCode>.txt`; the workflow includes it before GitHub's generated release notes. Publishing a stable release removes the prereleases before it and their tags. This keeps older testing builds from crowding the release list.
 
 ## Signing material
 

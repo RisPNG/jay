@@ -465,6 +465,13 @@ fun SettingsScreen(
             )
             SettingsCategory(stringResource(R.string.about))
             IconPreference(
+                title = stringResource(R.string.privacy_policy),
+                summary = stringResource(R.string.privacy_policy_summary),
+                imageVector = Icons.AutoMirrored.Filled.OpenInNew
+            ) {
+                uriHandler.openUri("https://github.com/RisPNG/jay/blob/jay/docs/privacy-policy.md")
+            }
+            IconPreference(
                 title = stringResource(R.string.source_code),
                 summary = stringResource(R.string.source_code_summary),
                 imageVector = Icons.AutoMirrored.Filled.OpenInNew

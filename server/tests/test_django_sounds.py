@@ -5,7 +5,7 @@ import pytest
 from django.test import override_settings
 from django.utils import timezone
 
-from jay_server.social.models import DeliveryWork, GroupMembership, Identity, PlayEntitlement, SharedAlarm, SharedSound
+from jay_server.social.models import DeliveryWork, GroupMembership, Identity, SharedSoundEntitlement, SharedAlarm, SharedSound
 
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -16,13 +16,13 @@ def test_sound_entitlement_and_unrelated_alarm_edit(client, group, alarm_payload
     alarm_payload["sound"] = {"mode": "shared", "sound_id": str(sound_id), "title": "Birds"}
     denied = client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())})
     assert denied.status_code == 403
-    PlayEntitlement.objects.create(identity=Identity.objects.get(pk="1" * 64), expires_at=timezone.now() + timedelta(days=1))
+    SharedSoundEntitlement.objects.create(identity=Identity.objects.get(pk="1" * 64), expires_at=timezone.now() + timedelta(days=1))
     created = client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())})
     assert created.status_code == 201, created.data
     sound = SharedSound.objects.get(pk=sound_id)
     assert sound.status == "pending"
     assert sound.sha256 is None
-    PlayEntitlement.objects.all().delete()
+    SharedSoundEntitlement.objects.all().delete()
     alarm_id = alarm_payload.pop("id")
     alarm_payload.pop("group_id")
     changed = client.put(f"/v1/alarms/{alarm_id}", {**alarm_payload, "label": "Later", "saved_at": timezone.now().isoformat()}, format="json", headers={"Idempotency-Key": str(uuid4())})

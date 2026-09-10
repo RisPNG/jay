@@ -48,8 +48,8 @@ The Android emulator can reach this API at `http://10.0.2.2:8000`. Use a debug b
 | `ALLOWED_HOSTS` | Comma-separated public hostnames; include the Render hostname and custom domain |
 | `TRUST_PROXY` | Trust the HTTPS forwarding header only when requests pass through a trusted proxy |
 | `DATABASE_POOL_SIZE` | Maximum pooled connections per process; size against the database connection budget |
-| `IDENTITY_INACTIVITY_TIMEOUT_DAYS` | Removes identities unseen for this many days together with the groups they solely lead, defaulting to 120; 0 disables the sweep |
-| `SHARED_SOUND_ACCESS` | Shared-sound upload and selection policy: `play` (default) requires a current Play entitlement; `everyone` grants access to every authenticated device, subject to group edit permissions |
+| `IDENTITY_INACTIVITY_TIMEOUT_DAYS` | Removes identities unseen for this many days together with the groups they solely lead, defaulting to 120; profiles with operator-granted sound access are retained; 0 disables the sweep |
+| `SHARED_SOUND_ACCESS` | Shared-sound upload and selection policy: `play` (default) requires a current Play entitlement or an operator grant for that profile; `everyone` grants access to every authenticated device, subject to group edit permissions |
 | `B2_S3_ENDPOINT` | Backblaze B2 S3-compatible endpoint |
 | `B2_BUCKET_NAME` | Private B2 bucket that stores normalised shared sounds |
 | `B2_APPLICATION_KEY_ID` | B2 application key ID scoped to the sound bucket |
@@ -137,6 +137,12 @@ mise exec -- bash server/test.sh -q tests/test_django_api.py
 `GET /v1/sync` returns the identity scope. Membership entries identify group scopes at `GET /v1/groups/{id}/sync`. Treat cursors as opaque strings and stage incomplete snapshots. Alarm delivery acknowledgement follows successful local scheduling and is independent of sound readiness. An audio upload is defined once, uploaded to staging using a renewable signed URL, completed with HTTP 202 and verified by the worker before downloads become available.
 
 The [architecture guide](../docs/architecture.md) describes ordering, synchronization and worker boundaries. The checked-in [API schema](../docs/openapi.json) is validated against the generated schema by the test runner.
+
+## Profile deletion
+
+The app's **Reset identity** action retires the current profile. For a deletion request received outside the app, verify ownership first, then run `mise exec -- .venv/bin/python manage.py delete_profile IDENTITY_ID` from `server/`. Both paths disable profile access and queue the same membership cleanup.
+
+Groups where the profile is the only leader are deleted with their shared alarms, timers and sounds, even if other members remain. Groups with another leader keep their shared content. After the 30-day retention period and membership cleanup, the worker removes profile details and personal history and clears author references on retained content. A minimal retired-profile record prevents old credentials from recreating it.
 
 ## Deployment
 

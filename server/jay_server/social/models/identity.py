@@ -11,6 +11,7 @@ class Identity(SavedState):
     time_zone = models.CharField(max_length=100, default="UTC")
     last_seen_at = models.DateTimeField(default=timezone.now, db_index=True)
     retired_at = models.DateTimeField(null=True)
+    purged_at = models.DateTimeField(null=True)
     scope = models.OneToOneField("SyncScope", on_delete=models.PROTECT, related_name="identity")
 
     @property
@@ -30,7 +31,20 @@ class PushSubscription(models.Model):
     updated_at = models.DateTimeField(default=timezone.now)
 
 
-class PlayEntitlement(models.Model):
+class SharedSoundEntitlement(models.Model):
+    class Source(models.TextChoices):
+        PLAY = "play"
+        OPERATOR = "operator"
+
     identity = models.OneToOneField(Identity, primary_key=True, on_delete=models.CASCADE)
-    verified_at = models.DateTimeField(default=timezone.now)
-    expires_at = models.DateTimeField()
+    source = models.CharField(max_length=8, choices=Source.choices, default=Source.PLAY)
+    granted_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(source="play", expires_at__isnull=False) | models.Q(source="operator", expires_at__isnull=True),
+                name="sound_entitlement_expiry_valid",
+            ),
+        ]

@@ -6,12 +6,12 @@ Shared sounds need storage and delivery. On the default Jay's hosted service, Th
 
 | Value | What it means |
 | --- | --- |
-| `play` | Uploading and choosing a shared sound requires verified Play access. This is the default. |
+| `play` | Uploading and choosing a shared sound requires verified Play access or an operator grant for that profile. This is the default. |
 | `everyone` | Every authenticated device can upload and choose shared sounds without a purchase or an expiry. Group editing permissions still apply. |
 
 ## What the rest of the group gets
 
-Play access is only needed for uploading and selecting distributed sounds on a server using `play`. People using the free GitHub APK can still join groups, choose their device's default sound or silence, and receive and play sounds selected by someone with access.
+On a server using `play`, ordinary profiles need Play access only for uploading and selecting distributed sounds. People using the free GitHub APK can still join groups, choose their device's default sound or silence, and receive and play sounds selected by someone with access.
 
 For example, one member can choose an audio file for a shared alarm and everyone in the group can hear it. They do not all need to buy the app for that to work. Changing something unrelated, such as the alarm's label, also keeps the selected sound in place.
 
@@ -26,6 +26,10 @@ The app gets the device's effective capabilities through authenticated synchroni
 On an `everyone` server, shared-sound access has no expiry and the app skips Play verification. Debug and prerelease builds get their access through normal synchronisation too; this does not require a special APK.
 
 On a `play` server, production builds refresh Play access immediately and every 24 hours when a connection is available. A successful verification grants access for 48 hours by default, controlled by `PLAY_ENTITLEMENT_LIFETIME_HOURS`. The API reports whether the device can upload through `shared_sound_upload`.
+
+`SharedSoundEntitlement` records the profile's access source and grant time. Play grants have an expiry; operator grants do not. An operator grant reports `requires_play_entitlement=false`, so the app uses it without requesting a Play Integrity token. An in-flight Play verification cannot replace or remove an operator grant. Both sources use the same sound selection, upload and worker authorization checks, including group editing permissions.
+
+The `grant_sound_access` management command grants or revokes operator access and publishes the updated capabilities through normal synchronization. It accepts an existing identity ID or prompts for an exported profile link. Operator-granted profiles are excluded from inactivity cleanup so their access remains reusable between reviews. Explicit profile deletion still retires them. Revoking an operator grant restores normal Play verification and inactivity cleanup; it does not restore a previously replaced Play grant.
 
 Changing the server setting back to `play` restores the server-side checks immediately. The app learns about it on its next sync or refresh, but an old cached grant cannot get an upload past the server. Sounds already selected remain playable, and unrelated edits preserve them.
 

@@ -30,7 +30,7 @@
 
 Jay is your run-of-the-mill [clock app](https://github.com/you-apps/ClockYou) for Android, but with groups, allowing for shared alarms and shared timers. I built it to replace your personal clock app, so you still get the personal alarms, world clocks, stopwatch, and widgets you would expect. Groups are there for when you want them.
 
-**No login. No account registration. No telemetry[\*](#privacy-and-your-data). Self-hostable.**
+**No email or password registration. No ads. Self-hostable.**
 
 Jay creates a profile for you automatically, so getting started is basically choosing a name (or stick with the auto-generated one), creating a group, and inviting someone. If you use more than one device, you can bring the same profile over and continue as the same member.
 
@@ -134,15 +134,7 @@ Group changes require a connection. Already synchronised alarms use local Androi
 
 ## Privacy and your data
 
-There is no email-and-password account to register, but the server still needs to know which member is making a request. The generated identity does that. So while there is no login, this does not make group activity anonymous.
-
-Groups need a server to keep track of members, shared alarms and timers, activity, alarm outcomes, and when a device was last seen. Other members can see the activity and responses relevant to their group. The operator and hosting provider also control who can access the infrastructure and what gets logged.
-
-You can use the default service if you do not want to look after a server. I do not have an interest in collecting, selling, or keeping data that is not needed to run it.
-
-However, a hosted service still requires you to trust the person running it. If you would rather not have to rely on that trust, self-hosting is the safer option, and the reason why the option is available to you. You decide what is logged, how long it is kept, and which services it connects to. That is the condition behind **no telemetry\***.
-
-To harden privacy even more, you always have the option to completely reset and erase your identity to leave your groups and start again. Groups where you are the only leader are deleted as part of that reset. The server's default also removes identities that are inactive for 120 days but that interval can be configured.
+Read the [privacy policy](docs/privacy-policy.md) for how Jay handles your identity, group activity, and data on hosted or self-hosted servers.
 
 ## Self-hosting
 

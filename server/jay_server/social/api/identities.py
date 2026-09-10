@@ -11,7 +11,8 @@ from rest_framework.views import APIView
 
 from ..access import identity_capabilities
 from ..errors import DomainError
-from ..models import DeliveryWork, GroupMembership, Identity, PlayEntitlement, PushSubscription, SyncScope
+from ..identities import retire_identity
+from ..models import DeliveryWork, GroupMembership, Identity, SharedSoundEntitlement, PushSubscription, SyncScope
 from ..synchronization import publish_changes, synchronize_scope
 from ..transactions import accept_saved_state, mutation
 from .representations import ScopeSyncRepresentation, IdentityRepresentation, MembershipRepresentation
@@ -79,9 +80,7 @@ class IdentityView(APIView):
         with mutation(request, {}, [request.user.scope_id], exclusive_identity=True) as receipt:
             if receipt.completed_at:
                 return Response(status=receipt.status)
-            Identity.objects.filter(pk=request.user.pk).update(retired_at=timezone.now())
-            PushSubscription.objects.filter(identity=request.user).delete()
-            DeliveryWork.objects.create(kind="retire", deduplication_key=f"retire:{request.user.pk}", payload={"identity_id": request.user.pk})
+            retire_identity(request.user)
             receipt.status, receipt.response = 204, None
         return Response(status=204)
 
@@ -111,7 +110,7 @@ class EntitlementView(APIView):
 
         serializer = EntitlementRequest(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if settings.SHARED_SOUND_ACCESS == "everyone":
+        if not identity_capabilities(request.user)["requires_play_entitlement"]:
             return Response(identity_capabilities(request.user))
         with mutation(request, serializer.validated_data, reserve=True) as receipt:
             if receipt.completed_at:
@@ -120,10 +119,11 @@ class EntitlementView(APIView):
         with mutation(request, serializer.validated_data, [request.user.scope_id]) as receipt:
             if receipt.completed_at:
                 return Response(receipt.response, status=receipt.status)
-            if licensed:
-                PlayEntitlement.objects.update_or_create(identity=request.user, defaults={"verified_at": timezone.now(), "expires_at": timezone.now() + timedelta(hours=settings.PLAY_ENTITLEMENT_LIFETIME_HOURS)})
-            else:
-                PlayEntitlement.objects.filter(identity=request.user).delete()
+            if identity_capabilities(request.user)["requires_play_entitlement"]:
+                if licensed:
+                    SharedSoundEntitlement.objects.update_or_create(identity=request.user, defaults={"source": SharedSoundEntitlement.Source.PLAY, "granted_at": timezone.now(), "expires_at": timezone.now() + timedelta(hours=settings.PLAY_ENTITLEMENT_LIFETIME_HOURS)})
+                else:
+                    SharedSoundEntitlement.objects.filter(identity=request.user, source=SharedSoundEntitlement.Source.PLAY).delete()
             receipt.status, receipt.response = 200, identity_capabilities(request.user)
             publish_changes(request.user.scope_id, [("capabilities", request.user.pk, "upsert", receipt.response, None)])
         return Response(receipt.response)

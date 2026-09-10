@@ -2,7 +2,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .errors import DomainError
-from .models import Group, GroupMembership, PlayEntitlement, SharedSound, SoundMode
+from .models import Group, GroupMembership, SharedSoundEntitlement, SharedSound, SoundMode
 
 
 def require_membership(group, identity, generation=None, leader=False, editor=False):
@@ -26,11 +26,11 @@ def require_membership(group, identity, generation=None, leader=False, editor=Fa
 def identity_capabilities(identity):
     if settings.SHARED_SOUND_ACCESS == "everyone":
         return {"shared_sound_upload": True, "requires_play_entitlement": False, "expires_at": None}
-    entitlement = PlayEntitlement.objects.filter(identity=identity).first()
+    entitlement = SharedSoundEntitlement.objects.filter(identity=identity).first()
     return {
-        "shared_sound_upload": entitlement is not None and entitlement.expires_at > timezone.now(),
-        "requires_play_entitlement": True,
-        "expires_at": entitlement.expires_at.isoformat() if entitlement else None,
+        "shared_sound_upload": entitlement is not None and (entitlement.expires_at is None or entitlement.expires_at > timezone.now()),
+        "requires_play_entitlement": entitlement is None or entitlement.source == SharedSoundEntitlement.Source.PLAY,
+        "expires_at": entitlement.expires_at.isoformat() if entitlement and entitlement.expires_at else None,
     }
 
 

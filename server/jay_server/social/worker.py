@@ -20,7 +20,8 @@ from .alarms import record_alarm_response, schedule_occurrences
 from .api.representations import AlarmRepresentation, SoundRepresentation
 from .errors import DomainError
 from .groups import publish_membership, remove_membership
-from .models import AlarmOccurrence, DeliveryWork, Group, GroupMembership, Identity, OperationReceipt, PushSubscription, SharedAlarm, SharedSound, SharedTimer, SyncScope, SyncVersion, WorkerHeartbeat
+from .identities import retire_identity
+from .models import AlarmActivity, AlarmDelivery, AlarmOccurrence, DeliveryWork, Group, GroupActivity, GroupInvitation, GroupMembership, Identity, OperationReceipt, PushSubscription, SharedAlarm, SharedSound, SharedSoundEntitlement, SharedTimer, SyncScope, SyncVersion, WorkerHeartbeat
 from .providers import object_storage_client, validate_sound_object
 from .synchronization import publish_changes
 
@@ -209,16 +210,13 @@ def process_identity_retirement(work):
 def maintain_state():
     now = timezone.now()
     if settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS:
-        stale = Identity.objects.filter(retired_at=None, last_seen_at__lt=now - timedelta(days=settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS)).order_by("last_seen_at")[:50]
+        stale = Identity.objects.filter(retired_at=None, last_seen_at__lt=now - timedelta(days=settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS)).exclude(sharedsoundentitlement__source=SharedSoundEntitlement.Source.OPERATOR).order_by("last_seen_at")[:50]
         for identity in stale:
             with transaction.atomic():
                 identity = Identity.objects.select_for_update().get(pk=identity.pk)
-                if identity.retired_at or identity.last_seen_at >= now - timedelta(days=settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS):
+                if identity.retired_at or identity.last_seen_at >= now - timedelta(days=settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS) or SharedSoundEntitlement.objects.filter(identity=identity, source=SharedSoundEntitlement.Source.OPERATOR).exists():
                     continue
-                identity.retired_at = now
-                identity.save(update_fields=["retired_at"])
-                PushSubscription.objects.filter(identity=identity).delete()
-                DeliveryWork.objects.get_or_create(deduplication_key=f"retire:{identity.pk}", defaults={"kind": "retire", "payload": {"identity_id": identity.pk}})
+                retire_identity(identity)
     for timer in SharedTimer.objects.select_related("group").filter(deleted_at=None, expires_at__lt=now - timedelta(minutes=15))[:50]:
         with transaction.atomic():
             SyncScope.objects.select_for_update().get(pk=timer.group.scope_id)
@@ -276,15 +274,44 @@ def maintain_state():
                 continue
             Group.objects.filter(pk=group.pk, deleted_at__lt=cutoff).delete()
             SyncVersion.objects.filter(scope_id=group.scope_id).delete()
-    for identity in Identity.objects.filter(retired_at__lt=cutoff).exclude(name="Removed member")[:20]:
+    for identity in Identity.objects.filter(retired_at__lt=cutoff, purged_at=None)[:20]:
         with transaction.atomic():
             identity = Identity.objects.select_for_update().get(pk=identity.pk)
-            if GroupMembership.objects.filter(identity=identity, removed_at=None).exists():
+            if identity.purged_at is not None or GroupMembership.objects.filter(identity=identity, removed_at=None).exists():
                 continue
-            SyncScope.objects.select_for_update().get(pk=identity.scope_id)
+            personal_versions = SyncVersion.objects.filter(
+                Q(scope_id=identity.scope_id) | Q(recipient=identity) | Q(representation__identity_id=identity.pk)
+                | Q(representation__actor_id=identity.pk) | Q(representation__subject_id=identity.pk)
+                | Q(representation__recipient_id=identity.pk)
+            )
+            scope_ids = set(personal_versions.values_list("scope_id", flat=True))
+            scope_ids.update(GroupMembership.objects.filter(identity=identity).values_list("group__scope_id", flat=True))
+            scope_ids.add(identity.scope_id)
+            scopes = list(SyncScope.objects.select_for_update().filter(pk__in=scope_ids).order_by("id"))
+            for scope in scopes:
+                largest = personal_versions.filter(scope=scope).order_by("-revision").values_list("revision", flat=True).first()
+                if largest is not None:
+                    scope.retention_floor = max(scope.retention_floor, largest)
+                    scope.save(update_fields=["retention_floor"])
+            personal_versions.delete()
+            GroupActivity.objects.filter(Q(actor=identity) | Q(subject=identity) | Q(recipient=identity)).delete()
+            AlarmActivity.objects.filter(identity=identity).delete()
+            AlarmOccurrence.objects.filter(identity=identity).delete()
+            AlarmDelivery.objects.filter(identity=identity).delete()
+            GroupInvitation.objects.filter(Q(created_by=identity) | Q(consumed_by=identity)).delete()
+            GroupMembership.objects.filter(identity=identity).delete()
+            OperationReceipt.objects.filter(identity=identity).delete()
+            PushSubscription.objects.filter(identity=identity).delete()
+            SharedSoundEntitlement.objects.filter(identity=identity).delete()
+            DeliveryWork.objects.filter(payload__identity_id=identity.pk).delete()
+            Group.objects.filter(created_by=identity).update(created_by=None)
+            SharedAlarm.objects.filter(created_by=identity).update(created_by=None)
+            SharedAlarm.objects.filter(updated_by=identity).update(updated_by=None)
+            SharedTimer.objects.filter(started_by=identity).update(started_by=None)
+            SharedSound.objects.filter(uploaded_by=identity).update(uploaded_by=None)
             identity.name, identity.token_hash, identity.time_zone = "Removed member", b"", "UTC"
-            identity.save(update_fields=["name", "token_hash", "time_zone"])
-            SyncVersion.objects.filter(scope_id=identity.scope_id).delete()
+            identity.last_seen_at, identity.purged_at = identity.retired_at, now
+            identity.save(update_fields=["name", "token_hash", "time_zone", "last_seen_at", "purged_at"])
     WorkerHeartbeat.objects.filter(progressed_at__lt=now - timedelta(days=1)).delete()
 
 

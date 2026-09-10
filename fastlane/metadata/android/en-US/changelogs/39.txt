@@ -1,0 +1,6 @@
+Updated privacy and profile-deletion features to support Google Play requirements.
+
+- Added an in-app privacy policy link and detailed data-use and retention disclosures.
+- Clarified Reset identity and improved cleanup of profile details and personal history.
+- Added instructions for requesting profile deletion without the app.
+- Added dedicated reviewer access while keeping shared sounds restricted to eligible profiles.

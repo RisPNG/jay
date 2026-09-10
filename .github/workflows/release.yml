@@ -61,6 +61,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version_name=$(awk -F= '$1 == "jayVersionName" { print $2 }' gradle.properties)
+          version_code=$(awk -F= '$1 == "jayVersionCode" { print $2 }' gradle.properties)
           commit_subject=$(git log -1 --pretty=%s)
           release_title=$(printf '%s\n' "$commit_subject" | awk '{ print $1, $2 }')
           apk_name="jay-${version_name}.apk"
@@ -72,6 +73,7 @@ jobs:
           gh release create "v${version_name}" "$apk_name" "$debug_apk_name" "$bundle_name" \
             --target "$GITHUB_SHA" \
             --title "$release_title" \
+            --notes-file "fastlane/metadata/android/en-US/changelogs/${version_code}.txt" \
             --generate-notes \
             --latest
 

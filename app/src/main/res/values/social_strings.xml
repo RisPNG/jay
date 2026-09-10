@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="privacy_policy_summary">How Jay handles your data</string>
     <string name="shared_alarm_activity">Shared alarm activity</string>
     <string name="member_alarm_activity">%1$s %2$s “%3$s”</string>
     <string name="member_unnamed_alarm_activity">%1$s %2$s a shared alarm</string>
@@ -119,8 +121,8 @@
     <string name="share_profile">Share Jay profile</string>
     <string name="answer_as_one">Answer as one</string>
     <string name="reset_identity">Reset identity</string>
-    <string name="reset_identity_summary">Leave every group and start over as a new device</string>
-    <string name="reset_identity_confirmation">Leave every group and delete the groups only you lead, together with their shared alarms? You will start over with a brand-new identity. This can\'t be undone.</string>
+    <string name="reset_identity_summary">Delete this profile, leave its groups and start with a new profile</string>
+    <string name="reset_identity_confirmation">Delete this profile and leave every group? Groups where you are the only leader will be deleted with their shared alarms, timers and sounds, even if other members remain. Groups with another leader keep their shared content. Profile details and personal history are cleaned up after 30 days. Your personal clocks stay, and you start with a new profile. This can\'t be undone.</string>
     <string name="reset_identity_confirm">Reset</string>
     <string name="clock_you_attribution">Jay is based on Clock You by You Apps and remains available under GPLv3.</string>
     <string name="jay_version">Jay version</string>
