@@ -270,7 +270,7 @@ fun AlarmScreen(
                 }
                 Box(Modifier.weight(1f)) {
                     if (alarms.isEmpty()) {
-                        BlobIconBox(icon = R.drawable.ic_notification)
+                        BlobIconBox(icon = R.drawable.ic_alarm)
                     }
                     LazyColumn(Modifier.fillMaxSize()) {
                         items(
