@@ -34,7 +34,7 @@ class SharedSoundWorker(context: Context, parameters: WorkerParameters) : Corout
         val identity = DeviceIdentityStore.loadOrCreate(applicationContext, server)
         val configured = Preferences.instance.getString(SocialPreferences.serverUrlKey, SocialRepository.DEFAULT_SERVER_URL)
         if (configured != server || identity.id != inputData.getString("identity")) return@withContext Result.success()
-        val api = SocialApi(server, identity)
+        val api = SocialApi(server, identity, PlayInstallationStore.credential(applicationContext, server))
         val repository = (applicationContext as App).container.socialRepository
         val dao = SocialDatabase.getDatabase(applicationContext).socialDao()
         val operationId = inputData.getString("operation_id")

@@ -2,7 +2,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .errors import DomainError
-from .models import Group, GroupMembership, SharedSoundEntitlement, SharedSound, SoundMode
+from .models import Group, GroupMembership, PlayInstallation, ProfileSoundGrant, SharedSound, SoundMode
 
 
 def require_membership(group, identity, generation=None, leader=False, editor=False):
@@ -23,21 +23,21 @@ def require_membership(group, identity, generation=None, leader=False, editor=Fa
     return member
 
 
-def identity_capabilities(identity):
-    if settings.SHARED_SOUND_ACCESS == "everyone":
+def identity_capabilities(identity, installation=None):
+    if settings.SHARED_SOUND_ACCESS == "everyone" or ProfileSoundGrant.objects.filter(identity=identity).exists():
         return {"shared_sound_upload": True, "requires_play_entitlement": False, "expires_at": None}
-    entitlement = SharedSoundEntitlement.objects.filter(identity=identity).first()
+    entitlement = PlayInstallation.objects.filter(pk=installation).first() if installation else None
     return {
-        "shared_sound_upload": entitlement is not None and (entitlement.expires_at is None or entitlement.expires_at > timezone.now()),
-        "requires_play_entitlement": entitlement is None or entitlement.source == SharedSoundEntitlement.Source.PLAY,
-        "expires_at": entitlement.expires_at.isoformat() if entitlement and entitlement.expires_at else None,
+        "shared_sound_upload": entitlement is not None and entitlement.expires_at > timezone.now(),
+        "requires_play_entitlement": True,
+        "expires_at": entitlement.expires_at.isoformat() if entitlement else None,
     }
 
 
-def select_shared_sound(group, identity, selection, current_sound_id=None):
+def select_shared_sound(group, identity, selection, current_sound_id=None, installation=None):
     if selection["mode"] != SoundMode.SHARED:
         return None
-    if selection["sound_id"] != current_sound_id and not identity_capabilities(identity)["shared_sound_upload"]:
+    if selection["sound_id"] != current_sound_id and not identity_capabilities(identity, installation)["shared_sound_upload"]:
         raise DomainError("entitlement_required", "A current Play entitlement is required", 403)
     sound = SharedSound.objects.filter(pk=selection["sound_id"], group=group).first()
     if sound is None and selection.get("title"):

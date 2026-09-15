@@ -14,10 +14,6 @@ jobs:
     env:
       ORG_GRADLE_PROJECT_jayFirebaseProjectId: ${{ secrets.FIREBASE_PROJECT_ID }}
       ORG_GRADLE_PROJECT_jayFirebaseApiKey: ${{ secrets.FIREBASE_API_KEY }}
-      ORG_GRADLE_PROJECT_jayFirebaseDebugApplicationId: ${{ secrets.FIREBASE_DEBUG_APPLICATION_ID }}
-      ORG_GRADLE_PROJECT_jaySigningStorePassword: ${{ secrets.PRERELEASE_KEYSTORE_PASSWORD }}
-      ORG_GRADLE_PROJECT_jaySigningKeyAlias: ${{ secrets.PRERELEASE_KEY_ALIAS }}
-      ORG_GRADLE_PROJECT_jaySigningKeyPassword: ${{ secrets.PRERELEASE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,8 +33,14 @@ jobs:
           prerelease_version="${version_name}-pre.r${padded_run}.g${short_sha}"
           printf 'VERSION_CODE=%s\n' "$version_code" >> "$GITHUB_ENV"
           printf 'PRERELEASE_VERSION=%s\n' "$prerelease_version" >> "$GITHUB_ENV"
-          printf 'ARTIFACT_NAME=jay-%s.apk\n' "$prerelease_version" >> "$GITHUB_ENV"
           printf 'RELEASE_TITLE=%s\n' "$short_sha" >> "$GITHUB_ENV"
+
+      - name: Restore production signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.PRODUCTION_KEYSTORE_BASE64 }}
+        run: |
+          keystore_path="$RUNNER_TEMP/jay-production.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
 
       - name: Restore prerelease signing key
         env:
@@ -46,11 +48,30 @@ jobs:
         run: |
           keystore_path="$RUNNER_TEMP/jay-prerelease.jks"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
-          printf 'ORG_GRADLE_PROJECT_jaySigningStoreFile=%s\n' "$keystore_path" >> "$GITHUB_ENV"
 
-      - name: Test and build
+      - name: Test and build release APKs
+        env:
+          ORG_GRADLE_PROJECT_jayFirebaseLiteApplicationId: ${{ secrets.FIREBASE_LITE_APPLICATION_ID }}
+          ORG_GRADLE_PROJECT_jayFirebaseReleaseApplicationId: ${{ secrets.FIREBASE_RELEASE_APPLICATION_ID }}
+          ORG_GRADLE_PROJECT_jaySigningStoreFile: ${{ runner.temp }}/jay-production.jks
+          ORG_GRADLE_PROJECT_jaySigningStorePassword: ${{ secrets.PRODUCTION_KEYSTORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_jaySigningKeyAlias: ${{ secrets.PRODUCTION_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_jaySigningKeyPassword: ${{ secrets.PRODUCTION_KEY_PASSWORD }}
         run: |
-          ./gradlew testDebugUnitTest assembleDebug \
+          ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest assembleFullRelease assembleLiteRelease \
+            -PjayVersionCode="$VERSION_CODE" \
+            -PjayVersionName="$PRERELEASE_VERSION" \
+            --no-daemon
+
+      - name: Build debug APK
+        env:
+          ORG_GRADLE_PROJECT_jayFirebaseDebugApplicationId: ${{ secrets.FIREBASE_DEBUG_APPLICATION_ID }}
+          ORG_GRADLE_PROJECT_jaySigningStoreFile: ${{ runner.temp }}/jay-prerelease.jks
+          ORG_GRADLE_PROJECT_jaySigningStorePassword: ${{ secrets.PRERELEASE_KEYSTORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_jaySigningKeyAlias: ${{ secrets.PRERELEASE_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_jaySigningKeyPassword: ${{ secrets.PRERELEASE_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleFullDebug \
             -PjayVersionCode="$VERSION_CODE" \
             -PjayVersionName="$PRERELEASE_VERSION" \
             --no-daemon
@@ -61,8 +82,13 @@ jobs:
         run: |
           commit_message=$(git log -1 --pretty=%B)
           release_notes=$(printf 'Automated prerelease for commit %s.\n\n%s\n' "$GITHUB_SHA" "$commit_message")
-          cp app/build/outputs/apk/debug/app-debug.apk "$ARTIFACT_NAME"
-          gh release create "v${PRERELEASE_VERSION}" "$ARTIFACT_NAME" \
+          apk_name="jay-${PRERELEASE_VERSION}.apk"
+          debug_apk_name="jay-${PRERELEASE_VERSION}-debug.apk"
+          lite_apk_name="jay-lite-${PRERELEASE_VERSION}.apk"
+          cp app/build/outputs/apk/full/release/app-full-release.apk "$apk_name"
+          cp app/build/outputs/apk/full/debug/app-full-debug.apk "$debug_apk_name"
+          cp app/build/outputs/apk/lite/release/app-lite-release.apk "$lite_apk_name"
+          gh release create "v${PRERELEASE_VERSION}" "$apk_name" "$debug_apk_name" "$lite_apk_name" \
             --target "$GITHUB_SHA" \
             --title "$RELEASE_TITLE" \
             --notes "$release_notes" \

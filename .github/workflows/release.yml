@@ -40,12 +40,13 @@ jobs:
 
       - name: Test and build release
         env:
+          ORG_GRADLE_PROJECT_jayFirebaseLiteApplicationId: ${{ secrets.FIREBASE_LITE_APPLICATION_ID }}
           ORG_GRADLE_PROJECT_jayFirebaseReleaseApplicationId: ${{ secrets.FIREBASE_RELEASE_APPLICATION_ID }}
           ORG_GRADLE_PROJECT_jaySigningStoreFile: ${{ runner.temp }}/jay-production.jks
           ORG_GRADLE_PROJECT_jaySigningStorePassword: ${{ secrets.PRODUCTION_KEYSTORE_PASSWORD }}
           ORG_GRADLE_PROJECT_jaySigningKeyAlias: ${{ secrets.PRODUCTION_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_jaySigningKeyPassword: ${{ secrets.PRODUCTION_KEY_PASSWORD }}
-        run: ./gradlew testDebugUnitTest assembleRelease bundleRelease --no-daemon
+        run: ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest assembleFullRelease bundleFullRelease assembleLiteRelease bundleLiteRelease --no-daemon
 
       - name: Build debug APK
         env:
@@ -54,7 +55,7 @@ jobs:
           ORG_GRADLE_PROJECT_jaySigningStorePassword: ${{ secrets.PRERELEASE_KEYSTORE_PASSWORD }}
           ORG_GRADLE_PROJECT_jaySigningKeyAlias: ${{ secrets.PRERELEASE_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_jaySigningKeyPassword: ${{ secrets.PRERELEASE_KEY_PASSWORD }}
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleFullDebug --no-daemon
 
       - name: Read previous releases
         env:
@@ -74,10 +75,14 @@ jobs:
           apk_name="jay-${version_name}.apk"
           debug_apk_name="jay-${version_name}-debug.apk"
           bundle_name="jay-${version_name}.aab"
-          cp app/build/outputs/apk/release/app-release.apk "$apk_name"
-          cp app/build/outputs/apk/debug/app-debug.apk "$debug_apk_name"
-          cp app/build/outputs/bundle/release/app-release.aab "$bundle_name"
-          gh release create "v${version_name}" "$apk_name" "$debug_apk_name" "$bundle_name" \
+          cp app/build/outputs/apk/full/release/app-full-release.apk "$apk_name"
+          cp app/build/outputs/apk/full/debug/app-full-debug.apk "$debug_apk_name"
+          cp app/build/outputs/bundle/fullRelease/app-full-release.aab "$bundle_name"
+          lite_apk_name="jay-lite-${version_name}.apk"
+          lite_bundle_name="jay-lite-${version_name}.aab"
+          cp app/build/outputs/apk/lite/release/app-lite-release.apk "$lite_apk_name"
+          cp app/build/outputs/bundle/liteRelease/app-lite-release.aab "$lite_bundle_name"
+          gh release create "v${version_name}" "$apk_name" "$debug_apk_name" "$bundle_name" "$lite_apk_name" "$lite_bundle_name" \
             --target "$GITHUB_SHA" \
             --title "$release_title" \
             --notes-file "fastlane/metadata/android/en-US/changelogs/${version_code}.txt" \

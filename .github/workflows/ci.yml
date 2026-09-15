@@ -42,4 +42,4 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Test and compile
-        run: ./gradlew testDebugUnitTest assembleDebug compileReleaseKotlin --no-daemon
+        run: ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest assembleFullDebug compileFullReleaseKotlin compileLiteReleaseKotlin --no-daemon

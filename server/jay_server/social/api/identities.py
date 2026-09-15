@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from ..access import identity_capabilities
 from ..errors import DomainError
 from ..identities import retire_identity
-from ..models import DeliveryWork, GroupMembership, Identity, SharedSoundEntitlement, PushSubscription, SyncScope
+from ..models import DeliveryWork, GroupMembership, Identity, PlayInstallation, PushSubscription, SyncScope
 from ..synchronization import publish_changes, synchronize_scope
 from ..transactions import accept_saved_state, mutation
 from .representations import ScopeSyncRepresentation, IdentityRepresentation, MembershipRepresentation
@@ -100,7 +100,7 @@ class PushSubscriptionView(APIView):
 class CapabilitiesView(APIView):
     @extend_schema(responses={200: {"type": "object", "properties": {"shared_sound_upload": {"type": "boolean"}, "requires_play_entitlement": {"type": "boolean"}, "expires_at": {"type": "string", "format": "date-time", "nullable": True}}, "required": ["shared_sound_upload", "requires_play_entitlement", "expires_at"]}})
     def get(self, request):
-        return Response(identity_capabilities(request.user))
+        return Response(identity_capabilities(request.user, request.auth))
 
 
 class EntitlementView(APIView):
@@ -110,23 +110,24 @@ class EntitlementView(APIView):
 
         serializer = EntitlementRequest(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if not identity_capabilities(request.user)["requires_play_entitlement"]:
-            return Response(identity_capabilities(request.user))
-        with mutation(request, serializer.validated_data, reserve=True) as receipt:
+        if not identity_capabilities(request.user, request.auth)["requires_play_entitlement"]:
+            return Response(identity_capabilities(request.user, request.auth))
+        if request.auth is None:
+            raise DomainError("installation_required", "A Play installation credential is required", 400)
+        data = {**serializer.validated_data, "installation": request.auth}
+        with mutation(request, data, reserve=True) as receipt:
             if receipt.completed_at:
-                return Response(receipt.response, status=receipt.status)
-        licensed = verify_play_entitlement(serializer.validated_data["integrity_token"], request.user.pk)
-        with mutation(request, serializer.validated_data, [request.user.scope_id]) as receipt:
+                return Response(identity_capabilities(request.user, request.auth))
+        licensed = verify_play_entitlement(serializer.validated_data["integrity_token"], request.user.pk, request.auth)
+        with mutation(request, data) as receipt:
             if receipt.completed_at:
-                return Response(receipt.response, status=receipt.status)
-            if identity_capabilities(request.user)["requires_play_entitlement"]:
-                if licensed:
-                    SharedSoundEntitlement.objects.update_or_create(identity=request.user, defaults={"source": SharedSoundEntitlement.Source.PLAY, "granted_at": timezone.now(), "expires_at": timezone.now() + timedelta(hours=settings.PLAY_ENTITLEMENT_LIFETIME_HOURS)})
-                else:
-                    SharedSoundEntitlement.objects.filter(identity=request.user, source=SharedSoundEntitlement.Source.PLAY).delete()
-            receipt.status, receipt.response = 200, identity_capabilities(request.user)
-            publish_changes(request.user.scope_id, [("capabilities", request.user.pk, "upsert", receipt.response, None)])
-        return Response(receipt.response)
+                return Response(identity_capabilities(request.user, request.auth))
+            if licensed:
+                PlayInstallation.objects.update_or_create(credential_hash=request.auth, defaults={"verified_at": timezone.now(), "expires_at": timezone.now() + timedelta(hours=settings.PLAY_ENTITLEMENT_LIFETIME_HOURS)})
+            else:
+                PlayInstallation.objects.filter(pk=request.auth).update(expires_at=timezone.now())
+            receipt.status, receipt.response = 200, identity_capabilities(request.user, request.auth)
+        return Response(identity_capabilities(request.user, request.auth))
 
 
 class IdentitySyncView(APIView):

@@ -5,7 +5,7 @@ import pytest
 from django.test import override_settings
 from django.utils import timezone
 
-from jay_server.social.models import DeliveryWork, GroupMembership, Identity, SharedSoundEntitlement, SharedAlarm, SharedSound
+from jay_server.social.models import DeliveryWork, GroupMembership, Identity, ProfileSoundGrant, SharedAlarm, SharedSound
 
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -16,13 +16,13 @@ def test_sound_entitlement_and_unrelated_alarm_edit(client, group, alarm_payload
     alarm_payload["sound"] = {"mode": "shared", "sound_id": str(sound_id), "title": "Birds"}
     denied = client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())})
     assert denied.status_code == 403
-    SharedSoundEntitlement.objects.create(identity=Identity.objects.get(pk="1" * 64), expires_at=timezone.now() + timedelta(days=1))
+    ProfileSoundGrant.objects.create(identity=Identity.objects.get(pk="1" * 64))
     created = client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())})
     assert created.status_code == 201, created.data
     sound = SharedSound.objects.get(pk=sound_id)
     assert sound.status == "pending"
     assert sound.sha256 is None
-    SharedSoundEntitlement.objects.all().delete()
+    ProfileSoundGrant.objects.all().delete()
     alarm_id = alarm_payload.pop("id")
     alarm_payload.pop("group_id")
     changed = client.put(f"/v1/alarms/{alarm_id}", {**alarm_payload, "label": "Later", "saved_at": timezone.now().isoformat()}, format="json", headers={"Idempotency-Key": str(uuid4())})
@@ -40,7 +40,7 @@ def test_upload_metadata_is_immutable_and_completion_is_queued(client, group):
     assert changed.status_code == 409
     key = str(uuid4())
     for _ in range(2):
-        completed = client.post(f"/v1/sounds/{payload['id']}/complete", headers={"Idempotency-Key": key})
+        completed = client.post(f"/v1/sounds/{payload['id']}/complete", headers={"Idempotency-Key": key, "X-Jay-Installation": "paid-installation"})
         assert completed.status_code == 202, completed.data
     assert DeliveryWork.objects.filter(kind="verify").count() == 1
     assert client.get(f"/v1/sounds/{payload['id']}/download").status_code == 404
@@ -59,11 +59,11 @@ def test_entitlement_replay_does_not_call_provider_again(client, monkeypatch):
     from jay_server.social import providers
 
     calls = []
-    def verify(token, identity):
+    def verify(token, identity, installation):
         calls.append((token, identity))
         return True
     monkeypatch.setattr(providers, "verify_play_entitlement", verify)
-    headers = {"Idempotency-Key": str(uuid4())}
+    headers = {"Idempotency-Key": str(uuid4()), "X-Jay-Installation": "paid-installation"}
     first = client.post("/v1/identity/play-entitlement", {"integrity_token": "verified"}, format="json", headers=headers)
     second = client.post("/v1/identity/play-entitlement", {"integrity_token": "verified"}, format="json", headers=headers)
     assert first.status_code == second.status_code == 200

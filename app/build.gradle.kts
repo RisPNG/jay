@@ -86,15 +86,32 @@ android {
 
     }
 
-    buildTypes {
-        release {
-            signingConfigs.findByName("jay")?.let { signingConfig = it }
+    flavorDimensions += "edition"
+    productFlavors {
+        create("full") {
+            dimension = "edition"
             buildConfigField("boolean", "JAY_PLAY_ENTITLEMENT_ELIGIBLE", "true")
             buildConfigField(
                 "String",
                 "JAY_FIREBASE_APPLICATION_ID",
                 "\"${providers.gradleProperty("jayFirebaseReleaseApplicationId").orElse("").get()}\""
             )
+        }
+        create("lite") {
+            dimension = "edition"
+            applicationIdSuffix = ".lite"
+            buildConfigField("boolean", "JAY_PLAY_ENTITLEMENT_ELIGIBLE", "false")
+            buildConfigField(
+                "String",
+                "JAY_FIREBASE_APPLICATION_ID",
+                "\"${providers.gradleProperty("jayFirebaseLiteApplicationId").orElse("").get()}\""
+            )
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfigs.findByName("jay")?.let { signingConfig = it }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -183,4 +200,10 @@ dependencies {
     implementation(libs.play.integrity)
 
     implementation(libs.kotlinx.serialization.json)
+}
+
+androidComponents {
+    beforeVariants(selector().withFlavor("edition" to "lite").withBuildType("debug")) {
+        it.enable = false
+    }
 }

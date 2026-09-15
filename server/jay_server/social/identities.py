@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.utils import timezone
 
-from .models import DeliveryWork, Identity, PushSubscription, SharedSoundEntitlement
+from .models import DeliveryWork, Identity, PushSubscription, ProfileSoundGrant
 
 
 def retire_identity(identity):
@@ -12,7 +12,7 @@ def retire_identity(identity):
         identity.retired_at = timezone.now()
         identity.save(update_fields=["retired_at"])
         PushSubscription.objects.filter(identity=identity).delete()
-        SharedSoundEntitlement.objects.filter(identity=identity).delete()
+        ProfileSoundGrant.objects.filter(identity=identity).delete()
         DeliveryWork.objects.get_or_create(
             kind="retire", deduplication_key=f"retire:{identity.pk}",
             defaults={"payload": {"identity_id": identity.pk}},

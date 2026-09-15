@@ -21,7 +21,7 @@ from .api.representations import AlarmRepresentation, SoundRepresentation
 from .errors import DomainError
 from .groups import publish_membership, remove_membership
 from .identities import retire_identity
-from .models import AlarmActivity, AlarmDelivery, AlarmOccurrence, DeliveryWork, Group, GroupActivity, GroupInvitation, GroupMembership, Identity, OperationReceipt, PushSubscription, SharedAlarm, SharedSound, SharedSoundEntitlement, SharedTimer, SyncScope, SyncVersion, WorkerHeartbeat
+from .models import AlarmActivity, AlarmDelivery, AlarmOccurrence, DeliveryWork, Group, GroupActivity, GroupInvitation, GroupMembership, Identity, OperationReceipt, PushSubscription, SharedAlarm, SharedSound, ProfileSoundGrant, SharedTimer, SyncScope, SyncVersion, WorkerHeartbeat
 from .providers import object_storage_client, validate_sound_object
 from .synchronization import publish_changes
 
@@ -152,7 +152,7 @@ def process_sound_verification(work, owner, stopping=None):
             if sound.uploaded_by is None or sound.uploaded_by.retired_at:
                 raise DomainError("uploader_removed", "Uploader is no longer active", 403)
             require_membership(sound.group, sound.uploaded_by, editor=True)
-            if not identity_capabilities(sound.uploaded_by)["shared_sound_upload"]:
+            if not identity_capabilities(sound.uploaded_by, sound.installation_id)["shared_sound_upload"]:
                 raise DomainError("entitlement_required", "Entitlement expired", 403)
         except DomainError as error:
             failure = error.domain_code
@@ -210,11 +210,11 @@ def process_identity_retirement(work):
 def maintain_state():
     now = timezone.now()
     if settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS:
-        stale = Identity.objects.filter(retired_at=None, last_seen_at__lt=now - timedelta(days=settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS)).exclude(sharedsoundentitlement__source=SharedSoundEntitlement.Source.OPERATOR).order_by("last_seen_at")[:50]
+        stale = Identity.objects.filter(retired_at=None, last_seen_at__lt=now - timedelta(days=settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS)).exclude(profilesoundgrant__isnull=False).order_by("last_seen_at")[:50]
         for identity in stale:
             with transaction.atomic():
                 identity = Identity.objects.select_for_update().get(pk=identity.pk)
-                if identity.retired_at or identity.last_seen_at >= now - timedelta(days=settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS) or SharedSoundEntitlement.objects.filter(identity=identity, source=SharedSoundEntitlement.Source.OPERATOR).exists():
+                if identity.retired_at or identity.last_seen_at >= now - timedelta(days=settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS) or ProfileSoundGrant.objects.filter(identity=identity).exists():
                     continue
                 retire_identity(identity)
     for timer in SharedTimer.objects.select_related("group").filter(deleted_at=None, expires_at__lt=now - timedelta(minutes=15))[:50]:
@@ -302,7 +302,7 @@ def maintain_state():
             GroupMembership.objects.filter(identity=identity).delete()
             OperationReceipt.objects.filter(identity=identity).delete()
             PushSubscription.objects.filter(identity=identity).delete()
-            SharedSoundEntitlement.objects.filter(identity=identity).delete()
+            ProfileSoundGrant.objects.filter(identity=identity).delete()
             DeliveryWork.objects.filter(payload__identity_id=identity.pk).delete()
             Group.objects.filter(created_by=identity).update(created_by=None)
             SharedAlarm.objects.filter(created_by=identity).update(created_by=None)

@@ -31,20 +31,12 @@ class PushSubscription(models.Model):
     updated_at = models.DateTimeField(default=timezone.now)
 
 
-class SharedSoundEntitlement(models.Model):
-    class Source(models.TextChoices):
-        PLAY = "play"
-        OPERATOR = "operator"
-
+class ProfileSoundGrant(models.Model):
     identity = models.OneToOneField(Identity, primary_key=True, on_delete=models.CASCADE)
-    source = models.CharField(max_length=8, choices=Source.choices, default=Source.PLAY)
     granted_at = models.DateTimeField(default=timezone.now)
-    expires_at = models.DateTimeField(null=True)
 
-    class Meta:
-        constraints = [
-            models.CheckConstraint(
-                condition=models.Q(source="play", expires_at__isnull=False) | models.Q(source="operator", expires_at__isnull=True),
-                name="sound_entitlement_expiry_valid",
-            ),
-        ]
+
+class PlayInstallation(models.Model):
+    credential_hash = models.CharField(primary_key=True, max_length=64)
+    verified_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()

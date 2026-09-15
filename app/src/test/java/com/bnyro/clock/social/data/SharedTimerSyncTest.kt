@@ -29,6 +29,7 @@ class SharedTimerSyncTest {
     @Test
     fun restartingADismissedRunReturnsItAndRejectedStartsRemainDurablyRecoverable() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Application>()
+        shadowOf(context.packageManager).setInstallSourceInfo(context.packageName, null, null)
         Preferences.init(context)
         Preferences.instance.edit().clear().commit()
         var expiresAt = System.currentTimeMillis() + 600_000L

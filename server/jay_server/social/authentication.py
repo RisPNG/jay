@@ -24,7 +24,9 @@ def authenticate_identity(authorization, identity_id):
 
 class IdentityAuthentication(BaseAuthentication):
     def authenticate(self, request):
-        return authenticate_identity(request.headers.get("Authorization", ""), request.headers.get("X-Jay-Identity-ID", "")), None
+        credential = request.headers.get("X-Jay-Installation", "")
+        installation = hashlib.sha256(credential.encode()).hexdigest() if credential else None
+        return authenticate_identity(request.headers.get("Authorization", ""), request.headers.get("X-Jay-Identity-ID", "")), installation
 
     def authenticate_header(self, request):
         return "Bearer"

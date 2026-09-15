@@ -6,12 +6,12 @@ Shared sounds need storage and delivery. On the default Jay's hosted service, Th
 
 | Value | What it means |
 | --- | --- |
-| `play` | Uploading and choosing a shared sound requires verified Play access or an operator grant for that profile. This is the default. |
+| `play` | Uploading and choosing a shared sound requires a verified paid Play installation or an operator grant for the current profile. This is the default. |
 | `everyone` | Every authenticated device can upload and choose shared sounds without a purchase or an expiry. Group editing permissions still apply. |
 
 ## What the rest of the group gets
 
-On a server using `play`, ordinary profiles need Play access only for uploading and selecting distributed sounds. People using the free GitHub APK can still join groups, choose their device's default sound or silence, and receive and play sounds selected by someone with access.
+On a server using `play`, ordinary profiles need Play access only for uploading and selecting distributed sounds. People using Jay Lite, Debug or the free GitHub APK can still join groups, choose their device's default sound or silence, and receive and play sounds selected by someone with access.
 
 For example, one member can choose an audio file for a shared alarm and everyone in the group can hear it. They do not all need to buy the app for that to work. Changing something unrelated, such as the alarm's label, also keeps the selected sound in place.
 
@@ -23,28 +23,32 @@ For playback, Android decodes each shared sound once and stores a lossless PCM/W
 
 The app gets the device's effective capabilities through authenticated synchronisation and `/v1/identity/capabilities`. It stores the result for that server and identity, so a grant from one server or profile cannot be reused by another.
 
-On an `everyone` server, shared-sound access has no expiry and the app skips Play verification. Debug and prerelease builds get their access through normal synchronisation too; this does not require a special APK.
+On an `everyone` server, shared-sound access has no expiry and the app skips Play verification. Lite, Debug and prerelease builds get their access through normal synchronisation too; this does not require a special APK.
 
-On a `play` server, production builds refresh Play access immediately and every 24 hours when a connection is available. A successful verification grants access for 48 hours by default, controlled by `PLAY_ENTITLEMENT_LIFETIME_HOURS`. The API reports whether the device can upload through `shared_sound_upload`.
+On a `play` server, the full release installed through Google Play refreshes purchased access immediately and every 24 hours when a connection is available. A successful verification grants that installation access for 48 hours by default, controlled by `PLAY_ENTITLEMENT_LIFETIME_HOURS`. Lite, Debug and sideloaded installations do not request or send purchased access credentials. The API reports the requesting installation's effective access through `shared_sound_upload`.
 
-`SharedSoundEntitlement` records the profile's access source and grant time. Play grants have an expiry; operator grants do not. An operator grant reports `requires_play_entitlement=false`, so the app uses it without requesting a Play Integrity token. An in-flight Play verification cannot replace or remove an operator grant. Both sources use the same sound selection, upload and worker authorization checks, including group editing permissions.
+`PlayInstallation` records verified installation credentials and their expiry independently of profiles. Android generates a private random credential for each server and keeps it in app storage excluded from backup and profile export. Authenticated requests carry it in `X-Jay-Installation`. Importing or resetting a profile leaves the installation credential in place; a profile imported into another installation does not carry it. Cached capabilities are bound to the server, profile and installation credential. Purchased capabilities are never published into a profile's shared synchronization history.
 
-The `grant_sound_access` management command grants or revokes operator access and publishes the updated capabilities through normal synchronization. It accepts an existing identity ID or prompts for an exported profile link. Operator-granted profiles are excluded from inactivity cleanup so their access remains reusable between reviews. Explicit profile deletion still retires them. Revoking an operator grant restores normal Play verification and inactivity cleanup; it does not restore a previously replaced Play grant.
+`ProfileSoundGrant` records operator overrides without an expiry. A granted profile can upload and select sounds in Full, Lite, Debug and GitHub installations. It reports `requires_play_entitlement=false`, so the app skips Play verification. Purchase verification never replaces or removes an operator grant. Both access sources use the same sound selection, upload and worker authorization checks, including group editing permissions.
+
+The `grant_sound_access` management command grants or revokes operator access and publishes the updated profile capabilities through normal synchronization. It accepts an existing identity ID or prompts for an exported profile link. Granted profiles are excluded from inactivity cleanup; explicit profile deletion still retires them. Revoking an operator grant does not revoke an independently verified paid installation.
+
+For example, the same profile can select audio in paid Jay and then edit the alarm's label in Lite. Lite preserves and plays the selected audio but cannot select another shared sound. Granting an operator override to that profile enables sound selection in both editions.
 
 Changing the server setting back to `play` restores the server-side checks immediately. The app learns about it on its next sync or refresh, but an old cached grant cannot get an upload past the server. Sounds already selected remain playable, and unrelated edits preserve them.
 
 ## What Play verification checks
 
-The production app requests a Standard Play Integrity token with a request hash tied to its Jay device identity. The authenticated API sends that token to Google and checks:
+The production app requests a Standard Play Integrity token with a request hash tied to its Jay identity and private installation credential hash. The authenticated API sends that token to Google and checks:
 
 - the request package is `com.rispng.jay`;
-- the request hash matches the authenticated device;
+- the request hash matches the authenticated identity and the installation credential on the request;
 - the request is no more than five minutes old and no more than one minute in the future;
 - the app recognition verdict is `PLAY_RECOGNIZED`;
 - the app licensing verdict is `LICENSED`;
 - the recognised package is `com.rispng.jay`.
 
-If those checks pass, the server stores the entitlement for that device. Access comes from this server verification rather than a separate paid feature flag in the APK.
+If those checks pass, the server grants access to that installation credential. Access comes from this server verification rather than a separate paid feature flag in the APK.
 
 ## Where Firebase fits
 

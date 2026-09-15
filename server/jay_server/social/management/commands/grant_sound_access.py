@@ -9,7 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from ...access import identity_capabilities
-from ...models import Identity, SharedSoundEntitlement, SyncScope
+from ...models import Identity, ProfileSoundGrant, SyncScope
 from ...synchronization import publish_changes
 
 
@@ -39,11 +39,11 @@ class Command(BaseCommand):
                 raise CommandError("Active profile not found. Open Jay and synchronize this profile with this server first.")
             SyncScope.objects.select_for_update().get(pk=identity.scope_id)
             if options["revoke"]:
-                SharedSoundEntitlement.objects.filter(identity=identity, source=SharedSoundEntitlement.Source.OPERATOR).delete()
+                ProfileSoundGrant.objects.filter(identity=identity).delete()
             else:
-                SharedSoundEntitlement.objects.update_or_create(
+                ProfileSoundGrant.objects.update_or_create(
                     identity=identity,
-                    defaults={"source": SharedSoundEntitlement.Source.OPERATOR, "granted_at": timezone.now(), "expires_at": None},
+                    defaults={"granted_at": timezone.now()},
                 )
             publish_changes(identity.scope_id, [("capabilities", identity.pk, "upsert", identity_capabilities(identity), None)])
         action = "Revoked" if options["revoke"] else "Granted"

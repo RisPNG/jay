@@ -26,7 +26,7 @@ class TimerListView(APIView):
                 return Response(receipt.response, status=receipt.status)
             data.pop("membership_id")
             selection = data.pop("sound")
-            sound = select_shared_sound(group, request.user, selection)
+            sound = select_shared_sound(group, request.user, selection, installation=request.auth)
             timer = SharedTimer.objects.create(**data, group=group, sound=sound, sound_mode=selection["mode"], started_by=request.user, save_id=receipt.operation_id)
             changes = [("timer", str(timer.pk), "upsert", TimerRepresentation(timer).data, None)]
             if sound:
@@ -51,7 +51,7 @@ class TimerView(APIView):
             accept_saved_state(timer, data.pop("saved_at"), receipt.operation_id, TimerRepresentation(timer).data)
             data.pop("membership_id")
             selection = data.pop("sound")
-            timer.sound = select_shared_sound(timer.group, request.user, selection, timer.sound_id)
+            timer.sound = select_shared_sound(timer.group, request.user, selection, timer.sound_id, installation=request.auth)
             timer.sound_mode = selection["mode"]
             for name, value in data.items():
                 setattr(timer, name, value)

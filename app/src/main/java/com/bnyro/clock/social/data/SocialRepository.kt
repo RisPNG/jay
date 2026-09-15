@@ -116,7 +116,10 @@ class SocialRepository(
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
             if (Preferences.instance.getString(SocialPreferences.capabilitiesServerKey, null) != serverUrl ||
-                Preferences.instance.getString(SocialPreferences.capabilitiesDeviceKey, null) != identity.id
+                Preferences.instance.getString(SocialPreferences.capabilitiesDeviceKey, null) != identity.id ||
+                Preferences.instance.getString(SocialPreferences.capabilitiesInstallationKey, null) != PlayInstallationStore.credential(context, serverUrl)?.let { credential ->
+                    MessageDigest.getInstance("SHA-256").digest(credential.toByteArray()).joinToString("") { "%02x".format(it) }
+                }.orEmpty()
             ) return DeviceCapabilities()
             return Preferences.instance.getString(SocialPreferences.capabilitiesKey, null)
                 ?.let { Json.decodeFromString<DeviceCapabilities>(it) } ?: DeviceCapabilities()
@@ -141,6 +144,9 @@ class SocialRepository(
             putString(SocialPreferences.capabilitiesKey, Json.encodeToString(capabilities))
             putString(SocialPreferences.capabilitiesServerKey, serverUrl)
             putString(SocialPreferences.capabilitiesDeviceKey, deviceId)
+            putString(SocialPreferences.capabilitiesInstallationKey, PlayInstallationStore.credential(context, serverUrl)?.let { credential ->
+                MessageDigest.getInstance("SHA-256").digest(credential.toByteArray()).joinToString("") { "%02x".format(it) }
+            }.orEmpty())
         }
     }
 
@@ -151,7 +157,7 @@ class SocialRepository(
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            val api = SocialApi(serverUrl, identity)
+            val api = SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl))
             if (registeredIdentity != (serverUrl to identity.id)) {
                 api.register()
                 registeredIdentity = serverUrl to identity.id
@@ -486,7 +492,7 @@ class SocialRepository(
             DEFAULT_SERVER_URL
         ) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity).apply {
+        SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl)).apply {
             synchronizationMutex.withLock {
                 if (registeredIdentity != (serverUrl to identity.id)) {
                     register()
@@ -645,7 +651,7 @@ class SocialRepository(
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            val page = SocialApi(serverUrl, identity).getGroupActivity(groupId, before)
+            val page = SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl)).getGroupActivity(groupId, before)
             SocialActivityPage(
                 page.items.map {
                     SocialChange(
@@ -677,7 +683,7 @@ class SocialRepository(
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            val page = SocialApi(serverUrl, identity).getAlarmActivity(alarmId, before)
+            val page = SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl)).getAlarmActivity(alarmId, before)
             SocialActivityPage(
                 page.items.map {
                     SocialChange(
@@ -975,14 +981,16 @@ class SocialRepository(
                 DEFAULT_SERVER_URL
             ) ?: DEFAULT_SERVER_URL
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-            val api = SocialApi(serverUrl, identity)
+            val api = SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl))
             api.register()
             val capabilities = api.deviceCapabilities()
             applyDeviceCapabilities(capabilities, serverUrl, identity.id)
             if (!capabilities.requiresPlayEntitlement) return@withContext
+            val credential = PlayInstallationStore.credential(context, serverUrl) ?: return@withContext
+            val installation = MessageDigest.getInstance("SHA-256").digest(credential.toByteArray()).joinToString("") { "%02x".format(it) }
             val requestHash = Base64.encodeToString(
                 MessageDigest.getInstance("SHA-256").digest(
-                    "jay-play-entitlement:${identity.id}".toByteArray()
+                    "jay-play-entitlement:${identity.id}:$installation".toByteArray()
                 ),
                 Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
             )
@@ -1053,7 +1061,7 @@ class SocialRepository(
         synchronizationMutex.withLock {
             try {
                 val operation = synchronization.saveOperation(identity.id, "identity", identity.id, "DELETE", "/v1/identity", null, null, ordered = false)
-                SocialApi(serverUrl, identity).executeOperation(operation)
+                SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl)).executeOperation(operation)
             } catch (removed: SocialApiException) {
                 if (removed.status != 401) throw removed
             }

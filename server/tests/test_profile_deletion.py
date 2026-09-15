@@ -6,7 +6,7 @@ import pytest
 from django.core.management import call_command
 from django.utils import timezone
 
-from jay_server.social.models import AlarmActivity, AlarmDelivery, AlarmOccurrence, DeliveryWork, GroupActivity, GroupInvitation, GroupMembership, Identity, OperationReceipt, PushSubscription, SharedAlarm, SharedSound, SharedSoundEntitlement, SharedTimer, SyncVersion
+from jay_server.social.models import AlarmActivity, AlarmDelivery, AlarmOccurrence, DeliveryWork, GroupActivity, GroupInvitation, GroupMembership, Identity, OperationReceipt, PushSubscription, SharedAlarm, SharedSound, ProfileSoundGrant, SharedTimer, SyncVersion
 from jay_server.social.worker import maintain_state, process_group_cleanup, process_identity_retirement
 
 
@@ -28,7 +28,7 @@ def test_profile_deletion_removes_personal_history_and_preserves_shared_content(
     GroupActivity.objects.create(group=group, revision=group.scope.head_revision, ordinal=100, entity_type="alarm", entity_id=str(alarm.pk), action="updated", actor_id="2" * 64, actor_label="Bob", group_label=group.name)
     assert client.delete("/v1/identity", headers={"Idempotency-Key": str(uuid4())}).status_code == 204
     assert not PushSubscription.objects.filter(identity=identity).exists()
-    assert not SharedSoundEntitlement.objects.filter(identity=identity).exists()
+    assert not ProfileSoundGrant.objects.filter(identity=identity).exists()
     assert client.get("/v1/identity/capabilities").status_code == 401
     retirement = DeliveryWork.objects.get(kind="retire", payload__identity_id=identity.pk)
     assert not process_identity_retirement(retirement)
@@ -70,7 +70,7 @@ def test_operator_deletion_uses_retirement_and_is_repeatable(client, group):
     for _ in range(2):
         call_command("delete_profile", "1" * 64, stdout=StringIO())
     assert Identity.objects.get(pk="1" * 64).retired_at is not None
-    assert not SharedSoundEntitlement.objects.exists()
+    assert not ProfileSoundGrant.objects.exists()
     assert DeliveryWork.objects.filter(kind="retire").count() == 1
     assert client.get("/v1/sync").status_code == 401
 
@@ -109,8 +109,8 @@ def test_unused_sound_queues_storage_cleanup(client, group):
 def test_existing_anonymized_profile_is_fully_cleaned(client):
     identity = Identity.objects.get(pk="1" * 64)
     Identity.objects.filter(pk=identity.pk).update(retired_at=timezone.now() - timedelta(days=31), name="Removed member", token_hash=b"")
-    SharedSoundEntitlement.objects.create(identity=identity, expires_at=timezone.now() - timedelta(days=30))
+    ProfileSoundGrant.objects.create(identity=identity)
     maintain_state()
     identity.refresh_from_db()
     assert identity.purged_at is not None
-    assert not SharedSoundEntitlement.objects.filter(identity=identity).exists()
+    assert not ProfileSoundGrant.objects.filter(identity=identity).exists()

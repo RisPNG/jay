@@ -75,7 +75,7 @@ def validate_sound_object(sound, stopping=None):
         response["Body"].close()
 
 
-def verify_play_entitlement(integrity_token, identity_id):
+def verify_play_entitlement(integrity_token, identity_id, installation):
     if not settings.GOOGLE_PLAY_CREDENTIALS_JSON:
         raise DomainError("play_unavailable", "Google Play verification is not configured", 503)
     credentials = service_account.Credentials.from_service_account_info(json.loads(settings.GOOGLE_PLAY_CREDENTIALS_JSON), scopes=["https://www.googleapis.com/auth/playintegrity"])
@@ -90,7 +90,7 @@ def verify_play_entitlement(integrity_token, identity_id):
         package, received_hash = request["requestPackageName"], request["requestHash"]
     except (KeyError, TypeError, ValueError, OverflowError):
         raise DomainError("play_verdict_invalid", "Google Play returned an invalid verdict", 503) from None
-    expected_hash = base64.urlsafe_b64encode(hashlib.sha256(f"jay-play-entitlement:{identity_id}".encode()).digest()).decode().rstrip("=")
+    expected_hash = base64.urlsafe_b64encode(hashlib.sha256(f"jay-play-entitlement:{identity_id}:{installation}".encode()).digest()).decode().rstrip("=")
     now = datetime.now(UTC)
     if package != "com.rispng.jay" or received_hash != expected_hash or requested_at < now - timedelta(minutes=5) or requested_at > now + timedelta(minutes=1):
         raise DomainError("play_binding_invalid", "The verdict does not match this identity request", 403)

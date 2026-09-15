@@ -52,7 +52,7 @@ Ordinary database operations use a two-second lock timeout and ten-second statem
 
 ## Scoped synchronization
 
-An identity scope contains profile, capabilities, private preferences and membership references. A group scope contains common group resources and recipient-filtered occurrences or activity. Group content is stored once per change rather than copied into every member's identity scope.
+An identity scope contains profile, profile-wide capabilities, private preferences and membership references. Purchased sound access is verified per installation and returned only through the requesting installation’s capability checks; it is not shared through the identity scope. A group scope contains common group resources and recipient-filtered occurrences or activity. Group content is stored once per change rather than copied into every member's identity scope.
 
 Each scope has a transactionally ordered head revision and retention floor. Incremental requests freeze an upper revision and page immutable versions in revision/ordinal order. Pages contain at most 200 items or 256 KiB. Recipient filtering occurs before payload disclosure; cursor advancement accounts for scanned positions. Android stages pages belonging to a domain revision and applies them atomically with cursor advancement.
 

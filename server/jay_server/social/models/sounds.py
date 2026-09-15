@@ -15,6 +15,7 @@ class SharedSound(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     group = models.ForeignKey("Group", on_delete=models.CASCADE)
     uploaded_by = models.ForeignKey("Identity", null=True, on_delete=models.SET_NULL)
+    installation = models.ForeignKey("PlayInstallation", null=True, on_delete=models.SET_NULL)
     title = models.CharField(max_length=200)
     sha256 = models.CharField(max_length=64, null=True)
     byte_length = models.PositiveIntegerField(null=True)

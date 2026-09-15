@@ -13,8 +13,9 @@ from jay_server.social import providers as play_integrity
 
 def test_play_entitlement_verdict_validation(monkeypatch) -> None:
     device_id = "a" * 64
+    installation = "b" * 64
     request_hash = base64.urlsafe_b64encode(
-        hashlib.sha256(f"jay-play-entitlement:{device_id}".encode()).digest()
+        hashlib.sha256(f"jay-play-entitlement:{device_id}:{installation}".encode()).digest()
     ).decode().rstrip("=")
     payload = {
         "tokenPayloadExternal": {
@@ -52,8 +53,15 @@ def test_play_entitlement_verdict_validation(monkeypatch) -> None:
         )),
     )
 
-    assert play_integrity.verify_play_entitlement("token", device_id) is True
+    assert play_integrity.verify_play_entitlement("token", device_id, installation) is True
+    with pytest.raises(DomainError):
+        play_integrity.verify_play_entitlement("token", device_id, "another-installation")
+    payload["tokenPayloadExternal"]["appIntegrity"]["packageName"] = "com.rispng.jay.lite"
+    assert play_integrity.verify_play_entitlement("token", device_id, installation) is False
+    payload["tokenPayloadExternal"]["appIntegrity"]["packageName"] = "com.rispng.jay"
+    payload["tokenPayloadExternal"]["accountDetails"]["appLicensingVerdict"] = "UNLICENSED"
+    assert play_integrity.verify_play_entitlement("token", device_id, installation) is False
     payload["tokenPayloadExternal"]["requestDetails"]["requestHash"] = "wrong"
     with pytest.raises(DomainError) as exception:
-        play_integrity.verify_play_entitlement("token", device_id)
+        play_integrity.verify_play_entitlement("token", device_id, installation)
     assert exception.value.status_code == 403

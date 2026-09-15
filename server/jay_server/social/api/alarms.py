@@ -26,7 +26,7 @@ class AlarmListView(APIView):
                 return Response(receipt.response, status=receipt.status)
             data.pop("membership_id")
             selection = data.pop("sound")
-            sound = select_shared_sound(group, request.user, selection)
+            sound = select_shared_sound(group, request.user, selection, installation=request.auth)
             alarm = SharedAlarm.objects.create(**data, sound_mode=selection["mode"], sound=sound, save_id=receipt.operation_id, created_by=request.user, updated_by=request.user)
             changes = [("alarm", str(alarm.pk), "upsert", AlarmRepresentation(alarm).data, None)]
             if sound:
@@ -53,7 +53,7 @@ class AlarmView(APIView):
             data.pop("membership_id")
             previous = AlarmRepresentation(alarm).data
             selection = data.pop("sound")
-            alarm.sound = select_shared_sound(alarm.group, request.user, selection, alarm.sound_id)
+            alarm.sound = select_shared_sound(alarm.group, request.user, selection, alarm.sound_id, installation=request.auth)
             alarm.sound_mode = selection["mode"]
             for name, value in data.items():
                 setattr(alarm, name, value)

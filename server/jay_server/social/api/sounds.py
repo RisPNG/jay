@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 
 from ..access import identity_capabilities, require_membership
 from ..errors import DomainError
-from ..models import DeliveryWork, Group, SharedSound
+from ..models import DeliveryWork, Group, PlayInstallation, SharedSound
 from ..providers import object_storage_client, signed_sound_upload
 from ..synchronization import publish_changes
 from ..transactions import mutation
@@ -25,7 +25,7 @@ class SoundUploadListView(APIView):
         group = get_object_or_404(Group, pk=group_id)
         with mutation(request, data, [group.scope_id]) as receipt:
             require_membership(group, request.user, data["membership_id"], editor=True)
-            if not identity_capabilities(request.user)["shared_sound_upload"]:
+            if not identity_capabilities(request.user, request.auth)["shared_sound_upload"]:
                 raise DomainError("entitlement_required", "A current Play entitlement is required", 403)
             if receipt.completed_at:
                 return Response(receipt.response, status=receipt.status)
@@ -52,7 +52,7 @@ class SoundUploadView(APIView):
     def get(self, request, sound_id):
         sound = get_object_or_404(SharedSound.objects.select_related("group"), pk=sound_id)
         require_membership(sound.group, request.user, editor=True)
-        if sound.uploaded_by_id != request.user.pk or not identity_capabilities(request.user)["shared_sound_upload"]:
+        if sound.uploaded_by_id != request.user.pk or not identity_capabilities(request.user, request.auth)["shared_sound_upload"]:
             raise DomainError("uploader_required", "Only the entitled uploader may upload this sound", 403)
         if sound.status != "pending" or sound.sha256 is None:
             raise DomainError("upload_unavailable", "This upload is not pending")
@@ -66,14 +66,15 @@ class SoundCompleteView(APIView):
         with mutation(request, {}, [sound.group.scope_id]) as receipt:
             sound = SharedSound.objects.select_for_update().select_related("group").get(pk=sound_id)
             require_membership(sound.group, request.user, editor=True)
-            if sound.uploaded_by_id != request.user.pk or not identity_capabilities(request.user)["shared_sound_upload"]:
+            if sound.uploaded_by_id != request.user.pk or not identity_capabilities(request.user, request.auth)["shared_sound_upload"]:
                 raise DomainError("uploader_required", "Only the entitled uploader may complete this sound", 403)
             if receipt.completed_at:
                 return Response(receipt.response, status=receipt.status)
             if sound.status != "pending" or sound.sha256 is None:
                 raise DomainError("upload_unavailable", "This upload is not pending")
+            sound.installation = PlayInstallation.objects.filter(pk=request.auth).first() if request.auth else None
             sound.status = "verifying"
-            sound.save(update_fields=["status"])
+            sound.save(update_fields=["status", "installation"])
             DeliveryWork.objects.create(kind="verify", deduplication_key=f"verify:{sound.pk}", payload={"sound_id": str(sound.pk)})
             publish_changes(sound.group.scope_id, [("sound", str(sound.pk), "upsert", SoundRepresentation(sound).data, None)], group=sound.group)
             receipt.status, receipt.response = 202, SoundRepresentation(sound).data

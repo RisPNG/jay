@@ -25,6 +25,7 @@ class DeviceCapabilitiesCacheTest {
     @Test
     fun grantsCannotFollowServerOrIdentityChanges() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
+        org.robolectric.Shadows.shadowOf(context.packageManager).setInstallSourceInfo(context.packageName, null, null)
         Preferences.init(context)
         val server = "https://self-hosted.example"
         Preferences.edit { putString(SocialPreferences.serverUrlKey, server) }
@@ -34,11 +35,15 @@ class DeviceCapabilitiesCacheTest {
         try {
             val repository = SocialRepository(context, social, AlarmRepository(alarms.alarmsDao()))
             Preferences.edit {
+                putString(SocialPreferences.capabilitiesInstallationKey, "")
                 putString(SocialPreferences.capabilitiesServerKey, server)
                 putString(SocialPreferences.capabilitiesDeviceKey, identity.id)
                 putString(SocialPreferences.capabilitiesKey, Json.encodeToString(DeviceCapabilities(true, false)))
             }
             assertTrue(repository.canUploadSharedSounds)
+            Preferences.edit { putString(SocialPreferences.capabilitiesInstallationKey, "another-installation") }
+            assertFalse(repository.canUploadSharedSounds)
+            Preferences.edit { putString(SocialPreferences.capabilitiesInstallationKey, "") }
             context.getSharedPreferences("jay_identity", Context.MODE_PRIVATE).edit { clear() }
             assertFalse(repository.canUploadSharedSounds)
             val replacement = DeviceIdentityStore.loadOrCreate(context, server)

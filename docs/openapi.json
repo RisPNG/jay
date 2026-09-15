@@ -9,6 +9,16 @@
         "/.well-known/assetlinks.json": {
             "get": {
                 "operationId": ".well_known_assetlinks.json_retrieve",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    }
+                ],
                 "tags": [
                     ".well-known"
                 ],
@@ -32,6 +42,16 @@
         "/health": {
             "get": {
                 "operationId": "health_retrieve",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    }
+                ],
                 "tags": [
                     "health"
                 ],
@@ -57,6 +77,16 @@
         "/health/live": {
             "get": {
                 "operationId": "health_live_retrieve",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    }
+                ],
                 "tags": [
                     "health"
                 ],
@@ -82,6 +112,16 @@
         "/health/ready": {
             "get": {
                 "operationId": "health_ready_retrieve",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    }
+                ],
                 "tags": [
                     "health"
                 ],
@@ -122,6 +162,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     }
                 ],
                 "tags": [
@@ -170,6 +218,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
                         "in": "path",
@@ -227,6 +283,14 @@
                         "required": true
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
                         "in": "path",
                         "name": "alarm_id",
                         "schema": {
@@ -256,6 +320,14 @@
             "get": {
                 "operationId": "v1_alarms_activity_retrieve",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
                     {
                         "in": "path",
                         "name": "alarm_id",
@@ -317,6 +389,14 @@
                         "required": true
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
                         "in": "path",
                         "name": "alarm_id",
                         "schema": {
@@ -374,6 +454,14 @@
                         "required": true
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
                         "in": "path",
                         "name": "alarm_id",
                         "schema": {
@@ -422,6 +510,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
                         "in": "path",
@@ -479,6 +575,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     }
                 ],
                 "tags": [
@@ -527,6 +631,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
                         "in": "path",
@@ -584,6 +696,14 @@
                         "required": true
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -613,6 +733,14 @@
             "get": {
                 "operationId": "v1_groups_activity_retrieve",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
                     {
                         "in": "query",
                         "name": "before",
@@ -676,6 +804,14 @@
                         "required": true
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -731,6 +867,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
                         "in": "path",
@@ -795,6 +939,14 @@
                         "required": true
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -843,6 +995,14 @@
                         "required": true
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -881,6 +1041,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
                         "in": "path",
@@ -940,6 +1108,14 @@
                         "required": true
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -986,6 +1162,14 @@
             "get": {
                 "operationId": "v1_groups_sync_retrieve",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
                     {
                         "in": "query",
                         "name": "cursor",
@@ -1040,6 +1224,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
                         "in": "path",
@@ -1097,6 +1289,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     }
                 ],
                 "tags": [
@@ -1175,6 +1375,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     }
                 ],
                 "tags": [
@@ -1220,6 +1428,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     }
                 ],
                 "tags": [
@@ -1241,6 +1457,16 @@
         "/v1/identity/capabilities": {
             "get": {
                 "operationId": "v1_identity_capabilities_retrieve",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    }
+                ],
                 "tags": [
                     "v1"
                 ],
@@ -1295,6 +1521,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     }
                 ],
                 "tags": [
@@ -1343,6 +1577,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     }
                 ],
                 "tags": [
@@ -1375,6 +1617,14 @@
             "get": {
                 "operationId": "v1_sounds_retrieve",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
                     {
                         "in": "path",
                         "name": "sound_id",
@@ -1423,6 +1673,14 @@
                         "required": true
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
                         "in": "path",
                         "name": "sound_id",
                         "schema": {
@@ -1459,6 +1717,14 @@
             "get": {
                 "operationId": "v1_sounds_download_retrieve",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
                     {
                         "in": "path",
                         "name": "sound_id",
@@ -1509,6 +1775,14 @@
                 "operationId": "v1_sounds_upload_retrieve",
                 "parameters": [
                     {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
                         "in": "path",
                         "name": "sound_id",
                         "schema": {
@@ -1545,6 +1819,14 @@
             "get": {
                 "operationId": "v1_sync_retrieve",
                 "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
                     {
                         "in": "query",
                         "name": "cursor",
@@ -1590,6 +1872,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
                         "in": "path",
@@ -1645,6 +1935,14 @@
                         },
                         "description": "Stable UUID for this exact saved operation; reuse on every retry.",
                         "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
                         "in": "path",

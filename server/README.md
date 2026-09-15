@@ -49,7 +49,7 @@ The Android emulator can reach this API at `http://10.0.2.2:8000`. Use a debug b
 | `TRUST_PROXY` | Trust the HTTPS forwarding header only when requests pass through a trusted proxy |
 | `DATABASE_POOL_SIZE` | Maximum pooled connections per process; size against the database connection budget |
 | `IDENTITY_INACTIVITY_TIMEOUT_DAYS` | Removes identities unseen for this many days together with the groups they solely lead, defaulting to 120; profiles with operator-granted sound access are retained; 0 disables the sweep |
-| `SHARED_SOUND_ACCESS` | Shared-sound upload and selection policy: `play` (default) requires a current Play entitlement or an operator grant for that profile; `everyone` grants access to every authenticated device, subject to group edit permissions |
+| `SHARED_SOUND_ACCESS` | Shared-sound upload and selection policy: `play` (default) requires a verified paid installation or an operator grant for the current profile; `everyone` grants access to every authenticated device, subject to group edit permissions |
 | `B2_S3_ENDPOINT` | Backblaze B2 S3-compatible endpoint |
 | `B2_BUCKET_NAME` | Private B2 bucket that stores normalised shared sounds |
 | `B2_APPLICATION_KEY_ID` | B2 application key ID scoped to the sound bucket |

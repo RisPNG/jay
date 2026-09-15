@@ -25,6 +25,8 @@ class DeletedResourceSchema(OpenApiSerializerExtension):
 class JaySchema(AutoSchema):
     def get_override_parameters(self):
         parameters = super().get_override_parameters()
+        if not self.path.endswith("/identities/register"):
+            parameters.append(OpenApiParameter("X-Jay-Installation", OpenApiTypes.STR, OpenApiParameter.HEADER, description="Private installation credential bound to a verified paid Play installation; never part of a profile export."))
         if self.method in {"POST", "PUT", "PATCH", "DELETE"} and not self.path.endswith("/identities/register"):
             parameters.append(OpenApiParameter("Idempotency-Key", OpenApiTypes.UUID, OpenApiParameter.HEADER, required=True, description="Stable UUID for this exact saved operation; reuse on every retry."))
         if self.method == "GET" and self.path.endswith("/sync"):

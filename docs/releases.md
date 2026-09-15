@@ -6,7 +6,7 @@ Releases come only from the `jay` branch. The head commit message decides whethe
 
 Jay and Clock You keep separate version numbers in `gradle.properties`. Change `jayVersionName` and `jayVersionCode` for Jay, increasing both for a Google Play release. `clockYouVersionName` and `clockYouVersionCode` record the Clock You base shown in the app.
 
-The production application ID is `com.rispng.jay`. Debug and prerelease builds add the `.debug` suffix and use `com.rispng.jay.debug`.
+Jay uses `com.rispng.jay`, Jay Lite uses `com.rispng.jay.lite`, and debug builds use `com.rispng.jay.debug`. These packages remain the same in stable releases and prereleases.
 
 ## Prereleases
 
@@ -18,11 +18,13 @@ The workflow puts the build information together like this:
 - version name: `<jayVersionName>-pre.r<five-digit-run-number>.g<seven-character-sha>`;
 - release title: the seven-character commit SHA;
 - tag: `v<prerelease-version-name>`;
-- artifact: `jay-<prerelease-version-name>.apk`.
+- artifacts: `jay-<prerelease-version-name>.apk`, `jay-<prerelease-version-name>-debug.apk`, and `jay-lite-<prerelease-version-name>.apk`.
 
 The run number is padded so GitHub keeps the tags in chronological order through run 99,999. For example, `0.4.0-pre.r00018.g<sha>` sorts after `0.4.0-pre.r00017.g<sha>`. The `r` also makes this an alphanumeric SemVer identifier, where the leading zeroes are allowed.
 
-The prerelease contains only the debug APK, signed with the prerelease key, and is marked as a GitHub prerelease.
+The prerelease contains the full and Lite release APKs signed with the production key, plus the debug APK signed with the prerelease key. It is marked as a GitHub prerelease and contains no app bundles.
+
+Prereleases use higher version codes than ordinary stable builds. Installing a full or Lite prerelease can therefore prevent installing a subsequent stable APK over it until the stable version code exceeds the installed code. Use the separate debug package when testing without replacing a stable installation.
 
 ## Stable releases
 
@@ -32,9 +34,11 @@ The stable tag is `v<jayVersionName>`. Artifact names use `jayVersionName` from 
 
 - `jay-<version>.apk`: minified production APK signed with the production key;
 - `jay-<version>.aab`: minified production AAB signed with the production key;
-- `jay-<version>-debug.apk`: debug APK signed with the prerelease key for debugging.
+- `jay-<version>-debug.apk`: debug APK signed with the prerelease key for debugging;
+- `jay-lite-<version>.apk`: minified Lite APK signed with the production key;
+- `jay-lite-<version>.aab`: minified Lite AAB signed with the production key.
 
-The production APK and AAB both use `com.rispng.jay`. Add the release changelog to `fastlane/metadata/android/en-US/changelogs/<jayVersionCode>.txt`; the workflow includes it before GitHub's generated release notes. Publishing a stable release removes the prereleases before it and their tags. This keeps older testing builds from crowding the release list.
+The full APK and AAB use `com.rispng.jay`; the Lite APK and AAB use `com.rispng.jay.lite`. Add the release changelog to `fastlane/metadata/android/en-US/changelogs/<jayVersionCode>.txt`; the workflow includes it before GitHub's generated release notes. Publishing a stable release removes the prereleases before it and their tags. This keeps older testing builds from crowding the release list.
 
 When `jayVersionName` increases the major or minor version compared with the highest previously published stable version, the workflow also deletes all uploaded assets from previous stable releases. For example, `1.0.3` to `1.1.0` or `1.9.5` to `2.0.0` removes the older APKs, AABs, and any other uploaded files. Previous stable release pages, notes, and tags remain, along with GitHub's automatically generated source-code ZIP and tar.gz downloads. Patch-only changes such as `1.1.0` to `1.1.1`, downgrades, and the first stable release do not trigger this asset cleanup.
 

@@ -1,0 +1,5 @@
+- Added Jay Lite and kept paid sound-sharing access tied to the verified Play installation across profile changes.
+- Improved shared-item sync, deadline handling, and alarm activity notifications.
+- Added alarm color filtering and live countdown updates.
+- Improved widgets, timer input and progress, and alarm deletion confirmation.
+- Added copying stopwatch laps and updated translations.

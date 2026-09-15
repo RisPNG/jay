@@ -31,7 +31,8 @@ import java.io.File
 
 class SocialApi(
     serverUrl: String,
-    private val identity: DeviceIdentity
+    private val identity: DeviceIdentity,
+    private val installationCredential: String? = null
 ) {
     private val baseUrl = URI(serverUrl).normalize().toString().trimEnd('/')
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -171,6 +172,7 @@ class SocialApi(
         connection.setRequestProperty("Accept", "text/event-stream")
         connection.setRequestProperty("Authorization", "Bearer ${identity.token}")
         connection.setRequestProperty("X-Jay-Identity-ID", identity.id)
+        installationCredential?.let { connection.setRequestProperty("X-Jay-Installation", it) }
         try {
             val status = connection.responseCode
             if (status !in 200..299) {
@@ -211,6 +213,7 @@ class SocialApi(
             if (authenticated) {
                 connection.setRequestProperty("Authorization", "Bearer ${identity.token}")
                 connection.setRequestProperty("X-Jay-Identity-ID", identity.id)
+                installationCredential?.let { connection.setRequestProperty("X-Jay-Installation", it) }
             }
             if (body != null) {
                 connection.doOutput = true

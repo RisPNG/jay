@@ -37,6 +37,16 @@ For changes that are useful to Clock You on its own, the starting point is a foc
 
 The [architecture guide](docs/architecture.md) describes the social protocol, persistence and worker boundaries. [Server deployment](server/README.md#deployment) and [performance guidance](server/README.md#performance) cover operations and release acceptance.
 
+## Android editions
+
+The `full` and `lite` product flavors share the clock, social and audio implementation. `fullRelease` uses `com.rispng.jay`; `liteRelease` uses `com.rispng.jay.lite`. Both editions display Jay as the launcher name. `fullDebug` retains `com.rispng.jay.debug`. There is no Lite debug variant.
+
+Build with `mise exec -- ./gradlew assembleFullDebug assembleFullRelease assembleLiteRelease bundleFullRelease bundleLiteRelease`. Run the JVM suite with `mise exec -- ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest`; release tests cover edition-specific access behavior. Stable release automation publishes both editions' APKs and app bundles, plus the full debug APK. Prereleases publish all three APKs without app bundles.
+
+Firebase is initialized from Gradle properties. The editions share `jayFirebaseProjectId` and `jayFirebaseApiKey`; their Android application IDs use `jayFirebaseReleaseApplicationId`, `jayFirebaseLiteApplicationId` and `jayFirebaseDebugApplicationId`. Register each package in the Firebase project. Release automation reads the Lite ID from `FIREBASE_LITE_APPLICATION_ID`. Each production package has its own Play listing and must be included in the hosted app-link configuration with its Play signing certificate when verified links are enabled.
+
+See [shared sounds and Play access](docs/entitlements.md) for installation purchase verification and profile operator overrides.
+
 ## Building shared audio
 
 The Android build uses NDK 29.0.14206865 and CMake 3.31.6, pinned in `app/build.gradle.kts`. Install these through Android SDK Manager before building, or allow Android Gradle Plugin to install them after accepting the SDK licenses. CMake fetches the official libFLAC 1.5.0 source archive and verifies its pinned SHA-256. Initial native configuration requires network access; subsequent builds reuse the source in the build cache.
