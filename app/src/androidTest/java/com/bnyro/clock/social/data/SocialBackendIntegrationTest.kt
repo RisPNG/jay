@@ -11,6 +11,8 @@ import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.util.Preferences
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -28,6 +30,45 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class SocialBackendIntegrationTest {
+    @Test
+    fun queuedChangesReachTheServerWithoutALiveStreamOrManualSync() = runBlocking {
+        val server = InstrumentationRegistry.getArguments().getString("jayTestServer")
+        assumeTrue("Requires an isolated Django test server", server != null)
+        val app = ApplicationProvider.getApplicationContext<App>()
+        assertTrue(server == Preferences.instance.getString(SocialPreferences.serverUrlKey, null))
+        val repository = app.container.socialRepository
+        repository.synchronize()
+        val dao = SocialDatabase.getDatabase(app).socialDao()
+        val api = SocialApi(requireNotNull(server), DeviceIdentityStore.loadOrCreate(app, server))
+        val name = "Queued ${UUID.randomUUID()}"
+        repository.createGroup(name, AlarmPermission.EVERYONE, false, false, false, false)
+        withTimeout(10_000) {
+            while (dao.getPendingOperations().isNotEmpty()) delay(50)
+        }
+        val group = repository.groups.first().single { it.name == name }
+        try {
+            repository.createSharedAlarm(group.id, Alarm(time = 28_800_000, label = "Queued alarm"))
+            withTimeout(10_000) {
+                while (dao.getPendingOperations().isNotEmpty()) delay(50)
+            }
+            assertTrue(api.synchronizeScope("/v1/groups/${group.id}/sync", null).items.any {
+                it.kind == "alarm" && it.data["label"]?.jsonPrimitive?.content == "Queued alarm"
+            })
+            repository.startSharedTimer(group.id, "Queued timer", TimerSettings(seconds = 600))
+            withTimeout(10_000) {
+                while (dao.getPendingOperations().isNotEmpty()) delay(50)
+            }
+            assertTrue(api.synchronizeScope("/v1/groups/${group.id}/sync", null).items.any {
+                it.kind == "timer"
+            })
+        } finally {
+            repository.deleteGroup(group.id)
+            withTimeout(10_000) {
+                while (dao.getPendingOperations().isNotEmpty()) delay(50)
+            }
+        }
+    }
+
     @Test
     fun sharedItemsReconcileAndGroupDeletionPreservesPersonalAlarms() = runBlocking {
         val server = InstrumentationRegistry.getArguments().getString("jayTestServer")

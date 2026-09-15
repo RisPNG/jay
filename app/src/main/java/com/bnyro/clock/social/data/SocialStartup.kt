@@ -63,7 +63,7 @@ object SocialStartup {
         SocialSyncWorker.enqueue(application)
         WorkManager.getInstance(application).enqueueUniquePeriodicWork(
             "jay_social_sync",
-            ExistingPeriodicWorkPolicy.UPDATE,
+            ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
             PeriodicWorkRequestBuilder<SocialSyncWorker>(15, TimeUnit.MINUTES)
                 .setConstraints(constraints)
                 .build()

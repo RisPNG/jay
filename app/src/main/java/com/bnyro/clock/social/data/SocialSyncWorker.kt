@@ -44,10 +44,10 @@ class SocialSyncWorker(context: Context, parameters: WorkerParameters) :
             val manager = WorkManager.getInstance(context)
             schedulingScope.launch {
                 schedulingMutex.withLock {
-                    val work = manager.getWorkInfosForUniqueWork("jay_social_sync").get()
+                    val work = manager.getWorkInfosForUniqueWork("jay_social_sync_immediate").get()
                     if (work.none { it.state in setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED) }) {
                         manager.enqueueUniqueWork(
-                            "jay_social_sync", androidx.work.ExistingWorkPolicy.APPEND_OR_REPLACE,
+                            "jay_social_sync_immediate", androidx.work.ExistingWorkPolicy.APPEND_OR_REPLACE,
                             request.build()
                         ).result.get()
                     }
