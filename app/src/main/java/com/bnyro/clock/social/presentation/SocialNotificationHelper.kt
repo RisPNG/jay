@@ -27,21 +27,6 @@ object SocialNotificationHelper {
     }
 
     @SuppressLint("MissingPermission")
-    fun notifyDeviceIssue(context: Context, id: Int, title: String, message: String) {
-        if (!Permission.NotificationPermission.hasPermission(context)) return
-        NotificationManagerCompat.from(context).notify(
-            id,
-            NotificationCompat.Builder(context, SOCIAL_CHANNEL)
-                .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle(title)
-                .setContentText(message)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-                .setAutoCancel(true)
-                .build()
-        )
-    }
-
-    @SuppressLint("MissingPermission")
     fun notifySocialChanges(context: Context, result: SocialSyncResult) {
         if (!Permission.NotificationPermission.hasPermission(context)) return
 
@@ -168,7 +153,5 @@ object SocialNotificationHelper {
     const val EXTRA_SOCIAL_ENTITY_TYPE = "com.rispng.jay.SOCIAL_ENTITY_TYPE"
     const val EXTRA_SOCIAL_GROUP_ID = "com.rispng.jay.SOCIAL_GROUP_ID"
     const val EXTRA_SOCIAL_ENTITY_ID = "com.rispng.jay.SOCIAL_ENTITY_ID"
-    const val SYNC_FAILURE_NOTIFICATION_ID = 190_001
-    const val ENTITLEMENT_NOTIFICATION_ID = 190_002
     const val SOCIAL_CHANNEL = "social"
 }

@@ -7,7 +7,6 @@ import androidx.core.content.edit
 import androidx.room.withTransaction
 import androidx.work.WorkManager
 import com.bnyro.clock.BuildConfig
-import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.RepeatAnchor
 import com.bnyro.clock.domain.model.RepeatUnit
@@ -138,23 +137,10 @@ class SocialRepository(
         if (currentServer != serverUrl ||
             DeviceIdentityStore.loadOrCreate(context, currentServer).id != deviceId
         ) return
-        val previous = deviceCapabilities
         Preferences.edit {
             putString(SocialPreferences.capabilitiesKey, Json.encodeToString(capabilities))
             putString(SocialPreferences.capabilitiesServerKey, serverUrl)
             putString(SocialPreferences.capabilitiesDeviceKey, deviceId)
-        }
-        if (capabilities.canUploadSharedSounds()) {
-            androidx.core.app.NotificationManagerCompat.from(context).cancel(
-                SocialNotificationHelper.ENTITLEMENT_NOTIFICATION_ID
-            )
-        } else if (previous.requiresPlayEntitlement && previous.sharedSoundUpload) {
-            SocialNotificationHelper.notifyDeviceIssue(
-                context,
-                SocialNotificationHelper.ENTITLEMENT_NOTIFICATION_ID,
-                context.getString(R.string.play_entitlement_lost_title),
-                context.getString(R.string.play_entitlement_lost_message)
-            )
         }
     }
 

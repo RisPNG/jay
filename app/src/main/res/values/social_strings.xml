@@ -95,11 +95,6 @@
     <string name="alarm_log_vibration_pattern">Vibration pattern</string>
     <string name="alarm_log_correction">Corrected by a later %1$s report</string>
     <string name="social_ignored">ignored</string>
-    <string name="social_sync_failure_title">Shared alarms may be out of date</string>
-    <string name="social_sync_failure_message">Jay has repeatedly been unable to synchronize this device.</string>
-    <string name="play_entitlement_lost_title">Play access needs attention</string>
-    <string name="play_entitlement_lost_message">This device can no longer upload or select group-distributed sounds.</string>
-    <string name="play_entitlement_refresh_failed_message">Jay could not renew this device’s Play access before it expired.</string>
     <string name="remove_member">Remove member</string>
     <string name="no_groups">Create a group or join one with an invitation.</string>
     <string name="sync">Synchronize</string>

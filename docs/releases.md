@@ -1,6 +1,6 @@
 # Releases
 
-Releases come only from the `jay` branch. The head commit message decides whether a push publishes a prerelease or a stable release, so check that message before pushing.
+Releases come only from the `jay` branch. The head commit message decides whether a push publishes a prerelease, a stable release, or neither, so check that message before pushing.
 
 ## Which version to change
 
@@ -10,7 +10,7 @@ The production application ID is `com.rispng.jay`. Debug and prerelease builds a
 
 ## Prereleases
 
-Every push to `jay` whose head commit message does not begin exactly with `Release ` runs `.github/workflows/prerelease.yml`. No other branch publishes a prerelease.
+A push to `jay` whose head commit message begins with `dev release ` (case insensitive, including the trailing space) runs the prerelease job in `.github/workflows/prerelease.yml`. For example, `dev release test shared alarms` and `DEV RELEASE test shared alarms` both publish a prerelease. Other commit messages skip the prerelease job, and no other branch publishes a prerelease.
 
 The workflow puts the build information together like this:
 
@@ -26,7 +26,7 @@ The prerelease contains only the debug APK, signed with the prerelease key, and 
 
 ## Stable releases
 
-A push to `jay` whose head commit message begins exactly with `Release ` skips the prerelease job and runs `.github/workflows/release.yml`. The release title is only the first two whitespace-separated words of the commit subject. For example, `Release 0.4.0 add sounds` produces the title `Release 0.4.0`.
+A push to `jay` whose head commit message begins with `Release ` (case insensitive) skips the prerelease job and runs `.github/workflows/release.yml`. The release title is only the first two whitespace-separated words of the commit subject. For example, `Release 0.4.0 add sounds` produces the title `Release 0.4.0`.
 
 The stable tag is `v<jayVersionName>`. Artifact names use `jayVersionName` from `gradle.properties`:
 
