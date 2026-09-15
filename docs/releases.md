@@ -36,6 +36,10 @@ The stable tag is `v<jayVersionName>`. Artifact names use `jayVersionName` from 
 
 The production APK and AAB both use `com.rispng.jay`. Add the release changelog to `fastlane/metadata/android/en-US/changelogs/<jayVersionCode>.txt`; the workflow includes it before GitHub's generated release notes. Publishing a stable release removes the prereleases before it and their tags. This keeps older testing builds from crowding the release list.
 
+When `jayVersionName` increases the major or minor version compared with the highest previously published stable version, the workflow also deletes all uploaded assets from previous stable releases. For example, `1.0.3` to `1.1.0` or `1.9.5` to `2.0.0` removes the older APKs, AABs, and any other uploaded files. Previous stable release pages, notes, and tags remain, along with GitHub's automatically generated source-code ZIP and tar.gz downloads. Patch-only changes such as `1.1.0` to `1.1.1`, downgrades, and the first stable release do not trigger this asset cleanup.
+
+The workflow records the existing published releases immediately before publishing. Cleanup runs only after the new release is published successfully and only affects that recorded set, preserving the new release's assets and any releases published afterwards. Draft releases are excluded.
+
 ## Signing material
 
 Keep signing stores and passwords in local secure configuration or GitHub Actions secrets. They must not appear in source control, logs, fixtures, screenshots, or generated artifacts.

@@ -56,6 +56,13 @@ jobs:
           ORG_GRADLE_PROJECT_jaySigningKeyPassword: ${{ secrets.PRERELEASE_KEY_PASSWORD }}
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Read previous releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate 'repos/{owner}/{repo}/releases?per_page=100' |
+            jq -s 'add | map(select(.draft == false))' > "$RUNNER_TEMP/jay-previous-releases.json"
+
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -77,12 +84,29 @@ jobs:
             --generate-notes \
             --latest
 
-      - name: Remove the prereleases this release settles
+      - name: Clean up previous releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release list --limit 500 --json tagName,isPrerelease \
-            --jq '.[] | select(.isPrerelease) | .tagName' |
+          previous_releases="$RUNNER_TEMP/jay-previous-releases.json"
+          version_name=$(awk -F= '$1 == "jayVersionName" { print $2 }' gradle.properties)
+          jq -r '.[] | select(.prerelease) | .tag_name' "$previous_releases" |
             while read -r tag; do
               gh release delete "$tag" --yes --cleanup-tag
+            done
+
+          jq -r --arg version "$version_name" '
+            (map(select(.prerelease == false) | .tag_name
+              | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))
+              | ltrimstr("v") | split(".") | map(tonumber)) | max) as $previous
+            | ($version | split(".") | map(tonumber)) as $current
+            | if $previous != null
+                and ($current[0] > $previous[0]
+                  or ($current[0] == $previous[0] and $current[1] > $previous[1]))
+              then .[] | select(.prerelease == false) | .assets[].id
+              else empty
+              end
+          ' "$previous_releases" |
+            while read -r asset_id; do
+              gh api --method DELETE "repos/{owner}/{repo}/releases/assets/$asset_id"
             done

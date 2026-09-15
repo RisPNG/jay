@@ -67,7 +67,7 @@ An `upstream` remote points to Clock You. Preserving its history in `main` means
 
 Fixes follow the same arrangement. A Clock You defect is fixed on its contribution branch, then brought into `main-canary` and `jay`. A social defect is fixed directly on `jay`. This keeps the fix with the work it belongs to, so an upstream contribution includes its own corrections.
 
-Pushing to `jay` also publishes a build. Ordinary pushes create prereleases, while a head commit message beginning exactly with `Release ` creates a stable release. The [release guide](docs/releases.md) explains the details, so it is worth checking the head message before a push.
+Pushing to `jay` publishes a prerelease when the head commit message begins with `dev release `, or a stable release when it begins with `Release `. Other messages publish neither. The [release guide](docs/releases.md) explains the version rules and cleanup of previous releases, so check the head message before a push.
 
 ## Bringing in upstream changes
 
