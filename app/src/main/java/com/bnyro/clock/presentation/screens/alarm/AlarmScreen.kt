@@ -66,6 +66,7 @@ import com.bnyro.clock.social.presentation.SocialAlarmActivityDialog
 import com.bnyro.clock.ui.theme.ItemFade
 import com.bnyro.clock.ui.theme.ItemSlide
 import com.bnyro.clock.util.AlarmHelper
+import kotlinx.coroutines.flow.update
 
 private val FAB_SIZE = 56.dp
 
@@ -85,6 +86,7 @@ fun AlarmScreen(
     val alarmGroupNames by alarmModel.alarmGroupNames.collectAsState()
     val alarmEditability by alarmModel.alarmEditability.collectAsState()
     val remoteAlarmIds by alarmModel.remoteAlarmIds.collectAsState()
+    val labelColors by alarmModel.labelColors.collectAsState()
 
     val selectedAlarmIds = remember { mutableStateListOf<Long>() }
     val isSelectionMode = selectedAlarmIds.isNotEmpty()
@@ -261,11 +263,15 @@ fun AlarmScreen(
                         filters = filters,
                         groups = groups,
                         selectedSourceIds = alarmSourceIds,
-                        onChangeLabel = { alarmModel.updateLabelFilter(it) },
-                        onClickWeekDay = { alarmModel.updateWeekDayFilter(it) },
                         onChangeSources = { alarmModel.alarmSourceIds.value = it },
+                        labelColors = labelColors,
+                        onChangeLabel = { alarmModel.updateLabelFilter(it) },
+                        onChangeLabelColors = { colors ->
+                            alarmModel.filters.update { it.copy(labelColors = colors) }
+                        },
+                        onClickWeekDay = { alarmModel.updateWeekDayFilter(it) },
                         onClickStartTime = { alarmModel.updateStartTimeFilter(it) },
-                        onClickEndTime = { alarmModel.updateEndTimeFilter(it) }
+                        onClickEndTime = { alarmModel.updateEndTimeFilter(it) },
                     )
                 }
 
