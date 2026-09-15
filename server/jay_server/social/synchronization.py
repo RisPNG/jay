@@ -21,6 +21,7 @@ def publish_changes(scope_id, changes, group=None, actor=None, activity=None):
     scope.save(update_fields=["head_revision"])
     now = timezone.now()
     if activity is not None:
+        activity = {**activity, "details": json.loads(json.dumps(activity.get("details", {}), cls=DjangoJSONEncoder))}
         history = GroupActivity.objects.create(
             group=group, revision=scope.head_revision, ordinal=len(changes),
             group_label=group.name, actor=actor, actor_label=actor.name if actor else None,

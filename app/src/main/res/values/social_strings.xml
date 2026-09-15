@@ -31,6 +31,7 @@
     <string name="alarm_delivered_to_member">%1$s was delivered to %2$s</string>
     <string name="ignored_alarm_corrected">Ignored report for “%1$s” corrected in %2$s</string>
     <string name="group_activity_updated">Activity updated in %1$s</string>
+    <string name="social_updates_for_alarm">%1$d updates for “%2$s” in %3$s</string>
     <string name="social_updates_in_group">%1$d updates in %2$s</string>
     <string name="social_snoozed">snoozed</string>
     <string name="social_dismissed">dismissed</string>

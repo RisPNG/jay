@@ -231,6 +231,7 @@ class SettingsModel : ViewModel() {
                             endOccurrences = 1.takeIf { item.optBoolean("oneShot", false) || parsedDaysList.isEmpty() }
                         )
 
+                        createUpdateDeleteAlarmUseCase.prepareForScheduling(newAlarm)
                         createUpdateDeleteAlarmUseCase.createAlarm(newAlarm)
                     }
                     true

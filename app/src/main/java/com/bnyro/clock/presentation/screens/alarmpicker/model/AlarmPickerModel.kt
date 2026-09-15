@@ -73,6 +73,7 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
         viewModelScope.launch {
             try {
                 if (groupId == null) {
+                    createUpdateDeleteAlarmUseCase.prepareForScheduling(alarm)
                     createUpdateDeleteAlarmUseCase.createAlarm(alarm)
                 } else {
                     socialRepository.createSharedAlarm(groupId, alarm) { soundProgress = it }

@@ -31,7 +31,7 @@ class AlarmListView(APIView):
             changes = [("alarm", str(alarm.pk), "upsert", AlarmRepresentation(alarm).data, None)]
             if sound:
                 changes.append(("sound", str(sound.pk), "upsert", SoundRepresentation(sound).data, None))
-            publish_changes(group.scope_id, changes, group=group, actor=request.user, activity={"entity_type": "alarm", "entity_id": str(alarm.pk), "action": "created", "entity_label": alarm.label, "entity_time": alarm.local_time_ms})
+            publish_changes(group.scope_id, changes, group=group, actor=request.user, activity={"entity_type": "alarm", "entity_id": str(alarm.pk), "action": "created", "entity_label": alarm.label, "entity_time": alarm.local_time_ms, "details": AlarmRepresentation(alarm).data})
             DeliveryWork.objects.create(kind="reschedule", deduplication_key=f"reschedule:alarm:{alarm.pk}:{alarm.revision}", payload={"alarm_id": str(alarm.pk)})
             receipt.status, receipt.response = 201, AlarmRepresentation(alarm).data
         return Response(receipt.response, status=201)
@@ -51,6 +51,7 @@ class AlarmView(APIView):
                 return Response(receipt.response, status=receipt.status)
             accept_saved_state(alarm, data.pop("saved_at"), receipt.operation_id, AlarmRepresentation(alarm).data)
             data.pop("membership_id")
+            previous = AlarmRepresentation(alarm).data
             selection = data.pop("sound")
             alarm.sound = select_shared_sound(alarm.group, request.user, selection, alarm.sound_id)
             alarm.sound_mode = selection["mode"]
@@ -65,7 +66,13 @@ class AlarmView(APIView):
             changes = [("alarm", str(alarm.pk), "upsert", AlarmRepresentation(alarm).data, None)]
             if alarm.sound:
                 changes.append(("sound", str(alarm.sound_id), "upsert", SoundRepresentation(alarm.sound).data, None))
-            publish_changes(alarm.group.scope_id, changes, group=alarm.group, actor=request.user, activity={"entity_type": "alarm", "entity_id": str(alarm.pk), "action": "updated", "entity_label": alarm.label, "entity_time": alarm.local_time_ms})
+            current = AlarmRepresentation(alarm).data
+            details = {}
+            for field in ["label", "label_color", "local_time_ms", "enabled", "days", "vibrate", "start_date", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "snooze_enabled", "snooze_minutes", "sound_mode", "sound_id", "vibration_pattern", "vibration_pattern_name"]:
+                key = "time" if field == "local_time_ms" else field
+                details[f"previous_{key}"], details[key] = previous[field], current[field]
+            action = "edited" if previous["enabled"] == alarm.enabled else "enabled" if alarm.enabled else "disabled"
+            publish_changes(alarm.group.scope_id, changes, group=alarm.group, actor=request.user, activity={"entity_type": "alarm", "entity_id": str(alarm.pk), "action": action, "entity_label": alarm.label, "entity_time": alarm.local_time_ms, "details": details})
             DeliveryWork.objects.create(kind="reschedule", deduplication_key=f"reschedule:alarm:{alarm.pk}:{alarm.revision}", payload={"alarm_id": str(alarm.pk)})
             receipt.status, receipt.response = 200, AlarmRepresentation(alarm).data
         return Response(receipt.response)
@@ -84,7 +91,7 @@ class AlarmView(APIView):
             alarm.deleted_at, alarm.revision = timezone.now(), alarm.revision + 1
             alarm.save(update_fields=["deleted_at", "revision"])
             AlarmOccurrence.objects.filter(alarm=alarm, state="pending").update(state="canceled", resolved_at=timezone.now())
-            publish_changes(alarm.group.scope_id, [("alarm", str(alarm.pk), "delete", {"id": str(alarm.pk)}, None)], group=alarm.group, actor=request.user, activity={"entity_type": "alarm", "entity_id": str(alarm.pk), "action": "deleted", "entity_label": alarm.label, "entity_time": alarm.local_time_ms})
+            publish_changes(alarm.group.scope_id, [("alarm", str(alarm.pk), "delete", {"id": str(alarm.pk)}, None)], group=alarm.group, actor=request.user, activity={"entity_type": "alarm", "entity_id": str(alarm.pk), "action": "deleted", "entity_label": alarm.label, "entity_time": alarm.local_time_ms, "details": {"alarm_revision": alarm.revision}})
             receipt.status, receipt.response = 204, None
         return Response(status=204)
 
@@ -104,6 +111,6 @@ class AlarmDeliveryView(APIView):
                     raise DomainError("revision_invalid", "This alarm revision does not exist")
                 _, created = AlarmDelivery.objects.get_or_create(alarm=alarm, identity=request.user, revision=data["revision"])
                 if created:
-                    publish_changes(alarm.group.scope_id, [], group=alarm.group, actor=request.user, activity={"entity_type": "delivery", "entity_id": str(alarm.pk), "action": "received", "entity_label": alarm.label, "entity_time": alarm.local_time_ms, "details": {"alarm_revision": data["revision"]}})
+                    publish_changes(alarm.group.scope_id, [], group=alarm.group, actor=request.user, activity={"entity_type": "delivery", "entity_id": str(alarm.pk), "action": "delivered", "entity_label": alarm.label, "entity_time": alarm.local_time_ms, "subject": request.user, "subject_label": request.user.name, "details": {"alarm_revision": data["revision"]}})
                 receipt.status, receipt.response = 204, None
         return Response(status=204)

@@ -5,6 +5,7 @@ import android.content.Context
 import android.app.PendingIntent
 import android.app.NotificationManager
 import android.content.Intent
+import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationManagerCompat
@@ -54,7 +55,9 @@ object SocialNotificationHelper {
             it.subjectDeviceId == result.deviceId &&
                 it.action == "removed"
         }
-        val grouped = (changes - direct.toSet()).groupBy { it.groupId }
+        val grouped = (changes - direct.toSet()).groupBy {
+            it.groupId to it.entityId.takeIf { _ -> it.entityType in setOf("alarm", "outcome") }
+        }
         val notificationManager = NotificationManagerCompat.from(context)
 
         direct.forEach { change ->
@@ -84,23 +87,33 @@ object SocialNotificationHelper {
             )
         }
 
-        grouped.forEach { (groupId, groupChanges) ->
+        grouped.forEach { (destination, groupChanges) ->
+            val (groupId, alarmId) = destination
+            val notificationKey = "$groupId:${alarmId ?: "group"}"
             val newest = groupChanges.last()
             val eventTime = OffsetDateTime.parse(newest.occurredAt).toInstant().toEpochMilli()
-            val notificationId = groupId.hashCode()
+            val notificationId = notificationKey.hashCode()
             val accumulation = context.getSharedPreferences(
                 "jay_social_notification_accumulation",
                 Context.MODE_PRIVATE
             )
             val isActive = (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                .activeNotifications.any { it.id == notificationId }
+                .activeNotifications.any { it.tag == notificationKey && it.id == notificationId }
             val updateCount = groupChanges.size + if (isActive) {
-                accumulation.getInt(groupId, 0)
+                accumulation.getInt(notificationKey, 0)
             } else {
                 0
             }
             val title = if (updateCount == 1) {
                 newest.presentationTitle(context, result.deviceId)
+            } else if (alarmId != null) {
+                context.getString(
+                    R.string.social_updates_for_alarm,
+                    updateCount,
+                    newest.entityLabel?.takeIf { it.isNotBlank() }
+                        ?: context.getString(R.string.unnamed_shared_alarm),
+                    newest.groupName
+                )
             } else {
                 context.getString(
                     R.string.social_updates_in_group,
@@ -116,6 +129,7 @@ object SocialNotificationHelper {
                 }
             }
             notificationManager.notify(
+                notificationKey,
                 notificationId,
                 NotificationCompat.Builder(context, SOCIAL_CHANNEL)
                     .setSmallIcon(R.drawable.ic_notification)
@@ -125,18 +139,17 @@ object SocialNotificationHelper {
                     .setContentIntent(
                         PendingIntent.getActivity(
                             context,
-                            groupId.hashCode(),
+                            notificationId,
                             Intent(context, MainActivity::class.java)
                                 .setAction(SHOW_SOCIAL_ACTIVITY_ACTION)
+                                .setData(Uri.Builder().scheme("jay").authority("activity").appendPath(groupId).appendPath(alarmId ?: "group").build())
                                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                 .putExtra(
                                     EXTRA_SOCIAL_ENTITY_TYPE,
-                                    if (updateCount == 1 && newest.entityType in
-                                        setOf("alarm", "outcome")
-                                    ) "alarm" else "group"
+                                    if (alarmId != null) "alarm" else "group"
                                 )
                                 .putExtra(EXTRA_SOCIAL_GROUP_ID, groupId)
-                                .putExtra(EXTRA_SOCIAL_ENTITY_ID, newest.entityId),
+                                .putExtra(EXTRA_SOCIAL_ENTITY_ID, alarmId),
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                         )
                     )
@@ -145,7 +158,7 @@ object SocialNotificationHelper {
                     .setAutoCancel(true)
                     .build()
             )
-            accumulation.edit().putInt(groupId, updateCount).apply()
+            accumulation.edit().putInt(notificationKey, updateCount).apply()
         }
     }
 

@@ -531,13 +531,13 @@ class TimerService : Service() {
         val existing = timerObjects.find { it.sharedTimerId == sharedId }
         val remaining = expiresAt - System.currentTimeMillis()
         if (existing == null) {
-            // a timer that finished long before this device heard of it is not worth ringing about
-            if (remaining < -timeoutMinutes * 60_000L) return
+            // a timer first received at or after its deadline has missed its ring
+            if (remaining <= 0) return
             val obj = TimerObject(
                 id = sharedId.hashCode(),
                 label = mutableStateOf(label ?: TimeHelper.durationToName(durationSeconds)),
                 labelColor = mutableStateOf(labelColor),
-                currentPosition = mutableStateOf(remaining.coerceAtLeast(0L).toInt()),
+                currentPosition = mutableStateOf(remaining.toInt()),
                 initialPosition = mutableStateOf(durationSeconds * 1000),
                 state = mutableStateOf(WatchState.RUNNING),
                 incrementSeconds = incrementSeconds,
@@ -553,17 +553,8 @@ class TimerService : Service() {
                 vibrationPattern = vibrationPattern,
                 vibrationPatternName = vibrationPatternName
             )
-            if (remaining > 0) {
-                startForeground(obj.id, getNotification(obj))
-                enqueueNew(obj)
-            } else {
-                timerObjects.add(obj)
-                invokeChangeListener()
-                startRinging(obj)
-                if (timerObjects.none { it.state.value == WatchState.RUNNING }) {
-                    releaseWakeLock()
-                }
-            }
+            startForeground(obj.id, getNotification(obj))
+            enqueueNew(obj)
             return
         }
 

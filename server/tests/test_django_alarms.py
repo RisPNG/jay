@@ -130,3 +130,28 @@ def test_snooze_resolves_other_members_only_when_shared(client, group, member, a
     assert response.status_code == 201, response.data
     assert AlarmOccurrence.objects.get(alarm=alarm, identity_id="1" * 64, occurrence_key=key).state == "pending"
     assert AlarmOccurrence.objects.get(alarm=alarm, identity_id="2" * 64, occurrence_key=key).state == ("snoozed" if shared else "pending")
+
+
+def test_alarm_history_describes_edits_enabled_state_and_delivery(client, group, alarm_payload):
+    assert client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 201
+    alarm_id = alarm_payload.pop("id")
+    alarm_payload.pop("group_id")
+    created_history = client.get(f"/v1/alarms/{alarm_id}/activity").data["items"][0]
+    assert created_history["details"]["days"] == alarm_payload["days"]
+    assert created_history["details"]["enabled"] == alarm_payload["enabled"]
+    original_label = alarm_payload["label"]
+    for enabled, action in [(alarm_payload["enabled"], "edited"), (False, "disabled"), (True, "enabled")]:
+        response = client.put(f"/v1/alarms/{alarm_id}", {**alarm_payload, "label": "Morning", "enabled": enabled, "saved_at": timezone.now().isoformat()}, format="json", headers={"Idempotency-Key": str(uuid4())})
+        assert response.status_code == 200, response.data
+        history = client.get(f"/v1/alarms/{alarm_id}/activity").data["items"][0]
+        assert history["action"] == action
+        assert history["details"]["previous_label"] == original_label
+        assert history["details"]["label"] == "Morning"
+        assert history["details"]["time"] == response.data["local_time_ms"]
+        assert history["details"]["enabled"] == enabled
+        original_label = "Morning"
+    assert client.post(f"/v1/alarms/{alarm_id}/deliveries", {"revision": 4}, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 204
+    history = client.get(f"/v1/alarms/{alarm_id}/activity").data["items"][0]
+    assert history["action"] == "delivered"
+    assert history["subject_id"] == history["actor_id"]
+    assert history["subject_label"] == history["actor_label"]

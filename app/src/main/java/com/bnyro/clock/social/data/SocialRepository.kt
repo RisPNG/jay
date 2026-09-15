@@ -747,6 +747,7 @@ class SocialRepository(
     suspend fun updateAlarm(alarm: Alarm, onProgress: (SharedSoundProgress) -> Unit = {}) = withContext(Dispatchers.IO) {
         val link = socialDao.getAlarmLinkByLocalId(alarm.id)
         if (link == null) {
+            alarmUseCase.prepareForScheduling(alarm)
             alarmUseCase.updateAlarm(alarm)
         } else {
             val group = groups.first().first { it.id == link.groupId }

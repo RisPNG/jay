@@ -71,6 +71,7 @@ fun SocialChange.presentationTitle(context: Context, deviceId: String): String {
             groupName
         )
         "updated" -> when {
+            entityType == "alarm" -> context.getString(R.string.social_alarm_activity_title, actor, action, alarm, groupName)
             details?.get("previous_alarm_permission") != details?.get("alarm_permission") ->
                 context.getString(R.string.group_alarm_permissions_updated, actor, groupName)
             details?.get("previous_name") != details?.get("name") -> context.getString(
@@ -82,13 +83,14 @@ fun SocialChange.presentationTitle(context: Context, deviceId: String): String {
             else -> context.getString(R.string.group_notification_policy_updated, actor, groupName)
         }
         "invitation_created" -> context.getString(R.string.group_invitation_created, actor)
-        "delivered" -> context.getString(R.string.alarm_delivered_to_member, alarm, subject)
+        "delivered", "received" -> context.getString(R.string.alarm_delivered_to_member, alarm, subjectName ?: actor)
         "corrected" -> context.getString(R.string.ignored_alarm_corrected, alarm, groupName)
         else -> context.getString(R.string.group_activity_updated, groupName)
     }
 }
 
 fun SocialChange.groupLogTitle(context: Context): String {
+    if (entityType in setOf("alarm", "outcome", "delivery")) return presentationTitle(context, "")
     val actor = actorName ?: context.getString(R.string.unknown_group_member)
     val subject = subjectName ?: entityLabel ?: context.getString(R.string.unknown_group_member)
     return when (action) {
@@ -124,10 +126,9 @@ fun SocialChange.groupLogTitle(context: Context): String {
 
 fun SocialChange.alarmLogTitle(context: Context): String {
     val actor = actorName ?: context.getString(R.string.unknown_group_member)
-    val subject = subjectName ?: context.getString(R.string.unknown_group_member)
     return when (action) {
         "created" -> context.getString(R.string.alarm_log_created, actor)
-        "edited" -> context.getString(R.string.alarm_log_edited, actor)
+        "edited", "updated" -> context.getString(R.string.alarm_log_edited, actor)
         "enabled" -> context.getString(R.string.alarm_log_enabled, actor)
         "disabled" -> context.getString(R.string.alarm_log_disabled, actor)
         "deleted" -> if (
@@ -141,7 +142,7 @@ fun SocialChange.alarmLogTitle(context: Context): String {
         "snoozed" -> context.getString(R.string.alarm_log_snoozed, actor)
         "dismissed" -> context.getString(R.string.alarm_log_dismissed, actor)
         "ignored" -> context.getString(R.string.alarm_log_ignored, actor)
-        "delivered" -> context.getString(R.string.alarm_log_delivered, subject)
+        "delivered", "received" -> context.getString(R.string.alarm_log_delivered, subjectName ?: actor)
         "corrected" -> context.getString(R.string.alarm_log_corrected)
         else -> context.getString(R.string.group_activity_updated, groupName)
     }
@@ -157,7 +158,7 @@ fun SocialChange.logDetails(context: Context): String? {
                 add(context.getString(R.string.alarm_log_time, TimeHelper.millisToFormatted(context, it)))
             }
         }
-        entityType == "alarm" && action == "edited" -> buildList {
+        entityType == "alarm" && action in setOf("edited", "updated", "enabled", "disabled") -> buildList {
             if (details?.get("previous_label") != details?.get("label")) {
                 add(
                     context.getString(
@@ -184,22 +185,29 @@ fun SocialChange.logDetails(context: Context): String? {
                 }
             }
             val otherChanges = buildList {
+                if (details?.get("previous_label_color") != details?.get("label_color")) {
+                    add(context.getString(R.string.label_color))
+                }
                 if (details?.get("previous_days") != details?.get("days")) {
                     add(context.getString(R.string.days))
                 }
                 if (
                     details?.get("previous_repeat_interval") != details?.get("repeat_interval") ||
-                    details?.get("previous_repeat_unit") != details?.get("repeat_unit")
+                    details?.get("previous_repeat_unit") != details?.get("repeat_unit") ||
+                    details?.get("previous_repeat_anchor") != details?.get("repeat_anchor") ||
+                    details?.get("previous_start_date") != details?.get("start_date")
                 ) {
                     add(context.getString(R.string.repeats_every))
                 }
                 if (
-                    details?.get("previous_repeat_duration") != details?.get("repeat_duration")
+                    details?.get("previous_repeat_duration") != details?.get("repeat_duration") ||
+                    details?.get("previous_repeat_duration_unit") != details?.get("repeat_duration_unit")
                 ) {
                     add(context.getString(R.string.repeats_for))
                 }
                 if (
-                    details?.get("previous_end_occurrences") != details?.get("end_occurrences")
+                    details?.get("previous_end_occurrences") != details?.get("end_occurrences") ||
+                    details?.get("previous_end_date") != details?.get("end_date")
                 ) {
                     add(context.getString(R.string.ends))
                 }
@@ -209,7 +217,9 @@ fun SocialChange.logDetails(context: Context): String? {
                 if (details?.get("previous_snooze_minutes") != details?.get("snooze_minutes")) {
                     add(context.getString(R.string.alarm_log_snooze_duration))
                 }
-                if (details?.get("previous_sound_mode") != details?.get("sound_mode")) {
+                if (details?.get("previous_sound_mode") != details?.get("sound_mode") ||
+                    details?.get("previous_sound_id") != details?.get("sound_id")
+                ) {
                     add(context.getString(R.string.sound))
                 }
                 if (details?.get("previous_vibrate") != details?.get("vibrate")) {

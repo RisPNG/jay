@@ -15,7 +15,8 @@ class CreateUpdateDeleteAlarmUseCase(
 ) {
     @RequiresApi(Build.VERSION_CODES.M)
     suspend fun createAlarm(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()): Long {
-        prepareForScheduling(alarm, timeZone)
+        alarm.dismissedAt = null
+        if (AlarmHelper.hasRecurrenceEnded(alarm, timeZone)) alarm.enabled = false
         val newId = alarmRepository.addAlarm(alarm)
         val alarmWithId = alarm.copy(id = newId)
         AlarmHelper.enqueue(context, alarmWithId, timeZone = timeZone)
@@ -24,7 +25,8 @@ class CreateUpdateDeleteAlarmUseCase(
 
     @RequiresApi(Build.VERSION_CODES.M)
     suspend fun updateAlarm(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()) {
-        prepareForScheduling(alarm, timeZone)
+        alarm.dismissedAt = null
+        if (AlarmHelper.hasRecurrenceEnded(alarm, timeZone)) alarm.enabled = false
         alarmRepository.updateAlarm(alarm)
         AlarmHelper.enqueue(context, alarm, timeZone = timeZone)
     }

@@ -93,7 +93,7 @@ class SocialNotificationHelperTest {
     }
 
     @Test
-    fun accumulatedNotificationsTargetTheGroupContainingAllEvents() {
+    fun differentAlarmsKeepSeparateLogDestinations() {
         for (alarmId in listOf("alarm-one", "alarm-two")) {
             SocialNotificationHelper.notifySocialChanges(
                 context, SocialSyncResult(
@@ -102,8 +102,28 @@ class SocialNotificationHelperTest {
                 )
             )
         }
-        val intent = shadowOf(manager.activeNotifications.single().notification.contentIntent).savedIntent
-        assertEquals(group.id, intent.getStringExtra(SocialNotificationHelper.EXTRA_SOCIAL_GROUP_ID))
-        assertEquals(HomeRoutes.Groups, coordinator.homeRoute(intent))
+        val destinations = manager.activeNotifications.map {
+            val intent = shadowOf(it.notification.contentIntent).savedIntent
+            assertEquals(HomeRoutes.Alarm, coordinator.homeRoute(intent))
+            intent.getStringExtra(SocialNotificationHelper.EXTRA_SOCIAL_ENTITY_ID)
+        }.toSet()
+        assertEquals(setOf("alarm-one", "alarm-two"), destinations)
+    }
+
+    @Test
+    fun repeatedUpdatesToOneAlarmStillOpenThatAlarm() {
+        for (action in listOf("edited", "dismissed")) {
+            SocialNotificationHelper.notifySocialChanges(
+                context, SocialSyncResult(
+                    listOf(change.copy(entityType = if (action == "edited") "alarm" else "outcome", entityId = "alarm-one", entityLabel = "Wake up", action = action)),
+                    mapOf(group.id to group), "self"
+                )
+            )
+        }
+        val notification = manager.activeNotifications.single().notification
+        val intent = shadowOf(notification.contentIntent).savedIntent
+        assertEquals("alarm-one", intent.getStringExtra(SocialNotificationHelper.EXTRA_SOCIAL_ENTITY_ID))
+        assertEquals(HomeRoutes.Alarm, coordinator.homeRoute(intent))
+        assertEquals("2 updates for “Wake up” in Household", notification.extras.getCharSequence("android.title").toString())
     }
 }

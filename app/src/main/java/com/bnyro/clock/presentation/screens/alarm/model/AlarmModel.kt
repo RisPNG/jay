@@ -145,7 +145,9 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
 
     fun copyAlarm(alarm: Alarm) {
         viewModelScope.launch {
-            createUpdateDeleteAlarmUseCase.createAlarm(alarm.copy(id = 0L))
+            val copiedAlarm = alarm.copy(id = 0L)
+            createUpdateDeleteAlarmUseCase.prepareForScheduling(copiedAlarm)
+            createUpdateDeleteAlarmUseCase.createAlarm(copiedAlarm)
         }
     }
 
