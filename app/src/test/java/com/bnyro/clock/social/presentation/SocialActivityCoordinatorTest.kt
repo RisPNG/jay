@@ -82,13 +82,22 @@ class SocialActivityCoordinatorTest {
     @Test
     fun browserProfilePayloadIsPreservedAndLiteWorksWithoutFull() {
         val activity = Robolectric.buildActivity(LiteActivity::class.java).get()
-        val value = "${SocialLink.BASE_URL}/profile#name=Quiet&key=profile-secret"
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("${SocialLink.BASE_URL}/profile"))
-            .putExtra(SocialLink.EXTRA_LINK, value)
-        assertTrue(SocialActivityCoordinator(activity).receiveLink(intent))
-        assertEquals(value, Preferences.instance.getString(SocialPreferences.pendingProfileKey, null))
-        assertNull(intent.getStringExtra(SocialLink.EXTRA_LINK))
-        assertNull(shadowOf(activity).nextStartedActivity)
+        val installedFull = runCatching { activity.packageManager.getPackageInfo("com.rispng.jay", 0) }.getOrNull()
+        shadowOf(activity.packageManager).removePackage("com.rispng.jay")
+        try {
+            val value = "${SocialLink.BASE_URL}/profile#name=Quiet&key=profile-secret"
+            val intent = Intent.parseUri(
+                "intent://jay.poppybit.com/profile#Intent;scheme=https;package=com.rispng.jay.lite;" +
+                        "S.jay_link=${Uri.encode(value)};end",
+                Intent.URI_INTENT_SCHEME
+            )
+            assertTrue(SocialActivityCoordinator(activity).receiveLink(intent))
+            assertEquals(value, Preferences.instance.getString(SocialPreferences.pendingProfileKey, null))
+            assertNull(intent.getStringExtra(SocialLink.EXTRA_LINK))
+            assertNull(shadowOf(activity).nextStartedActivity)
+        } finally {
+            installedFull?.let { shadowOf(activity.packageManager).installPackage(it) }
+        }
     }
 
     @Test
