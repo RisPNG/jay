@@ -46,9 +46,7 @@
     <string name="offset">Зміщення</string>
     <string name="alphabetic">За алфавітом</string>
     <string name="hours">Години</string>
-    <plurals name="minutes">
-        <item quantity="one">Хвилини</item>
-    </plurals>
+    <string name="minutes">Хвилини</string>
     <string name="seconds">Секунди</string>
     <string name="dismiss">Відхилити</string>
     <string name="snooze">Відкласти</string>

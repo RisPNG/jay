@@ -40,7 +40,7 @@ import androidx.compose.material3.VerticalDivider
 import com.bnyro.clock.ui.theme.primaryFade
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +51,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.AlarmSortOrder
 import com.bnyro.clock.navigation.TopBarScaffold
@@ -66,6 +70,7 @@ import com.bnyro.clock.social.presentation.SocialAlarmActivityDialog
 import com.bnyro.clock.ui.theme.ItemFade
 import com.bnyro.clock.ui.theme.ItemSlide
 import com.bnyro.clock.util.AlarmHelper
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 
 private val FAB_SIZE = 56.dp
@@ -79,14 +84,25 @@ fun AlarmScreen(
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
-    val alarms by alarmModel.alarms.collectAsState()
-    val filters by alarmModel.filters.collectAsState()
-    val alarmSourceIds by alarmModel.alarmSourceIds.collectAsState()
-    val groups by alarmModel.groups.collectAsState()
-    val alarmGroupNames by alarmModel.alarmGroupNames.collectAsState()
-    val alarmEditability by alarmModel.alarmEditability.collectAsState()
-    val remoteAlarmIds by alarmModel.remoteAlarmIds.collectAsState()
-    val labelColors by alarmModel.labelColors.collectAsState()
+    val alarmSourceIds by alarmModel.alarmSourceIds.collectAsStateWithLifecycle()
+    val groups by alarmModel.groups.collectAsStateWithLifecycle()
+    val alarmGroupNames by alarmModel.alarmGroupNames.collectAsStateWithLifecycle()
+    val alarmEditability by alarmModel.alarmEditability.collectAsStateWithLifecycle()
+    val remoteAlarmIds by alarmModel.remoteAlarmIds.collectAsStateWithLifecycle()
+    val alarms by alarmModel.alarms.collectAsStateWithLifecycle()
+    val filters by alarmModel.filters.collectAsStateWithLifecycle()
+    val labelColors by alarmModel.labelColors.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentTime by produceState(System.currentTimeMillis(), lifecycleOwner, alarms.isNotEmpty()) {
+        if (alarms.isNotEmpty()) {
+            lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while (true) {
+                    value = System.currentTimeMillis()
+                    delay(1000L)
+                }
+            }
+        }
+    }
 
     val selectedAlarmIds = remember { mutableStateListOf<Long>() }
     val isSelectionMode = selectedAlarmIds.isNotEmpty()
@@ -290,6 +306,7 @@ fun AlarmScreen(
                                 alarm = alarm,
                                 groupName = alarmGroupNames[alarm.id],
                                 canEdit = alarmEditability[alarm.id] ?: true,
+                                currentTime = currentTime,
                                 isSelected = isSelected,
                                 isSelectionMode = isSelectionMode,
                                 onLongClick = { alarmItem ->

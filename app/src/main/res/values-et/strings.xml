@@ -78,9 +78,7 @@
     </plurals>
     <string name="hours">Tundi</string>
     <string name="seconds">Sekundit</string>
-    <plurals name="minutes">
-        <item quantity="one">Minutit</item>
-    </plurals>
+    <string name="minutes">Minutit</string>
     <string name="available_days_1">E</string>
     <string name="available_days_2">T</string>
     <string name="available_days_3">K</string>
