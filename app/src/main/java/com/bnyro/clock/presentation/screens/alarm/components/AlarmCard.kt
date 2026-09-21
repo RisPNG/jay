@@ -21,8 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
@@ -35,9 +33,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.repeatOnLifecycle
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.RepeatUnit
@@ -45,8 +40,6 @@ import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.TimeHelper
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -58,10 +51,10 @@ fun AlarmCard(
     onEnable: (Boolean) -> Unit,
     onActivity: (() -> Unit)? = null,
     canDismiss: Boolean,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    currentTime: Long = System.currentTimeMillis()
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -77,16 +70,7 @@ fun AlarmCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                val currentTime by produceState(System.currentTimeMillis(), lifecycleOwner) {
-                    lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                        while (isActive) {
-                            value = System.currentTimeMillis()
-                            delay(1000)
-                        }
-                    }
-                }
-                val millisRemaining = AlarmHelper.getAlarmTime(alarm)
-                    ?.minus(currentTime)
+                val millisRemaining = AlarmHelper.getAlarmTime(alarm)?.minus(currentTime)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

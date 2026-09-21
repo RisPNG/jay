@@ -162,8 +162,6 @@ class AlarmModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-
-
     fun deleteAlarm(alarm: Alarm) {
         viewModelScope.launch {
             runCatching { socialRepository.deleteAlarm(alarm) }
