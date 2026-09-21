@@ -7,7 +7,7 @@ import com.bnyro.clock.domain.repository.TimezoneRepository
 import com.bnyro.clock.social.data.SocialDatabase
 import com.bnyro.clock.social.data.SocialRepository
 
-class AppContainer(context: Context, database: AppDatabase) {
+class AppContainer(context: Context, val database: AppDatabase) {
     val alarmRepository: AlarmRepository by lazy {
         AlarmRepository(database.alarmsDao())
     }

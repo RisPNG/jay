@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Close
@@ -102,6 +103,14 @@ fun AlarmScreen(
                 }
             }
         }
+    }
+
+    val listState = rememberLazyListState()
+    LaunchedEffect(alarms.map { it.id }) {
+        listState.requestScrollToItem(
+            listState.firstVisibleItemIndex,
+            listState.firstVisibleItemScrollOffset
+        )
     }
 
     val selectedAlarmIds = remember { mutableStateListOf<Long>() }
@@ -295,7 +304,7 @@ fun AlarmScreen(
                     if (alarms.isEmpty()) {
                         BlobIconBox(icon = R.drawable.ic_alarm)
                     }
-                    LazyColumn(Modifier.fillMaxSize()) {
+                    LazyColumn(Modifier.fillMaxSize(), state = listState) {
                         items(
                             items = alarms,
                             key = { it.id }
