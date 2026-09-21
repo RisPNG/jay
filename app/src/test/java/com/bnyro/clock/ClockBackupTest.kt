@@ -96,9 +96,14 @@ class ClockBackupTest {
         val useCase = ClockBackupUseCase(app)
         app.container.alarmRepository.addAlarm(Alarm(time = 1000, label = "Imported"))
         TimerSettings.setSavedTimers(listOf(TimerSettings(seconds = 42)))
-        Preferences.edit { putString(Preferences.themeKey, "DARK") }
+        Preferences.edit {
+            putString(Preferences.themeKey, "DARK")
+            putString("jayDeviceSecret", "keep-secret")
+        }
         val backup = useCase.capture(emptyList())
+        assertFalse(backup.preferences.containsKey("jayDeviceSecret"))
         clearClockData()
+        Preferences.edit { putString("jayDeviceSecret", "current-secret") }
         app.container.alarmRepository.addAlarm(Alarm(time = 2000, label = "Existing"))
         TimerSettings.setSavedTimers(listOf(TimerSettings(seconds = 84)))
         val unrelated = app.getSharedPreferences("jay_identity", 0)
@@ -109,6 +114,7 @@ class ClockBackupTest {
         useCase.restore(backup)
         assertEquals(setOf("Imported", "Existing"), app.container.alarmRepository.getAlarms().map { it.label }.toSet())
         assertEquals(setOf(42, 84), TimerSettings.getSavedTimers().map { it.seconds }.toSet())
+        assertEquals("current-secret", Preferences.instance.getString("jayDeviceSecret", null))
         assertEquals("DARK", Preferences.instance.getString(Preferences.themeKey, null))
         assertEquals("keep", unrelated.getString("identity", null))
         assertEquals(7, widgets.getInt("widget", 0))

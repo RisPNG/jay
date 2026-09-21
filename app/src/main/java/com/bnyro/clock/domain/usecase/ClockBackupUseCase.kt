@@ -9,6 +9,7 @@ import com.bnyro.clock.domain.model.ClockBackup
 import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
@@ -22,7 +23,7 @@ class ClockBackupUseCase(private val context: Context) {
     private val container = (context.applicationContext as App).container
 
     suspend fun capture(activeTimers: List<BackupTimer>): ClockBackup {
-        val preferences = Preferences.instance.all.filterKeys { it != Preferences.savedTimersKey }
+        val preferences = Preferences.instance.all.filterKeys { it != Preferences.savedTimersKey && !it.startsWith("jay") }
             .mapValues { (_, value) ->
                 when (value) {
                     is Boolean -> BackupPreference("boolean", JsonPrimitive(value))
@@ -34,9 +35,10 @@ class ClockBackupUseCase(private val context: Context) {
                     else -> error("Unsupported preference")
                 }
             }
+        val sharedAlarmIds = container.socialRepository.alarmGroupNames.first().map { it.localAlarmId }.toSet()
         return ClockBackup(
-            alarms = container.alarmRepository.getAlarms().map { it.copy(id = 0) },
-            timers = TimerSettings.getSavedTimers().map { it.copy(id = 0) },
+            alarms = container.alarmRepository.getAlarms().filter { it.id !in sharedAlarmIds }.map { it.copy(id = 0) },
+            timers = TimerSettings.getSavedTimers().map { it.copy(id = 0, groupId = null) },
             activeTimers = activeTimers,
             timeZones = container.timezoneRepository.getTimezones(),
             preferences = preferences
@@ -45,7 +47,7 @@ class ClockBackupUseCase(private val context: Context) {
 
     suspend fun restore(backup: ClockBackup) {
         require(backup.version == 1)
-        val preferences = backup.preferences.mapValues { (_, preference) ->
+        val preferences = backup.preferences.filterKeys { !it.startsWith("jay") }.mapValues { (_, preference) ->
             when (preference.type) {
                 "boolean" -> preference.value.jsonPrimitive.boolean
                 "int" -> preference.value.jsonPrimitive.int
@@ -56,7 +58,7 @@ class ClockBackupUseCase(private val context: Context) {
                 else -> error("Unsupported preference")
             }
         }
-        val timers = (TimerSettings.getSavedTimers().map { it.copy(id = 0) } + backup.timers)
+        val timers = (TimerSettings.getSavedTimers().map { it.copy(id = 0) } + backup.timers.map { it.copy(id = 0, groupId = null) })
             .distinct()
         val addedAlarms = container.database.withTransaction {
             val existingAlarms = container.alarmRepository.getAlarms().map { it.copy(id = 0) }.toSet()
@@ -70,7 +72,7 @@ class ClockBackupUseCase(private val context: Context) {
             added
         }
         Preferences.edit {
-            clear()
+            Preferences.instance.all.keys.filterNot { it.startsWith("jay") }.forEach { remove(it) }
             preferences.forEach { (key, value) ->
                 when (value) {
                     is Boolean -> putBoolean(key, value)

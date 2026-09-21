@@ -83,3 +83,9 @@ Completing an upload queues verification and returns immediately. The worker str
 Provider work has a 60-second lease renewed every ten seconds, bounded timeouts and exponential retry with jitter up to a 300-second delay. Failures lasting 24 hours retain a classified terminal error for operator attention. Provider delivery is at least once; activity IDs prevent duplicate effective client actions. Heartbeats track progress by work class. Shutdown stops new claims and allows short work to finish; expired leases can be recovered by another worker.
 
 [Deployment](../server/README.md#deployment) covers health checks and recovery. [Performance guidance](../server/README.md#performance) describes capacity measurement and device checks.
+
+## Clock backups
+
+Settings exports a versioned ZIP containing personal alarms, saved timer configurations, active personal timers, selected world clocks, clock preferences and the selected audio files. Alarm recurrence, bounds, dismissal state and per-item sound, vibration, snooze, increment and label-color options are retained. Imports merge clock items and apply backed-up clock settings. Active timers return paused with their saved remaining time. The older alarm-only JSON format remains importable.
+
+Jay profiles, group membership and shared clock state stay with the current social profile and continue synchronizing from the server. Backups exclude social credentials and pending links, widgets and the stopwatch. Saved timer configurations are portable personal templates; their group assignment is not transferred.
