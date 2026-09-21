@@ -17,16 +17,22 @@ class AppLinksView(APIView):
 
     @extend_schema(responses={200: {"type": "array", "items": {"type": "object"}}})
     def get(self, request):
-        return Response([{"relation": ["delegate_permission/common.handle_all_urls"], "target": {"namespace": "android_app", "package_name": package, "sha256_cert_fingerprints": hashes}} for package, hashes in settings.ANDROID_APP_LINKS.items() if hashes])
+        return Response([{"relation": ["delegate_permission/common.handle_all_urls"], "target": {"namespace": "android_app", "package_name": package, "sha256_cert_fingerprints": hashes}} for package, hashes in settings.ANDROID_APP_LINKS.items() if hashes and package in ("com.rispng.jay", "com.rispng.jay.lite")])
 
 
 class InstallView(View):
     def get(self, request):
-        response = HttpResponse(status=302)
-        response["Location"] = "https://play.google.com/store/apps/details?id=com.rispng.jay#"
+        response = render(request, "app_link.html")
+        response["Content-Security-Policy"] = "default-src 'none'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'"
         response["Cache-Control"] = "no-store"
         response["Referrer-Policy"] = "no-referrer"
         return response
+
+
+def app_link_script(request):
+    response = HttpResponse((Path(__file__).parent / "static" / "app_link.js").read_bytes(), content_type="text/javascript")
+    response["Cache-Control"] = "no-cache"
+    return response
 
 
 class HealthLiveView(APIView):

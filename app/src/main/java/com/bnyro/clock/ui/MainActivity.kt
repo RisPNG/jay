@@ -98,6 +98,8 @@ class MainActivity : ComponentActivity() {
             } else savedInstanceState
         )
 
+        if (isFinishing) return
+
         val allPermissions = PermissionModel.allPermissions
         val requiredPermissions = allPermissions.any {
             !it.hasPermission(this)
@@ -168,7 +170,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         if (
             intent.action == SocialNotificationHelper.SHOW_SOCIAL_ACTIVITY_ACTION ||
-            intent.action == Intent.ACTION_VIEW && SocialLink.parse(intent.dataString.orEmpty()) != null
+            intent.action == Intent.ACTION_VIEW && SocialLink.parse(intent.getStringExtra(SocialLink.EXTRA_LINK) ?: intent.dataString.orEmpty()) != null
         ) {
             recreate()
         }

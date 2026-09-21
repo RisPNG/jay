@@ -18,8 +18,21 @@ class SocialActivityCoordinator(private val activity: ComponentActivity) {
 
     fun receiveLink(intent: Intent?): Boolean {
         if (intent?.action != Intent.ACTION_VIEW) return false
-        val value = intent.dataString ?: return false
+        val value = intent.getStringExtra(SocialLink.EXTRA_LINK) ?: intent.dataString ?: return false
         val link = SocialLink.parse(value) ?: return false
+        if (activity.packageName == "com.rispng.jay.lite") {
+            val fullIntent = Intent(Intent.ACTION_VIEW, intent.data).apply {
+                setClassName("com.rispng.jay", "com.bnyro.clock.ui.MainActivity")
+                putExtra(SocialLink.EXTRA_LINK, value)
+            }
+            if (activity.packageManager.resolveActivity(fullIntent, 0) != null) {
+                activity.startActivity(fullIntent)
+                intent.data = null
+                intent.removeExtra(SocialLink.EXTRA_LINK)
+                activity.finish()
+                return true
+            }
+        }
         val key = when (link.destination) {
             "join" -> SocialPreferences.pendingInvitationKey
             "profile" -> SocialPreferences.pendingProfileKey
@@ -27,6 +40,7 @@ class SocialActivityCoordinator(private val activity: ComponentActivity) {
         }
         Preferences.edit { putString(key, value) }
         intent.data = null
+        intent.removeExtra(SocialLink.EXTRA_LINK)
         return true
     }
 

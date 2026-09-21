@@ -1,6 +1,9 @@
 package com.bnyro.clock.social.presentation
 
 import android.app.Application
+import android.content.pm.ActivityInfo
+import android.content.pm.ResolveInfo
+import org.robolectric.Shadows.shadowOf
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.ComponentActivity
@@ -43,6 +46,49 @@ class SocialActivityCoordinatorTest {
             assertNull(intent.data)
             assertFalse(coordinator.receiveLink(intent))
         }
+    }
+
+    class LiteActivity : ComponentActivity() {
+        override fun getPackageName() = "com.rispng.jay.lite"
+    }
+
+    @Test
+    fun liteForwardsBothLinkKindsToInstalledFullWithoutQueuingLocally() {
+        val activity = Robolectric.buildActivity(LiteActivity::class.java).get()
+        val coordinator = SocialActivityCoordinator(activity)
+        for (value in listOf(
+            "${SocialLink.BASE_URL}/join?token=invitation",
+            "${SocialLink.BASE_URL}/profile#name=Quiet&key=profile-secret"
+        )) {
+            val link = Uri.parse(value)
+            val target = Intent(Intent.ACTION_VIEW, link).setClassName(
+                "com.rispng.jay", "com.bnyro.clock.ui.MainActivity"
+            )
+            shadowOf(activity.packageManager).addResolveInfoForIntent(target, ResolveInfo().apply {
+                activityInfo = ActivityInfo().apply {
+                    packageName = "com.rispng.jay"
+                    name = "com.bnyro.clock.ui.MainActivity"
+                }
+            })
+            assertTrue(coordinator.receiveLink(Intent(Intent.ACTION_VIEW, link)))
+            val forwarded = shadowOf(activity).nextStartedActivity
+            assertEquals("com.rispng.jay", forwarded.component?.packageName)
+            assertEquals(value, forwarded.getStringExtra(SocialLink.EXTRA_LINK))
+            assertTrue(Preferences.instance.all.isEmpty())
+            shadowOf(activity.packageManager).removeResolveInfosForIntent(target, "com.rispng.jay")
+        }
+    }
+
+    @Test
+    fun browserProfilePayloadIsPreservedAndLiteWorksWithoutFull() {
+        val activity = Robolectric.buildActivity(LiteActivity::class.java).get()
+        val value = "${SocialLink.BASE_URL}/profile#name=Quiet&key=profile-secret"
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("${SocialLink.BASE_URL}/profile"))
+            .putExtra(SocialLink.EXTRA_LINK, value)
+        assertTrue(SocialActivityCoordinator(activity).receiveLink(intent))
+        assertEquals(value, Preferences.instance.getString(SocialPreferences.pendingProfileKey, null))
+        assertNull(intent.getStringExtra(SocialLink.EXTRA_LINK))
+        assertNull(shadowOf(activity).nextStartedActivity)
     }
 
     @Test

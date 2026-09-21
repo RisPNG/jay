@@ -170,3 +170,11 @@ Use `/health/live` for web liveness, `/health/ready` for database and schema rea
 Size web and worker processes from measured traffic and resource use. Account for all process pools, live-listener connections and deployment overlap when setting the database connection budget. Long-lived streams and group fan-out affect capacity beyond ordinary request rates.
 
 Load-test representative group sizes, concurrent connections, shared edits, deadline bursts and offline reconnections in an isolated environment. Measure response and synchronization latency, errors, worker backlog, CPU, memory and database connections, including recovery after failures. Check audio transfer and playback separately on real devices: metadata scheduling must proceed while audio is pending, with the default ringtone available when needed. Passing local tests alone does not establish production capacity.
+
+## Production app links
+
+For the official deployment, copy the complete contents of [`android-app-links.json`](android-app-links.json) into `ANDROID_APP_LINKS` and redeploy. These are public production certificate fingerprints for Play and directly distributed APKs.
+
+Set `ANDROID_APP_LINKS` to a JSON object containing both `com.rispng.jay` and `com.rispng.jay.lite`, with each package's Play app-signing SHA-256 certificate fingerprints. Include the production APK signing certificate too when distributing APKs outside Play. The upload certificate alone does not verify a Play-signed installation. Debug and unrelated packages are never published in the association response. After deployment, verify `https://jay.poppybit.com/.well-known/assetlinks.json` and reinstall or reverify each release edition on a device.
+
+Only release manifests register `/join` and `/profile`. If Android selects Lite while Full is installed, Lite forwards the original link to Full. If link verification is disabled or the browser handles the URL, a page offers explicit Full and Lite buttons. The browser hands profile fragments directly to the selected app as an intent extra; they are not sent to the server or Play Store. The selected edition's store page is the fallback when it is absent.

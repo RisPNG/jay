@@ -8,13 +8,14 @@ from .social.api.groups import GroupListView, GroupSyncView, GroupView, Invitati
 from .social.api.identities import CapabilitiesView, EntitlementView, IdentitySyncView, IdentityView, PushSubscriptionView, RegistrationView
 from .social.api.sounds import SoundCompleteView, SoundDownloadView, SoundUploadListView, SoundUploadView, SoundView
 from .social.api.timers import TimerListView, TimerView
-from .views import AppLinksView, HealthLiveView, HealthReadyView, InstallView, documentation, documentation_asset
+from .views import AppLinksView, HealthLiveView, HealthReadyView, InstallView, app_link_script, documentation, documentation_asset
 
 
 urlpatterns = [
     path(".well-known/assetlinks.json", AppLinksView.as_view()),
     path("join", InstallView.as_view()),
     path("profile", InstallView.as_view()),
+    path("app-link.js", app_link_script),
     path("health", HealthLiveView.as_view()),
     path("health/live", HealthLiveView.as_view()),
     path("health/ready", HealthReadyView.as_view()),

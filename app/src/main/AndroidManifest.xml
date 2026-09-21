@@ -16,6 +16,10 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <queries>
+        <package android:name="com.rispng.jay" />
+    </queries>
+
     <application
             android:name=".App"
             android:allowBackup="true"
@@ -64,14 +68,7 @@
 
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="jay.poppybit.com" />
-                <data android:path="/join" />
-                <data android:path="/profile" />
-            </intent-filter>
+
         </activity>
 
         <activity-alias

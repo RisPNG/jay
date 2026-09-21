@@ -5,6 +5,7 @@ import java.net.URLDecoder
 
 data class SocialLink(val destination: String, val parameters: Map<String, String>) {
     companion object {
+        const val EXTRA_LINK = "jay_link"
         const val BASE_URL = "https://jay.poppybit.com"
 
         fun parse(value: String): SocialLink? = runCatching {
