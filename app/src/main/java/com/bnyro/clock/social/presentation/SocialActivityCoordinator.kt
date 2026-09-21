@@ -2,6 +2,7 @@ package com.bnyro.clock.social.presentation
 
 import android.content.Intent
 import androidx.activity.ComponentActivity
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.bnyro.clock.App
 import com.bnyro.clock.navigation.HomeRoutes
@@ -21,9 +22,8 @@ class SocialActivityCoordinator(private val activity: ComponentActivity) {
         val value = intent.getStringExtra(SocialLink.EXTRA_LINK) ?: intent.dataString ?: return false
         val link = SocialLink.parse(value) ?: return false
         if (activity.packageName == "com.rispng.jay.lite") {
-            val fullIntent = Intent(Intent.ACTION_VIEW, intent.data).apply {
+            val fullIntent = Intent(Intent.ACTION_VIEW, value.toUri()).apply {
                 setClassName("com.rispng.jay", "com.bnyro.clock.ui.MainActivity")
-                putExtra(SocialLink.EXTRA_LINK, value)
             }
             if (activity.packageManager.resolveActivity(fullIntent, 0) != null) {
                 activity.startActivity(fullIntent)

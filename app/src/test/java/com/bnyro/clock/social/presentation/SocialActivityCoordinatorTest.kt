@@ -70,10 +70,12 @@ class SocialActivityCoordinatorTest {
                     name = "com.bnyro.clock.ui.MainActivity"
                 }
             })
-            assertTrue(coordinator.receiveLink(Intent(Intent.ACTION_VIEW, link)))
+            val incoming = Intent(Intent.ACTION_VIEW, Uri.parse("${SocialLink.BASE_URL}/${if (value.contains("/profile")) "profile" else "join"}"))
+                .putExtra(SocialLink.EXTRA_LINK, value)
+            assertTrue(coordinator.receiveLink(incoming))
             val forwarded = shadowOf(activity).nextStartedActivity
             assertEquals("com.rispng.jay", forwarded.component?.packageName)
-            assertEquals(value, forwarded.getStringExtra(SocialLink.EXTRA_LINK))
+            assertEquals(value, forwarded.dataString)
             assertTrue(Preferences.instance.all.isEmpty())
             shadowOf(activity.packageManager).removeResolveInfosForIntent(target, "com.rispng.jay")
         }
