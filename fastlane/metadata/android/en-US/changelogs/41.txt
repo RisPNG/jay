@@ -1,0 +1,5 @@
+- Remember alarm sorting, default to upcoming, and retain scroll position when dismissing alarms.
+- Back up and merge personal alarms, timers, world clocks, settings, and selected sounds. Restore active timers paused.
+- Open group and profile links in Jay or Jay Lite, preferring Jay when both are installed.
+- Align alarm and timer pickers and improve stopwatch readability for long durations.
+- Fix widget interactions, translations, and countdown updates.
