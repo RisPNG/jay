@@ -1,0 +1,3 @@
+- Keep alarm editor buttons clear of system navigation, display cutouts, and the keyboard.
+- Replace fixed navigation-bar spacing with the actual space needed by the device.
+- Keep alarm and timer ringing controls clear of system bars and cutouts in portrait and landscape.
