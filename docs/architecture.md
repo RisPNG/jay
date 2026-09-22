@@ -86,6 +86,6 @@ Provider work has a 60-second lease renewed every ten seconds, bounded timeouts 
 
 ## Clock backups
 
-Settings exports a versioned ZIP containing personal alarms, saved timer configurations, active personal timers, selected world clocks, clock preferences and the selected audio files. Alarm recurrence, bounds, dismissal state and per-item sound, vibration, snooze, increment and label-color options are retained. Imports merge clock items and apply backed-up clock settings. Active timers return paused with their saved remaining time. The older alarm-only JSON format remains importable.
+Settings exports a versioned ZIP containing personal alarms, saved timer configurations, active personal timers, selected world clocks, clock preferences and the selected audio files. Alarm recurrence, bounds, dismissal state and per-item sound, vibration, snooze, increment and label-color options are retained. Imports merge clock items and apply backed-up clock settings. Active timers return paused with their saved remaining time.
 
 Jay profiles, group membership and shared clock state stay with the current social profile and continue synchronizing from the server. Backups exclude social credentials and pending links, widgets and the stopwatch. Saved timer configurations are portable personal templates; their group assignment is not transferred.
