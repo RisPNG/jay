@@ -76,7 +76,7 @@ private fun TimerAlertControls(
     RingingTitle(
         label,
         showSeconds = true,
-        time = Instant.ofEpochMilli(ringingSince).atZone(ZoneId.systemDefault()),
+        finishedAt = Instant.ofEpochMilli(ringingSince).atZone(ZoneId.systemDefault()),
         groupName = groupName
     )
 
