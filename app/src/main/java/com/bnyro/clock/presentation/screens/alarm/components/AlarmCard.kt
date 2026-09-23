@@ -1,6 +1,7 @@
 package com.bnyro.clock.presentation.screens.alarm.components
 
 import androidx.compose.foundation.clickable
+import com.bnyro.clock.ui.theme.resolveLabelColor
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,7 +23,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -98,7 +98,7 @@ fun AlarmCard(
                         )
                     }
                     alarm.label?.let {
-                        Icon(Icons.AutoMirrored.Filled.Label, null, tint = Color(alarm.labelColor))
+                        Icon(Icons.AutoMirrored.Filled.Label, null, tint = resolveLabelColor(alarm.labelColor))
                         Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = it,
