@@ -1,0 +1,3 @@
+The ringing alarm clock now shows the current time, with the scheduled time as the label when no name is set.
+Snoozed alarms now show a notification, a live countdown, and a dismiss button.
+Added an alarm volume slider in Settings.
