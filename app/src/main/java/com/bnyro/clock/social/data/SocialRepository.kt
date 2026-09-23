@@ -406,7 +406,9 @@ class SocialRepository(
                 Preferences.edit {
                     remove("${SocialPreferences.alarmOccurrencePrefix}${alarm.id}")
                 }
-                if ((occurrenceId.toLongOrNull() ?: 0L) > System.currentTimeMillis()) {
+                if (alarm.snoozedUntil != null ||
+                    (occurrenceId.toLongOrNull() ?: 0L) > System.currentTimeMillis()
+                ) {
                     alarmUseCase.dismissUpcomingAlarm(alarm)
                 } else if (alarm.enabled) {
                     AlarmHelper.enqueue(context, alarm, skipToday = true)

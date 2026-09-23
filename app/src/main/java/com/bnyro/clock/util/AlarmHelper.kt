@@ -10,6 +10,7 @@ import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import com.bnyro.clock.App
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.RepeatAnchor
@@ -20,6 +21,7 @@ import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.social.data.SocialAlarmSchedule
 import com.bnyro.clock.util.receivers.AlarmReceiver
 import com.bnyro.clock.util.receivers.PreAlarmReceiver
+import kotlinx.coroutines.runBlocking
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -65,11 +67,11 @@ object AlarmHelper {
     ) {
         if (!Permission.AlarmPermission.hasPermission(context)) return
         cancel(context, alarm)
-        if (!alarm.enabled) {
+        if (!alarm.enabled && alarm.snoozedUntil == null) {
             Log.d("AlarmHelper", "Alarm Is disabled")
             return
         }
-        if (hasRecurrenceEnded(alarm, timeZone)) {
+        if (alarm.snoozedUntil == null && hasRecurrenceEnded(alarm, timeZone)) {
             Log.d("AlarmHelper", "Alarm has no occurrence left")
             return
         }
@@ -91,7 +93,11 @@ object AlarmHelper {
         alarmManager.setAlarmClock(alarmInfo, getPendingIntent(context, alarm))
 
         val preAlarmTime = triggerTime - PRE_ALARM_DELAY
-        if (preAlarmTime > System.currentTimeMillis()) {
+        if (alarm.snoozedUntil != null) {
+            context.sendBroadcast(
+                Intent(context, PreAlarmReceiver::class.java).putExtra(EXTRA_ID, alarm.id)
+            )
+        } else if (preAlarmTime > System.currentTimeMillis()) {
             alarmManager.setExactAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
                 preAlarmTime,
@@ -164,6 +170,7 @@ object AlarmHelper {
         skipToday: Boolean = false,
         timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
     ): Long? {
+        alarm.snoozedUntil?.let { return it }
         val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
         return getNextOccurrence(alarm, skipToday, timeZone)
             ?.atTime(hours, minutes)
@@ -373,7 +380,11 @@ object AlarmHelper {
         calendar.add(Calendar.MINUTE, snoozeMinutes)
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)
-        schedule(context, oldAlarm, calendar.timeInMillis)
+        val alarm = oldAlarm.copy(snoozedUntil = calendar.timeInMillis)
+        runBlocking {
+            (context.applicationContext as App).container.alarmRepository.updateAlarm(alarm)
+        }
+        enqueue(context, alarm)
     }
     /**
      * @return the days of the week mapped to an index 0-Sunday, 1-Monday, ..., 6-Saturday.

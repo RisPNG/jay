@@ -102,7 +102,7 @@ fun RingingAlert(icon: Painter, controls: @Composable ColumnScope.() -> Unit) {
 }
 
 /**
- * The time a ringing screen leads with, which is the time an alarm was set for and the moment a
+ * The time a ringing screen leads with, which is the current time for an alarm and the moment a
  * timer finished, over the group whatever is ringing comes from, and the name of whatever is
  * ringing, which a reader woken by it reads first.
  */
