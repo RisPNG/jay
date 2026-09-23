@@ -43,7 +43,7 @@ import com.bnyro.clock.presentation.screens.ringing.RingingActivity
 import com.bnyro.clock.presentation.screens.timer.TimerAlertActivity
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.NotificationHelper
-import com.bnyro.clock.ui.theme.SnowLabelColor
+import com.bnyro.clock.ui.theme.DefaultLabelColor
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.social.data.SocialTimerActions
 import com.bnyro.clock.util.widgets.TextColor
@@ -528,7 +528,7 @@ class TimerService : Service() {
         val sharedId = intent.getStringExtra(SHARED_TIMER_ID_EXTRA_KEY) ?: return
         val groupName = intent.getStringExtra(SHARED_TIMER_GROUP_NAME_EXTRA_KEY)
         val label = intent.getStringExtra(SHARED_TIMER_LABEL_EXTRA_KEY)
-        val labelColor = intent.getIntExtra(SHARED_TIMER_LABEL_COLOR_EXTRA_KEY, SnowLabelColor)
+        val labelColor = intent.getIntExtra(SHARED_TIMER_LABEL_COLOR_EXTRA_KEY, DefaultLabelColor)
         val durationSeconds = intent.getIntExtra(SHARED_TIMER_DURATION_EXTRA_KEY, 0)
         val incrementSeconds = intent.getIntExtra(SHARED_TIMER_INCREMENT_EXTRA_KEY, 60)
         val expiresAt = intent.getLongExtra(SHARED_TIMER_EXPIRES_EXTRA_KEY, 0L)

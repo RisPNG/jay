@@ -2205,7 +2205,7 @@
                     },
                     "label_color": {
                         "type": "integer",
-                        "maximum": -1,
+                        "maximum": 0,
                         "minimum": -16777216
                     },
                     "enabled": {
@@ -2344,7 +2344,7 @@
                     },
                     "label_color": {
                         "type": "integer",
-                        "maximum": -1,
+                        "maximum": 0,
                         "minimum": -16777216
                     },
                     "enabled": {
@@ -3697,7 +3697,7 @@
                     },
                     "label_color": {
                         "type": "integer",
-                        "maximum": -1,
+                        "maximum": 0,
                         "minimum": -16777216
                     },
                     "duration_seconds": {
@@ -3771,7 +3771,7 @@
                     },
                     "label_color": {
                         "type": "integer",
-                        "maximum": -1,
+                        "maximum": 0,
                         "minimum": -16777216
                     },
                     "duration_seconds": {

@@ -13,7 +13,7 @@ class SharedAlarm(SavedState):
     revision = models.PositiveIntegerField(default=1)
     local_time_ms = models.PositiveIntegerField()
     label = models.CharField(max_length=200, null=True)
-    label_color = models.IntegerField(default=-1)
+    label_color = models.IntegerField(default=0)
     enabled = models.BooleanField()
     days = ArrayField(models.PositiveSmallIntegerField(), size=7)
     vibrate = models.BooleanField()

@@ -36,7 +36,7 @@ class SharedTimerLabelColorTest {
 
             intent.removeExtra(TimerService.SHARED_TIMER_LABEL_COLOR_EXTRA_KEY)
             service.onStartCommand(intent, 0, 3)
-            assertEquals(-1, service.timerObjects.single().labelColor.value)
+            assertEquals(0, service.timerObjects.single().labelColor.value)
         } finally {
             controller.destroy()
         }

@@ -3,7 +3,7 @@ package com.bnyro.clock.social.domain
 import androidx.room.Entity
 import androidx.room.Index
 import kotlinx.serialization.SerialName
-import com.bnyro.clock.ui.theme.SnowLabelColor
+import com.bnyro.clock.ui.theme.DefaultLabelColor
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -215,7 +215,7 @@ data class SharedAlarmRequest(
     @SerialName("group_id") val groupId: String? = null,
     @SerialName("local_time_ms") val time: Long,
     val label: String?,
-    @SerialName("label_color") val labelColor: Int = SnowLabelColor,
+    @SerialName("label_color") val labelColor: Int = DefaultLabelColor,
     val enabled: Boolean,
     val days: List<Int>,
     val vibrate: Boolean,
@@ -320,7 +320,7 @@ data class SharedAlarmDto(
     @SerialName("save_id") val saveId: String,
     @SerialName("local_time_ms") val time: Long,
     val label: String?,
-    @SerialName("label_color") val labelColor: Int = SnowLabelColor,
+    @SerialName("label_color") val labelColor: Int = DefaultLabelColor,
     val enabled: Boolean,
     val days: List<Int>,
     val vibrate: Boolean,
@@ -370,7 +370,7 @@ data class ActivityPageDto(
 @Serializable
 data class SharedTimerRequest(
     val label: String? = null,
-    @SerialName("label_color") val labelColor: Int = SnowLabelColor,
+    @SerialName("label_color") val labelColor: Int = DefaultLabelColor,
     @SerialName("duration_seconds") val durationSeconds: Int,
     @SerialName("increment_seconds") val incrementSeconds: Int,
     val vibrate: Boolean = true,
@@ -387,7 +387,7 @@ data class SharedTimerDto(
     val id: String,
     @SerialName("group_id") val groupId: String,
     val label: String?,
-    @SerialName("label_color") val labelColor: Int = SnowLabelColor,
+    @SerialName("label_color") val labelColor: Int = DefaultLabelColor,
     @SerialName("duration_seconds") val durationSeconds: Int,
     @SerialName("increment_seconds") val incrementSeconds: Int,
     @SerialName("expires_at") val expiresAt: String,

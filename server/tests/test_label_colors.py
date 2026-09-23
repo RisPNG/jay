@@ -11,7 +11,7 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 
 @pytest.mark.parametrize("kind", ["alarm", "timer"])
-@pytest.mark.parametrize("color", [-1, -16777216, -15584170])
+@pytest.mark.parametrize("color", [0, -1, -16777216, -15584170])
 def test_label_colors_survive_saves_and_group_sync(client, group, alarm_payload, timer_payload, kind, color):
     payload = dict(alarm_payload if kind == "alarm" else timer_payload, label_color=color)
     collection = "/v1/alarms" if kind == "alarm" else f"/v1/groups/{group.pk}/timers"
@@ -42,16 +42,16 @@ def test_label_colors_survive_saves_and_group_sync(client, group, alarm_payload,
 
 
 @pytest.mark.parametrize("kind", ["alarm", "timer"])
-def test_legacy_items_default_to_snow(client, group, alarm_payload, timer_payload, kind):
+def test_new_items_default_to_theme_color(client, group, alarm_payload, timer_payload, kind):
     payload = alarm_payload if kind == "alarm" else timer_payload
     endpoint = "/v1/alarms" if kind == "alarm" else f"/v1/groups/{group.pk}/timers"
     response = client.post(endpoint, payload, format="json", headers={"Idempotency-Key": str(uuid4())})
     assert response.status_code == 201, response.data
-    assert response.data["label_color"] == -1
+    assert response.data["label_color"] == 0
 
 
 @pytest.mark.parametrize("kind", ["alarm", "timer"])
-@pytest.mark.parametrize("color", [0, -16777217, None])
+@pytest.mark.parametrize("color", [1, -16777217, None])
 def test_label_colors_reject_nonopaque_or_missing_values(client, group, alarm_payload, timer_payload, kind, color):
     payload = dict(alarm_payload if kind == "alarm" else timer_payload, label_color=color)
     endpoint = "/v1/alarms" if kind == "alarm" else f"/v1/groups/{group.pk}/timers"
