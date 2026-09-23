@@ -1,0 +1,3 @@
+• Alarms now re-sort immediately when enabled or disabled.
+• The sort menu shows the selected order.
+• Added a Default label colour that follows light and dark mode for alarms and timers.
