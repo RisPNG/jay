@@ -1,3 +1,4 @@
-The ringing alarm clock now shows the current time, with the scheduled time as the label when no name is set.
-Snoozed alarms now show a notification, a live countdown, and a dismiss button.
-Added an alarm volume slider in Settings.
+Alarm and timer ringing screens now show a larger live clock, with consistent text sizes and icons below it.
+Unnamed alarms show their scheduled time as the label. Timers keep their finished time beside a bell icon.
+Snoozed alarms show a notification, a live countdown, and a dismiss button, and stay snoozed after restarting the phone.
+Added an alarm volume slider in Settings that controls the phone's alarm volume.
