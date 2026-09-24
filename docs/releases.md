@@ -4,7 +4,7 @@ Releases come only from the `jay` branch. The head commit message decides whethe
 
 ## Which version to change
 
-Jay and Clock You keep separate version numbers in `gradle.properties`. Change `jayVersionName` and `jayVersionCode` for Jay, increasing both for a Google Play release. `clockYouVersionName` and `clockYouVersionCode` record the Clock You base shown in the app.
+Jay and Clock You keep separate version numbers in `gradle.properties`. Keep `jayVersionName` and `jayVersionCode` unchanged across updates and merges until the current Jay version has a matching `Release` commit. Then increase the name to the next patch version and the code once for the next update. `clockYouVersionName` and `clockYouVersionCode` record the Clock You base shown in the app.
 
 Jay uses `com.rispng.jay`, Jay Lite uses `com.rispng.jay.lite`, and debug builds use `com.rispng.jay.debug`. These packages remain the same in stable releases and prereleases.
 
