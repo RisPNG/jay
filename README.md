@@ -146,6 +146,8 @@ If something does not work as expected, or you have an idea that could make Jay 
 
 If you want to contribute code, start with the [contributing guide](CONTRIBUTING.md). It explains how Jay builds on Clock You's source, the branch pipeline, and where each kind of change belongs.
 
+If you submit a Clock You contribution upstream, follow [Clock You's contribution rules](https://github.com/you-apps/ClockYou/blob/main/CONTRIBUTING), including its AI usage guidelines.
+
 ## Credits
 
 A lot of what makes Jay useful is already there because of [You Apps](https://github.com/you-apps) and [Clock You's contributors](https://github.com/you-apps/ClockYou/graphs/contributors). The alarms, world clocks, stopwatch, widgets, and much of the Android behaviour come from their work. Thank you for making that available for others to build on.
