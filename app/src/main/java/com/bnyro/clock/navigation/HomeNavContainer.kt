@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -111,6 +112,7 @@ fun HomeNavContainer(
         ) {
             if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 NavigationRail {
+                    Spacer(modifier = Modifier.weight(1f))
                     filteredRoutes.forEachIndexed { index, item ->
                         NavigationRailItem(
                             selected = pagerState.currentPage == index,
@@ -122,6 +124,7 @@ fun HomeNavContainer(
                             icon = { Icon(item.icon, null) },
                             label = { Text(stringResource(item.stringRes)) })
                     }
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
             HorizontalPager(
