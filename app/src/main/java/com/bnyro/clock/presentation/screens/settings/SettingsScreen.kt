@@ -144,7 +144,7 @@ fun SettingsScreen(
     )
 
     val exportDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip"),
+        contract = ActivityResultContracts.CreateDocument("application/json"),
         onResult = { fileUri ->
             fileUri?.let { uri ->
                 val timers = (context as MainActivity).timerModel.scheduledObjects.value.filter { it.sharedTimerId == null }.map {
@@ -483,14 +483,14 @@ fun SettingsScreen(
                 summary = stringResource(R.string.import_backup_description),
                 imageVector = Icons.Default.Restore
             ) {
-                documentPickerLauncher.launch(arrayOf("application/zip"))
+                documentPickerLauncher.launch(arrayOf("application/json", "text/plain"))
             }
             IconPreference(
                 title = stringResource(R.string.export_backup),
                 summary = stringResource(R.string.export_backup_description),
                 imageVector = Icons.Default.Backup
             ) {
-                exportDocumentLauncher.launch("jay_backup.zip")
+                exportDocumentLauncher.launch("jay_backup.json")
             }
             HorizontalDivider(
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),

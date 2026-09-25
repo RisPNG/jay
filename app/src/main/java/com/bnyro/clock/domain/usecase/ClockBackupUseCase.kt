@@ -47,7 +47,7 @@ class ClockBackupUseCase(private val context: Context) {
 
     suspend fun restore(backup: ClockBackup) {
         require(backup.version == 1)
-        val preferences = backup.preferences.filterKeys { !it.startsWith("jay") }.mapValues { (_, preference) ->
+        val preferences = backup.preferences?.filterKeys { !it.startsWith("jay") }?.mapValues { (_, preference) ->
             when (preference.type) {
                 "boolean" -> preference.value.jsonPrimitive.boolean
                 "int" -> preference.value.jsonPrimitive.int
@@ -71,16 +71,18 @@ class ClockBackupUseCase(private val context: Context) {
             container.timezoneRepository.replaceAll(*timeZones.toTypedArray())
             added
         }
-        Preferences.edit {
-            Preferences.instance.all.keys.filterNot { it.startsWith("jay") }.forEach { remove(it) }
-            preferences.forEach { (key, value) ->
-                when (value) {
-                    is Boolean -> putBoolean(key, value)
-                    is Int -> putInt(key, value)
-                    is Long -> putLong(key, value)
-                    is Float -> putFloat(key, value)
-                    is String -> putString(key, value)
-                    is Set<*> -> putStringSet(key, value.map { it as String }.toSet())
+        if (preferences != null) {
+            Preferences.edit {
+                Preferences.instance.all.keys.filterNot { it.startsWith("jay") }.forEach { remove(it) }
+                preferences.forEach { (key, value) ->
+                    when (value) {
+                        is Boolean -> putBoolean(key, value)
+                        is Int -> putInt(key, value)
+                        is Long -> putLong(key, value)
+                        is Float -> putFloat(key, value)
+                        is String -> putString(key, value)
+                        is Set<*> -> putStringSet(key, value.map { it as String }.toSet())
+                    }
                 }
             }
         }

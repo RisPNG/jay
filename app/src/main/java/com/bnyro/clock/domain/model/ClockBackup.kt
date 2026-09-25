@@ -10,9 +10,16 @@ data class ClockBackup(
     val timers: List<TimerSettings>,
     val activeTimers: List<BackupTimer>,
     val timeZones: List<TimeZone>,
-    val preferences: Map<String, BackupPreference>,
-    val sounds: Map<String, String> = emptyMap()
-)
+    val preferences: Map<String, BackupPreference>?
+) {
+    fun withoutCustomAudio(): ClockBackup = copy(
+        alarms = alarms.map { it.copy(soundName = null, soundUri = null) },
+        timers = timers.map { it.copy(soundName = null, soundUri = null) },
+        activeTimers = activeTimers.map { timer ->
+            timer.copy(settings = timer.settings.copy(soundName = null, soundUri = null))
+        }
+    )
+}
 
 @Serializable
 data class BackupTimer(
