@@ -16,7 +16,7 @@ import androidx.lifecycle.viewModelScope
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.BackupTimer
 import com.bnyro.clock.domain.usecase.ClockBackupUseCase
-import com.bnyro.clock.util.ClockBackupArchive
+import com.bnyro.clock.util.ClockBackupFile
 import com.bnyro.clock.domain.model.PickerStyle
 import com.bnyro.clock.domain.model.TimerPickerBehaviour
 import com.bnyro.clock.domain.model.WeekStart
@@ -110,7 +110,7 @@ class SettingsModel : ViewModel() {
             val success = withContext(Dispatchers.IO) {
                 runCatching {
                     val backup = ClockBackupUseCase(context).capture(activeTimers)
-                    ClockBackupArchive.exportBackup(context, uri, backup)
+                    ClockBackupFile.exportBackup(context, uri, backup)
                 }.onFailure { Log.e("SettingsModel", "Unable to export backup", it) }.isSuccess
             }
             Toast.makeText(context, if (success) R.string.backup_exported else R.string.backup_export_failed, Toast.LENGTH_LONG).show()
@@ -121,7 +121,7 @@ class SettingsModel : ViewModel() {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val backup = ClockBackupArchive.importBackup(context, uri)
+                    val backup = ClockBackupFile.importBackup(context, uri)
                     ClockBackupUseCase(context).restore(backup)
                     backup.activeTimers
                 }.onFailure { Log.e("SettingsModel", "Unable to import backup", it) }
