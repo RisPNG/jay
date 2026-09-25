@@ -218,7 +218,7 @@
 
         <receiver
                 android:name=".presentation.widgets.DigitalClockWidget"
-                android:label="@string/digital_clock_widget_name"
+                android:label="@string/digital_clock"
                 android:enabled="true"
                 android:exported="false">
             <intent-filter>
@@ -232,7 +232,7 @@
 
         <receiver
                 android:name=".presentation.widgets.VerticalClockWidget"
-                android:label="@string/vertical_clock_widget_name"
+                android:label="@string/vertical_clock"
                 android:enabled="true"
                 android:exported="false">
             <intent-filter>
@@ -246,7 +246,7 @@
 
         <receiver
                 android:name=".presentation.widgets.AnalogClockWidget"
-                android:label="@string/analog_clock_widget_name"
+                android:label="@string/analog_clock"
                 android:enabled="true"
                 android:exported="false">
             <intent-filter>
