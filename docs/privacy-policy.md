@@ -26,7 +26,7 @@ Jay does not include advertising, Firebase Analytics or Crashlytics. Its network
 
 ## Who can receive information
 
-Other members can see the names, shared content, activity and responses relevant to their group. Exported profile links let their holder act as that profile. Invitation links let their holder join the relevant group while the invitation remains valid. Keep those links private.
+Other members can see the names, shared content, activity and responses relevant to their group. Exported profile links let their holder act as that profile. Anyone with an invitation link can join the relevant group, and multiple people can use the same link until it expires. Keep those links private.
 
 The default service uses these providers:
 

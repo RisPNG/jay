@@ -199,16 +199,14 @@ class InvitationJoinView(APIView):
                 require_membership(invite.group, request.user)
                 return Response(receipt.response, status=receipt.status)
             group = Group.objects.select_for_update().get(pk=invite.group_id)
-            invite = GroupInvitation.objects.select_for_update().get(pk=invite.pk)
-            if group.deleted_at or invite.expires_at <= timezone.now() or invite.consumed_at:
-                raise DomainError("invite_unavailable", "This invitation is expired or already used")
+            invite = get_object_or_404(GroupInvitation.objects.select_for_update(), pk=invite.pk)
+            if group.deleted_at or invite.expires_at <= timezone.now():
+                raise DomainError("invite_unavailable", "This invitation is expired or unavailable")
             member = GroupMembership.objects.select_related("identity", "group").filter(group=group, identity=request.user, removed_at=None).first()
             if member is None:
                 member = GroupMembership.objects.create(group=group, identity=request.user)
                 publish_membership(member, request.user, "upsert")
                 DeliveryWork.objects.create(kind="reschedule", deduplication_key=f"reschedule:membership:{member.pk}", payload={"group_id": str(group.pk), "identity_id": request.user.pk})
-            invite.consumed_at, invite.consumed_by = timezone.now(), request.user
-            invite.save(update_fields=["consumed_at", "consumed_by"])
             receipt.status, receipt.response = 200, MembershipAccessRepresentation(member).data
         return Response(receipt.response)
 

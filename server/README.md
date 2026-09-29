@@ -43,7 +43,7 @@ The Android emulator can reach this API at `http://10.0.2.2:8000`. Use a debug b
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection URL used by the API and migrations |
 | `PUBLIC_URL` | Public base URL included in generated invitations |
-| `INVITE_LIFETIME_HOURS` | Default lifetime of a one-use invitation, 24 hours |
+| `INVITE_LIFETIME_HOURS` | Default lifetime of a reusable invitation, 24 hours |
 | `SECRET_KEY` | Required signing secret, identical on web and worker replicas |
 | `ALLOWED_HOSTS` | Comma-separated public hostnames; include the Render hostname and custom domain |
 | `TRUST_PROXY` | Trust the HTTPS forwarding header only when requests pass through a trusted proxy |

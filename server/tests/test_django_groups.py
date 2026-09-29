@@ -75,15 +75,74 @@ def test_old_generation_cannot_delete_after_rejoining(client, group, member):
     assert GroupMembership.objects.get(pk=new.pk).removed_at is None
 
 
-def test_consumed_invitation_cannot_create_a_second_membership(client, group, member):
-    invite = GroupInvitation.objects.get(group=group)
+def test_invitation_can_join_multiple_members_and_rejoin_before_expiry(client, group, member):
+    from rest_framework.test import APIClient
+
     own = GroupMembership.objects.get(group=group, identity_id="1" * 64)
     new_invite = client.post(f"/v1/groups/{group.pk}/invites", {"id": str(uuid4()), "membership_id": str(own.pk)}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert new_invite.status_code == 201, new_invite.data
     token = new_invite.data["token"]
-    assert member.post("/v1/groups/join", {"token": token}, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 200
+    GroupInvitation.objects.filter(pk=new_invite.data["id"]).update(consumed_at=timezone.now(), consumed_by_id="2" * 64)
+    previous = GroupMembership.objects.get(group=group, identity_id="2" * 64, removed_at=None)
+    assert member.delete(f"/v1/groups/{group.pk}/membership", {"membership_id": str(previous.pk)}, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 204
+
+    key = str(uuid4())
+    joined = member.post("/v1/groups/join", {"token": token}, format="json", headers={"Idempotency-Key": key})
+    assert joined.status_code == 200, joined.data
+    assert joined.data["id"] != str(previous.pk)
+    replay = member.post("/v1/groups/join", {"token": token}, format="json", headers={"Idempotency-Key": key})
+    assert replay.status_code == 200 and replay.data == joined.data
+    already_member = member.post("/v1/groups/join", {"token": token}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert already_member.status_code == 200 and already_member.data == joined.data
+
+    another = APIClient()
+    identity_id, secret = "3" * 64, "third-secret" * 5
+    registered = another.post("/v1/identities/register", {"id": identity_id, "name": "Charlie", "token": secret, "time_zone": "UTC"}, format="json")
+    assert registered.status_code == 201, registered.data
+    another.credentials(HTTP_AUTHORIZATION="Bearer " + secret, HTTP_X_JAY_IDENTITY_ID=identity_id)
+    second_join = another.post("/v1/groups/join", {"token": token}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert second_join.status_code == 200, second_join.data
+    assert second_join.data["id"] != joined.data["id"]
+    assert GroupMembership.objects.filter(group=group, removed_at=None).count() == 3
+
+    assert member.delete(f"/v1/groups/{group.pk}/membership", {"membership_id": joined.data["id"]}, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 204
+    rejoined = member.post("/v1/groups/join", {"token": token}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert rejoined.status_code == 200, rejoined.data
+    assert rejoined.data["id"] not in {str(previous.pk), joined.data["id"]}
+
+
+def test_expired_invitation_rejects_new_joins_but_replays_a_completed_join(client, group, member):
+    own = GroupMembership.objects.get(group=group, identity_id="1" * 64)
+    invitation = client.post(f"/v1/groups/{group.pk}/invites", {"id": str(uuid4()), "membership_id": str(own.pk)}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert invitation.status_code == 201, invitation.data
+    token = invitation.data["token"]
     current = GroupMembership.objects.get(group=group, identity_id="2" * 64, removed_at=None)
     assert member.delete(f"/v1/groups/{group.pk}/membership", {"membership_id": str(current.pk)}, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 204
-    assert member.post("/v1/groups/join", {"token": token}, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 409
+    key = str(uuid4())
+    joined = member.post("/v1/groups/join", {"token": token}, format="json", headers={"Idempotency-Key": key})
+    assert joined.status_code == 200, joined.data
+
+    GroupInvitation.objects.filter(pk=invitation.data["id"]).update(expires_at=timezone.now() - timedelta(seconds=1))
+    replay = member.post("/v1/groups/join", {"token": token}, format="json", headers={"Idempotency-Key": key})
+    assert replay.status_code == 200 and replay.data == joined.data
+    current = GroupMembership.objects.get(pk=joined.data["id"])
+    assert member.delete(f"/v1/groups/{group.pk}/membership", {"membership_id": str(current.pk)}, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 204
+    expired = member.post("/v1/groups/join", {"token": token}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert expired.status_code == 409 and expired.data["code"] == "invite_unavailable"
+    assert not GroupMembership.objects.filter(group=group, identity_id="2" * 64, removed_at=None).exists()
+
+
+def test_invitation_cannot_join_a_deleted_group(client, group, member):
+    own = GroupMembership.objects.get(group=group, identity_id="1" * 64)
+    invitation = client.post(f"/v1/groups/{group.pk}/invites", {"id": str(uuid4()), "membership_id": str(own.pk)}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert invitation.status_code == 201, invitation.data
+    current = GroupMembership.objects.get(group=group, identity_id="2" * 64, removed_at=None)
+    assert member.delete(f"/v1/groups/{group.pk}/membership", {"membership_id": str(current.pk)}, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 204
+    assert client.delete(f"/v1/groups/{group.pk}", {"membership_id": str(own.pk)}, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 204
+
+    joined = member.post("/v1/groups/join", {"token": invitation.data["token"]}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert joined.status_code == 409 and joined.data["code"] == "invite_unavailable"
+    assert not GroupMembership.objects.filter(group=group, identity_id="2" * 64, removed_at=None).exists()
 
 
 def test_any_leader_can_delete_and_cleanup_group(client, group, member):

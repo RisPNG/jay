@@ -110,7 +110,7 @@ If you want to try work that is still being tested, look for prereleases in [all
 ## Getting started
 
 1. **Open Jay and optionally change your name.** Your profile is created automatically; no email address or password is needed.
-2. **Create a group in the Groups tab.** Invite the people you want to share alarms or timers with. Invitations are single-use and expire after 24 hours by default.
+2. **Create a group in the Groups tab.** Invite the people you want to share alarms or timers with. Invite links expire after 24 hours by default and can be used by multiple people until then.
 3. **Share an alarm.** Choose the group in the alarm editor and set its schedule. Members receive it through synchronisation.
 4. **Try a countdown.** Hold the timer start button to choose the group. Save a group timer if you want to use it again.
 5. **Choose the group's rules.** Decide who can make changes and whether members answer alarms individually or together.

@@ -16,7 +16,7 @@ Android keeps authoritative social state, pending operations, synchronization cu
 
 An identity retains its generated name, 64-character identifier and bearer-secret derivation. Imported profiles represent the same member across devices, with multiple push subscriptions. Registration cannot replace another credential, and retirement disables authentication and permanently reserves the identifier.
 
-Groups own memberships, invitations, shared alarms, timers and sounds. A membership UUID identifies one period of access: leaving and rejoining creates a new generation. Current membership, role, entitlement and group invariants are checked when an operation is applied. Invitations are single-use and expire; a nonempty active group must retain a leader. Offline joins remain provisional until the server validates the invitation.
+Groups own memberships, invitations, shared alarms, timers and sounds. A membership UUID identifies one period of access: leaving and rejoining creates a new generation. Current membership, role, entitlement and group invariants are checked when an operation is applied. Invitations remain reusable until they expire; a nonempty active group must retain a leader. Offline joins remain provisional until the server validates the invitation.
 
 Client-created resources have UUID keys so dependent offline operations can refer to them. Django uses conventional table and foreign-key names, explicit choices, check constraints and uniqueness constraints. Internal append-only IDs are not synchronization cursors. Historical actor references can become null while their recorded labels remain available.
 
