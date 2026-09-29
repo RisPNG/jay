@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.work.Configuration
 import com.bnyro.clock.social.data.SocialStartup
 import android.widget.RemoteViews
+import androidx.core.os.UserManagerCompat
 import com.bnyro.clock.data.database.AppDatabase
 import com.bnyro.clock.presentation.widgets.AnalogClockWidget
 import com.bnyro.clock.presentation.widgets.DigitalClockWidget
@@ -78,15 +79,35 @@ class App : Application(), Configuration.Provider {
         }
     }
 
-    private fun migrateToDeviceProtectedStorage() {
+    fun migrateToDeviceProtectedStorage() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val dbName = "app_database"
-            val prefName = "${packageName}_preferences"
+            val prefName = Preferences.FILE_NAME
             if (!safeContext.getDatabasePath(dbName).exists()) {
                 safeContext.moveDatabaseFrom(this, dbName)
             }
-            if (!safeContext.getSharedPreferences(prefName, MODE_PRIVATE).all.isNotEmpty()) {
+            if (!UserManagerCompat.isUserUnlocked(this)) return
+
+            val devicePreferences = safeContext.getSharedPreferences(prefName, MODE_PRIVATE)
+            val deviceValues = devicePreferences.all
+            val credentialValues = getSharedPreferences(prefName, MODE_PRIVATE).all
+            if (deviceValues.isEmpty()) {
                 safeContext.moveSharedPreferencesFrom(this, prefName)
+            } else if (credentialValues.isNotEmpty()) {
+                val editor = devicePreferences.edit()
+                credentialValues.forEach { (key, value) ->
+                    if (key !in deviceValues) {
+                        when (value) {
+                            is Boolean -> editor.putBoolean(key, value)
+                            is Float -> editor.putFloat(key, value)
+                            is Int -> editor.putInt(key, value)
+                            is Long -> editor.putLong(key, value)
+                            is String -> editor.putString(key, value)
+                            is Set<*> -> editor.putStringSet(key, value.filterIsInstance<String>().toSet())
+                        }
+                    }
+                }
+                if (editor.commit()) deleteSharedPreferences(prefName)
             }
         }
     }
