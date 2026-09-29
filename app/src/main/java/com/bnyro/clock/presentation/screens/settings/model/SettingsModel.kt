@@ -22,6 +22,7 @@ import com.bnyro.clock.domain.model.WeekStart
 import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.navigation.HomeRoutes
 import com.bnyro.clock.navigation.homeRoutes
+import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.catpucchinLatte
 import kotlinx.coroutines.Dispatchers
@@ -141,6 +142,15 @@ class SettingsModel : ViewModel() {
     fun updateFabAlignment(alignment: FabAlignment) {
         Preferences.edit { putString("fab_alignment", alignment.name) }
         fabAlignment = alignment
+    }
+
+    fun updateUpcomingAlarmDuration(context: Context, minutes: Int) {
+        Preferences.edit { putInt(Preferences.upcomingAlarmDuration, minutes) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val appContext = context.applicationContext
+            val alarmRepository = (appContext as App).container.alarmRepository
+            alarmRepository.getAlarms().forEach { AlarmHelper.enqueue(appContext, it) }
+        }
     }
 
     enum class AppName(@StringRes val resId: Int) {

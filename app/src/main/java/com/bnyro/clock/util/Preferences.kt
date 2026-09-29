@@ -11,6 +11,8 @@ import kotlinx.serialization.json.Json
 object Preferences {
     lateinit var instance: SharedPreferences
 
+    const val FILE_NAME = "clock_you"
+
     const val showSecondsKey = "showSeconds"
     const val themeKey = "theme"
     const val timerPickerStyleKey = "timerUsePicker"
@@ -41,7 +43,7 @@ object Preferences {
 
 
     fun init(context: Context) {
-        instance = context.getSharedPreferences("clock_you", Context.MODE_PRIVATE)
+        instance = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 
         val timerPickerStyle = instance.all[timerPickerStyleKey]
         val alarmPickerStyle = instance.all[alarmPickerStyleKey]

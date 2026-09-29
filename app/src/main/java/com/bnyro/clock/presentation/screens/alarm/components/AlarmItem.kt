@@ -71,7 +71,7 @@ fun AlarmItem(
         if (!isAlarmEnabled || alarmTime == null) false
         else {
             val timeUntilAlarm = alarmTime - currentTime
-            timeUntilAlarm in 1..AlarmHelper.PRE_ALARM_DELAY
+            timeUntilAlarm in 1..AlarmHelper.getPreAlarmDelayMillis()
         }
     }
 
