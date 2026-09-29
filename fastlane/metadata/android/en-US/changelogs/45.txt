@@ -2,5 +2,5 @@
 • Snoozing an Answer as one alarm now reschedules it for everyone.
 • Fixed one-time alarms that would not stay enabled.
 • Group invitation links can be reused until they expire.
-• Choose when upcoming alarm notifications appear.
+• Set upcoming alarm notification timing; changes reschedule existing alarms.
 • Backups now use JSON. Older Jay ZIP backups cannot be imported, and new backups omit custom audio.
