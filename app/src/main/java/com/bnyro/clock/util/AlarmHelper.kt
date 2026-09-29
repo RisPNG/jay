@@ -39,7 +39,6 @@ object AlarmHelper {
     private const val DAYS_PER_WEEK = 7
     private const val MONTHS_PER_YEAR = 12
     const val PRE_ALARM_ID_OFFSET = 4000
-    const val PRE_ALARM_DELAY = 10800000L  //CHANGE this to change delay maybe in settings later BUDDY
 
     fun showAlarmScheduledToast(context: Context, alarm: Alarm) {
         val alarmTime = getAlarmTime(alarm) ?: return
