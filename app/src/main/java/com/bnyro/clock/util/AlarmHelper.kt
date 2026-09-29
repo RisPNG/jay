@@ -226,14 +226,16 @@ object AlarmHelper {
     }
 
     /**
-     * @return the day the repetition that rings next begins on. Arming an alarm anchors it here
-     * rather than at the occurrence itself, which would shift every later repetition.
+     * @return the next ring date for a one-time alarm, or the day the next repetition begins for
+     * an alarm that repeats. Repeating alarms keep their run start so later repetitions do not shift.
      */
     fun getNextRepetitionStart(
         alarm: Alarm,
         timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
     ): LocalDate? = getNextOccurrence(alarm, timeZone = timeZone)
-        ?.let { runStartsOnOrBefore(alarm, it).first() }
+        ?.let { occurrence ->
+            if (alarm.isOneTime) occurrence else runStartsOnOrBefore(alarm, occurrence).first()
+        }
 
     /**
      * @return the last day the repetition the alarm begins with rings on, or null when its
