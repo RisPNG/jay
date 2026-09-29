@@ -39,7 +39,6 @@ object AlarmHelper {
     private const val DAYS_PER_WEEK = 7
     private const val MONTHS_PER_YEAR = 12
     const val PRE_ALARM_ID_OFFSET = 4000
-    const val PRE_ALARM_DELAY = 10800000L  //CHANGE this to change delay maybe in settings later BUDDY
 
     fun showAlarmScheduledToast(context: Context, alarm: Alarm) {
         val alarmTime = getAlarmTime(alarm) ?: return
@@ -56,6 +55,13 @@ object AlarmHelper {
             },
             Toast.LENGTH_SHORT
         ).show()
+    }
+    fun getPreAlarmDelayMillis(): Long {
+        val minutes = Preferences.instance.getInt(
+            Preferences.upcomingAlarmDuration,
+            Preferences.DEFAULT_UPCOMING_ALARM_DURATION
+        )
+        return minutes * 60 * 1000L
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
@@ -92,17 +98,25 @@ object AlarmHelper {
         Log.d("AlarmHelper", "Scheduling alarm time: ${Date(triggerTime)}")
         alarmManager.setAlarmClock(alarmInfo, getPendingIntent(context, alarm))
 
-        val preAlarmTime = triggerTime - PRE_ALARM_DELAY
+        val preAlarmDelay = getPreAlarmDelayMillis()
+        val preAlarmTime = triggerTime - preAlarmDelay
+        val now = System.currentTimeMillis()
+
         if (alarm.snoozedUntil != null) {
             context.sendBroadcast(
                 Intent(context, PreAlarmReceiver::class.java).putExtra(EXTRA_ID, alarm.id)
             )
-        } else if (preAlarmTime > System.currentTimeMillis()) {
+        } else if (preAlarmTime > now) {
             alarmManager.setExactAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
                 preAlarmTime,
                 getPreAlarmPendingIntent(context, alarm)
             )
+        } else if (triggerTime > now) {
+            val intent = Intent(context.applicationContext, PreAlarmReceiver::class.java).apply {
+                putExtra(EXTRA_ID, alarm.id)
+            }
+            context.sendBroadcast(intent)
         }
     }
 
@@ -178,6 +192,8 @@ object AlarmHelper {
             ?.toInstant()
             ?.toEpochMilli()
     }
+
+
 
     /**
      * @return the day the alarm rings next, skipping the occurrence the user dismissed upfront,

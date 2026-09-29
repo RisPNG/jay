@@ -34,7 +34,11 @@ class PreAlarmReceiver : BroadcastReceiver() {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "Upcoming Alarms", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Upcoming Alarms",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
             notificationManager.createNotificationChannel(channel)
         }
 
@@ -88,10 +92,14 @@ class PreAlarmReceiver : BroadcastReceiver() {
                             )
                             .setContentText("$formattedDay $formattedTime")
                             .setContentIntent(contentPendingIntent)
-                            .setPriority(NotificationCompat.PRIORITY_LOW)
-                            .addAction(R.drawable.ic_alarm, context.getString(R.string.dismiss), dismissPendingIntent)
-
+                            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                            .addAction(
+                                R.drawable.ic_notification,
+                                context.getString(R.string.dismiss),
+                                dismissPendingIntent
+                            )
                             .setOngoing(true)
+                            .setAutoCancel(true)
                             .build()
 
                         notificationManager.notify(
