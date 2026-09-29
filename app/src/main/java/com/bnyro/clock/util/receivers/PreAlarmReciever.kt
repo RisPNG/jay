@@ -25,7 +25,7 @@ import java.util.Locale
 
 class PreAlarmReceiver : BroadcastReceiver() {
     companion object {
-        const val CHANNEL_ID = "upcoming_alarm_channel" //insane crazy name
+        const val CHANNEL_ID = "upcoming_alarm_channel"
     }
 
     override fun onReceive(context: Context, intent: Intent?) {
@@ -37,7 +37,7 @@ class PreAlarmReceiver : BroadcastReceiver() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Upcoming Alarms",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_LOW
             )
             notificationManager.createNotificationChannel(channel)
         }
@@ -92,7 +92,7 @@ class PreAlarmReceiver : BroadcastReceiver() {
                             )
                             .setContentText("$formattedDay $formattedTime")
                             .setContentIntent(contentPendingIntent)
-                            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                            .setPriority(NotificationCompat.PRIORITY_LOW)
                             .addAction(
                                 R.drawable.ic_notification,
                                 context.getString(R.string.dismiss),
