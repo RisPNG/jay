@@ -60,7 +60,7 @@ class TimerRepresentation(serializers.ModelSerializer):
 class OccurrenceRepresentation(serializers.ModelSerializer):
     class Meta:
         model = AlarmOccurrence
-        fields = ["id", "alarm_id", "group_id", "identity_id", "alarm_revision", "occurrence_key", "cycle_date", "trigger_at", "deadline_at", "state", "resolved_at"]
+        fields = ["id", "alarm_id", "group_id", "identity_id", "alarm_revision", "occurrence_key", "cycle_date", "trigger_at", "deadline_at", "snoozed_until", "state", "resolved_at"]
         read_only_fields = fields
 
 

@@ -72,7 +72,7 @@ fun RingtonePickerDialog(
         dismissButton = {
             DialogButton(com.bnyro.clock.R.string.custom_file, DialogButtonStyle.PRIMARY) {
                 ringingToneModel.stopRinging()
-                pickSoundFile.launch(arrayOf("audio/*"))
+                pickSoundFile.launch(arrayOf("*/*"))
             }
         },
         title = {

@@ -50,7 +50,7 @@ def schedule_occurrences(alarm, identity_ids, after=None):
             occurrence.trigger_at = trigger
             occurrence.deadline_at = trigger + timedelta(minutes=10)
             occurrence.cycle_date = trigger.astimezone(ZoneInfo(zone)).date()
-            occurrence.state, occurrence.resolved_at = "pending", None
+            occurrence.state, occurrence.resolved_at, occurrence.snoozed_until = "pending", None, None
             occurrence.save()
         changes.append(("occurrence", str(occurrence.pk), "upsert", OccurrenceRepresentation(occurrence).data, member.identity_id))
     return changes
@@ -80,7 +80,7 @@ def record_alarm_response(alarm, identity, data):
     if data["alarm_revision"] != alarm.revision:
         raise DomainError("revision_changed", "This response belongs to an old alarm schedule")
     fingerprint = hashlib.sha256(json.dumps(
-        {key: data.get(key) for key in ["alarm_revision", "kind", "occurred_at", "occurrence_key", "reason"]},
+        {key: data.get(key) for key in ["alarm_revision", "kind", "occurred_at", "occurrence_key", "reason", "snoozed_until"]},
         cls=DjangoJSONEncoder, sort_keys=True, separators=(",", ":"),
     ).encode()).hexdigest()
     existing = AlarmActivity.objects.filter(pk=data["id"]).first()
@@ -93,6 +93,8 @@ def record_alarm_response(alarm, identity, data):
     occurrence = occurrences.filter(occurrence_key=occurrence_key).first() if occurrence_key else occurrences.filter(trigger_at__lte=data["occurred_at"], state__in=["pending", "ignored"]).order_by("-trigger_at").first()
     if occurrence:
         occurrence_key = occurrence.occurrence_key
+        if occurrence.snoozed_until and data["kind"] == "ignored" and data["occurred_at"] < occurrence.deadline_at:
+            raise DomainError("response_outdated", "The alarm was snoozed before this response deadline")
     previous = AlarmActivity.objects.filter(alarm=alarm, identity=identity, occurrence_key=occurrence_key, kind__in=["dismissed", "ignored"]).exclude(reason="corrected").order_by("-created_at").first() if occurrence_key else None
     changes = []
     if previous:
@@ -108,18 +110,24 @@ def record_alarm_response(alarm, identity, data):
     changes.append(("outcome", str(activity.pk), "upsert", OutcomeRepresentation(activity).data, None))
     if occurrence:
         if activity.kind == "snoozed":
-            occurrence.state, occurrence.resolved_at = "pending", None
-            occurrence.deadline_at = activity.occurred_at + timedelta(minutes=alarm.snooze_minutes + 10)
+            snoozed_until = data.get("snoozed_until") or (activity.occurred_at + timedelta(minutes=alarm.snooze_minutes)).replace(second=0, microsecond=0)
+            occurrence.state, occurrence.resolved_at, occurrence.snoozed_until = "pending", None, snoozed_until
+            occurrence.deadline_at = snoozed_until + timedelta(minutes=10)
         else:
             occurrence.state, occurrence.resolved_at = activity.kind, timezone.now()
+            occurrence.snoozed_until = None
         occurrence.save()
         changes.append(("occurrence", str(occurrence.pk), "upsert", OccurrenceRepresentation(occurrence).data, identity.pk))
         changes.extend(schedule_occurrences(alarm, [identity.pk], occurrence.trigger_at + timedelta(milliseconds=1)))
         if alarm.group.shared_answers:
             shared = AlarmOccurrence.objects.filter(alarm=alarm, alarm_revision=alarm.revision, cycle_date=occurrence.cycle_date, state="pending").exclude(identity=identity)
             for other in shared:
-                other.state, other.resolved_at = activity.kind, timezone.now()
-                other.save(update_fields=["state", "resolved_at"])
+                if activity.kind == "snoozed":
+                    other.state, other.resolved_at, other.snoozed_until = "pending", None, snoozed_until
+                    other.deadline_at = snoozed_until + timedelta(minutes=10)
+                else:
+                    other.state, other.resolved_at, other.snoozed_until = activity.kind, timezone.now(), None
+                other.save()
                 changes.append(("occurrence", str(other.pk), "upsert", OccurrenceRepresentation(other).data, other.identity_id))
                 changes.extend(schedule_occurrences(alarm, [other.identity_id], other.trigger_at + timedelta(milliseconds=1)))
         changes.extend(evaluate_alarm_cycle(alarm, occurrence.cycle_date))

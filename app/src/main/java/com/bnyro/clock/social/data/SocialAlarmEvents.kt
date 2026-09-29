@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.os.UserManagerCompat
 import androidx.work.WorkManager
 import com.bnyro.clock.social.domain.AlarmActivityKind
+import java.time.Instant
 
 object SocialAlarmEvents {
     fun dismiss(context: Context, alarmId: Long, occurrenceId: String? = null) {
@@ -16,19 +17,20 @@ object SocialAlarmEvents {
     fun snooze(
         context: Context,
         alarmId: Long,
-        snoozeMinutes: Int,
+        snoozedUntil: Long,
         occurrenceId: String
     ) {
         SocialActivityWorker.enqueue(
             context,
             alarmId,
             AlarmActivityKind.SNOOZED,
-            occurrenceId
+            occurrenceId,
+            snoozedUntil = Instant.ofEpochMilli(snoozedUntil).toString()
         )
         SocialIgnoredAlarmWorker.schedule(
             context,
             alarmId,
-            System.currentTimeMillis() + snoozeMinutes * 60_000L,
+            snoozedUntil,
             occurrenceId
         )
     }

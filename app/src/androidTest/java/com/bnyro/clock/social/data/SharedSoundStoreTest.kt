@@ -8,11 +8,13 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.bnyro.clock.util.NotificationHelper
 import java.io.File
+import java.net.ServerSocket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.runBlocking
@@ -24,6 +26,55 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SharedSoundStoreTest {
+    @Test
+    fun readySoundDownloadsAndDecodesForPlayback() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val soundId = UUID.randomUUID().toString()
+        val source = File(context.cacheDir, "$soundId.flac")
+        val playback = File(context.filesDir, "shared-sounds/$soundId.wav")
+        val samples = ShortArray(48_000) { (sin(it * 0.05) * 3_000).roundToInt().toShort() }
+        try {
+            FlacStreamEncoder(source).use {
+                it.write(samples, samples.size)
+                it.finish()
+            }
+            ServerSocket(0).use { server ->
+                val address = "http://127.0.0.1:${server.localPort}"
+                val metadata = """{"url":"$address/audio.flac","sha256":"${SharedSoundFileVerifier.sha256(source)}","byte_length":${source.length()}}"""
+                    .toByteArray()
+                val responder = thread {
+                    repeat(2) {
+                        server.accept().use { socket ->
+                            val input = socket.getInputStream().bufferedReader()
+                            val path = requireNotNull(input.readLine())
+                            var header = input.readLine()
+                            while (!header.isNullOrEmpty()) {
+                                header = input.readLine()
+                            }
+                            val body = if (path.contains("/download")) metadata else source.readBytes()
+                            socket.getOutputStream().use { output ->
+                                output.write("HTTP/1.1 200 OK\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                                output.write(body)
+                            }
+                        }
+                    }
+                }
+                val api = SocialApi(address, DeviceIdentity("test", "test", "test", "test"))
+                assertEquals(playback, SharedSoundStore(context).cache(soundId, api))
+                responder.join(5_000)
+                assertTrue("Sound download responses did not complete", !responder.isAlive)
+            }
+            val prepared = playback.readBytes()
+            val decoded = ShortArray(samples.size)
+            ByteBuffer.wrap(prepared, 44, prepared.size - 44)
+                .order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(decoded)
+            assertTrue(samples.contentEquals(decoded))
+        } finally {
+            source.delete()
+            playback.delete()
+        }
+    }
+
     @Test
     fun sharedSoundIsDecodedLosslesslyCachedAndPlayable() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()

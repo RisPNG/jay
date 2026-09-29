@@ -220,6 +220,13 @@ class ActivityCommand(CommandSerializer):
     occurred_at = serializers.DateTimeField()
     occurrence_key = serializers.CharField(max_length=200, allow_null=True)
     reason = serializers.CharField(max_length=40, allow_null=True)
+    snoozed_until = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate(self, data):
+        snoozed_until = data.get("snoozed_until")
+        if snoozed_until is not None and (data["kind"] != "snoozed" or snoozed_until <= data["occurred_at"]):
+            raise serializers.ValidationError({"snoozed_until": "Snooze time must follow a snooze response"})
+        return data
 
 
 class DeliveryCommand(CommandSerializer):

@@ -55,7 +55,7 @@ class AndroidPcmDecoder(private val context: Context, private val source: Uri) {
                         AudioFormat.ENCODING_PCM_16BIT
                 ) { "The device extractor did not produce 16-bit PCM" }
                 val buffer = ByteBuffer.allocate(64 * 1024).order(ByteOrder.LITTLE_ENDIAN)
-                while (extractor.sampleTime in 0 until limitUs) {
+                while (extractor.sampleTrackIndex >= 0 && extractor.sampleTime < limitUs) {
                     currentCoroutineContext().ensureActive()
                     buffer.clear()
                     val size = extractor.readSampleData(buffer, 0)
@@ -92,7 +92,7 @@ class AndroidPcmDecoder(private val context: Context, private val source: Uri) {
                     if (index >= 0) {
                         val buffer = decoder.getInputBuffer(index)!!
                         val sampleTime = extractor.sampleTime
-                        if (sampleTime < 0 || sampleTime >= limitUs) {
+                        if (extractor.sampleTrackIndex < 0 || sampleTime >= limitUs) {
                             decoder.queueInputBuffer(
                                 index,
                                 0,
@@ -103,8 +103,19 @@ class AndroidPcmDecoder(private val context: Context, private val source: Uri) {
                             inputEnded = true
                         } else {
                             val size = extractor.readSampleData(buffer, 0)
-                            decoder.queueInputBuffer(index, 0, size, sampleTime, 0)
-                            extractor.advance()
+                            if (size < 0) {
+                                decoder.queueInputBuffer(
+                                    index,
+                                    0,
+                                    0,
+                                    maxOf(sampleTime, 0),
+                                    MediaCodec.BUFFER_FLAG_END_OF_STREAM
+                                )
+                                inputEnded = true
+                            } else {
+                                decoder.queueInputBuffer(index, 0, size, sampleTime, 0)
+                                extractor.advance()
+                            }
                         }
                         stalls = 0
                     }

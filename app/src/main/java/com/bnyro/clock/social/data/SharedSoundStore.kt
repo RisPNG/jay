@@ -1,6 +1,7 @@
 package com.bnyro.clock.social.data
 
 import android.content.Context
+import android.util.Log
 import androidx.core.net.toUri
 import com.bnyro.clock.social.domain.SHARED_SOUND_MAX_DURATION_US
 import com.bnyro.clock.social.domain.SHARED_SOUND_SAMPLE_RATE
@@ -40,7 +41,8 @@ class SharedSoundStore(private val context: Context) {
             return cached(soundId)
         } catch (exception: CancellationException) {
             throw exception
-        } catch (_: Exception) {
+        } catch (exception: Exception) {
+            Log.e("SharedSoundStore", "Failed to cache shared sound $soundId", exception)
             return null
         } finally {
             temporary.delete()

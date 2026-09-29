@@ -73,6 +73,7 @@ class AlarmOccurrence(models.Model):
     cycle_date = models.DateField()
     trigger_at = models.DateTimeField()
     deadline_at = models.DateTimeField()
+    snoozed_until = models.DateTimeField(null=True)
     state = models.CharField(max_length=16, choices=State, default=State.PENDING)
     resolved_at = models.DateTimeField(null=True)
 

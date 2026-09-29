@@ -31,7 +31,8 @@ class SocialActivityWorker(context: Context, parameters: WorkerParameters) :
             inputData.getString(EVENT_ID) ?: return Result.failure(),
             occurredAt,
             inputData.getString(OCCURRENCE_ID),
-            inputData.getString(REASON)
+            inputData.getString(REASON),
+            inputData.getString(SNOOZED_UNTIL)
         )
         Result.success()
     } catch (error: SocialApiException) {
@@ -47,13 +48,15 @@ class SocialActivityWorker(context: Context, parameters: WorkerParameters) :
         private const val EVENT_ID = "event_id"
         private const val OCCURRENCE_ID = "occurrence_id"
         private const val REASON = "reason"
+        private const val SNOOZED_UNTIL = "snoozed_until"
 
         fun enqueue(
             context: Context,
             alarmId: Long,
             kind: AlarmActivityKind,
             occurrenceId: String? = null,
-            reason: String? = null
+            reason: String? = null,
+            snoozedUntil: String? = null
         ) {
             val eventId = UUID.randomUUID().toString()
             val event = JSONObject()
@@ -63,6 +66,7 @@ class SocialActivityWorker(context: Context, parameters: WorkerParameters) :
                 .put(OCCURRED_AT, Instant.now().toString())
                 .put(OCCURRENCE_ID, occurrenceId)
                 .put(REASON, reason)
+                .put(SNOOZED_UNTIL, snoozedUntil)
             Preferences.instance.edit()
                 .putString("jayPendingAlarmActivity:$eventId", event.toString())
                 .commit()

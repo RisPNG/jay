@@ -391,16 +391,23 @@ object AlarmHelper {
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
-    fun snooze(context: Context, oldAlarm: Alarm, snoozeMinutes: Int = oldAlarm.snoozeMinutes) {
-        val calendar = Calendar.getInstance()
-        calendar.add(Calendar.MINUTE, snoozeMinutes)
-        calendar.set(Calendar.SECOND, 0)
-        calendar.set(Calendar.MILLISECOND, 0)
-        val alarm = oldAlarm.copy(snoozedUntil = calendar.timeInMillis)
+    fun snooze(
+        context: Context,
+        oldAlarm: Alarm,
+        snoozeMinutes: Int = oldAlarm.snoozeMinutes,
+        snoozedUntil: Long? = null
+    ): Long {
+        val nextRing = snoozedUntil ?: Calendar.getInstance().apply {
+            add(Calendar.MINUTE, snoozeMinutes)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val alarm = oldAlarm.copy(snoozedUntil = nextRing)
         runBlocking {
             (context.applicationContext as App).container.alarmRepository.updateAlarm(alarm)
         }
         enqueue(context, alarm)
+        return nextRing
     }
     /**
      * @return the days of the week mapped to an index 0-Sunday, 1-Monday, ..., 6-Saturday.

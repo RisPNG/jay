@@ -143,7 +143,7 @@ def process_sound_verification(work, owner, stopping=None):
         failure = error.domain_code
     with transaction.atomic():
         SyncScope.objects.select_for_update().get(pk=sound.group.scope_id)
-        sound = SharedSound.objects.select_for_update().select_related("group", "uploaded_by").get(pk=sound.pk)
+        sound = SharedSound.objects.select_for_update(of=("self",)).select_related("group", "uploaded_by").get(pk=sound.pk)
         if not DeliveryWork.objects.filter(pk=work.pk, lease_owner=owner, lease_until__gt=timezone.now()).exists():
             return False
         if sound.status != "verifying":

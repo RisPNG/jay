@@ -378,16 +378,31 @@ class SocialRepository(
             }
         }
 
-        // an outcome the server holds for the occurrence this device is living in was
-        // answered elsewhere: stop the ring, move the local schedule past it, and arm the
-        // next occurrence, whether the answer came from another member or another device
-        // carrying this same profile
+        // an occurrence answered elsewhere stops the local ring and either postpones it
+        // to the shared snooze time or arms the next occurrence
         remoteOccurrences.groupBy { it.alarmId }.forEach { (remoteAlarmId, rows) ->
             val link = socialDao.getAlarmLinkByRemoteId(remoteAlarmId) ?: return@forEach
             val occurrenceId = Preferences.instance.getString(
                 "${SocialPreferences.alarmOccurrencePrefix}${link.localAlarmId}",
                 null
             ) ?: return@forEach
+            val snoozedUntil = rows.firstOrNull {
+                it.occurrenceId == occurrenceId && it.alarmRevision == link.revision &&
+                    it.status == "pending" && it.snoozedUntil != null
+            }?.snoozedUntil?.let { Instant.parse(it).toEpochMilli() }
+            if (snoozedUntil != null && snoozedUntil > System.currentTimeMillis()) {
+                alarmRepository.getAlarmById(link.localAlarmId)?.takeIf {
+                    it.snoozedUntil != snoozedUntil
+                }?.let { alarm ->
+                    context.sendBroadcast(
+                        Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
+                            .setPackage(context.packageName)
+                            .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                    )
+                    AlarmHelper.snooze(context, alarm, snoozedUntil = snoozedUntil)
+                    SocialIgnoredAlarmWorker.schedule(context, alarm.id, snoozedUntil, occurrenceId)
+                }
+            }
             if (
                 rows.none {
                     it.occurrenceId == occurrenceId && it.alarmRevision == link.revision &&
@@ -414,26 +429,6 @@ class SocialRepository(
                     AlarmHelper.enqueue(context, alarm, skipToday = true)
                 }
                 scheduleIgnoredOutcome(alarm, remoteAlarmId, link.revision)
-            }
-        }
-
-        // a snooze leaves the shared occurrence pending for the re-ring where it was
-        // answered, so the devices sharing this profile only stop ringing
-        if (hadCheckpoint) {
-            remoteChanges.filter {
-                it.entityType == "outcome" && it.action == "snoozed" &&
-                    it.subjectDeviceId == identityId
-            }.forEach { change ->
-                socialDao.getAlarmLinkByRemoteId(change.entityId)?.let { link ->
-                    context.sendBroadcast(
-                        Intent(AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION)
-                            .setPackage(context.packageName)
-                            .putExtra(AlarmHelper.EXTRA_ID, link.localAlarmId)
-                    )
-                    WorkManager.getInstance(context).cancelUniqueWork(
-                        "jay_ignored_alarm_${link.localAlarmId}"
-                    )
-                }
             }
         }
 
@@ -803,7 +798,8 @@ class SocialRepository(
         eventId: String,
         occurredAt: String,
         occurrenceId: String?,
-        reason: String?
+        reason: String?,
+        snoozedUntil: String? = null
     ) =
         withContext(Dispatchers.IO) {
             val link = socialDao.getAlarmLinkByLocalId(localAlarmId) ?: return@withContext
@@ -814,7 +810,7 @@ class SocialRepository(
             val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
             val group = groups.first().firstOrNull { it.id == link.groupId } ?: return@withContext
             synchronization.saveOperation(link.groupId, "outcome", eventId, "POST", "/v1/alarms/${link.remoteAlarmId}/activity",
-                json.encodeToJsonElement(AlarmActivityRequest(eventId, link.revision, kind.name.lowercase(), occurredAt, occurrenceId, reason, group.membershipId)).jsonObject,
+                json.encodeToJsonElement(AlarmActivityRequest(eventId, link.revision, kind.name.lowercase(), occurredAt, occurrenceId, reason, group.membershipId, snoozedUntil)).jsonObject,
                 null, ordered = false, operationId = eventId)
             SocialSyncWorker.enqueue(context, expedited = true)
         }
@@ -1183,7 +1179,7 @@ class SocialRepository(
     companion object {
         const val DEFAULT_SERVER_URL = "https://jay.poppybit.com"
 
-        private val RESOLVED_OCCURRENCE_STATUSES = setOf("dismissed", "ignored", "snoozed")
+        private val RESOLVED_OCCURRENCE_STATUSES = setOf("dismissed", "ignored")
         private const val SHARED_TIMER_LINGER_MILLIS = 15 * 60_000L
         private const val SUPPRESSED_TIMER_LIFETIME_MILLIS = 30 * 60_000L
     }

@@ -6,12 +6,12 @@ Shared sounds need storage and delivery. On the default Jay's hosted service, Th
 
 | Value | What it means |
 | --- | --- |
-| `play` | Uploading and choosing a shared sound requires a verified paid Play installation or an operator grant for the current profile. This is the default. |
-| `everyone` | Every authenticated device can upload and choose shared sounds without a purchase or an expiry. Group editing permissions still apply. |
+| `play` | Uploading a new shared sound requires a verified paid Play installation or an operator grant for the current profile. This is the default. |
+| `everyone` | Every authenticated device can upload new shared sounds without a purchase or an expiry. Group editing permissions still apply. |
 
 ## What the rest of the group gets
 
-On a server using `play`, ordinary profiles need Play access only for uploading and selecting distributed sounds. People using Jay Lite, Debug or the free GitHub APK can still join groups, choose their device's default sound or silence, and receive and play sounds selected by someone with access.
+On a server using `play`, ordinary profiles need Play access only for uploading new distributed sounds. People using Jay Lite, Debug or the free GitHub APK can still join groups, choose their device's default sound or silence, and receive and play sounds uploaded by someone with access. The API also permits selecting an existing group sound without upload access.
 
 For example, one member can choose an audio file for a shared alarm and everyone in the group can hear it. They do not all need to buy the app for that to work. Changing something unrelated, such as the alarm's label, also keeps the selected sound in place.
 
@@ -29,11 +29,11 @@ On a `play` server, the full release installed through Google Play refreshes pur
 
 `PlayInstallation` records verified installation credentials and their expiry independently of profiles. Android generates a private random credential for each server and keeps it in app storage excluded from backup and profile export. Authenticated requests carry it in `X-Jay-Installation`. Importing or resetting a profile leaves the installation credential in place; a profile imported into another installation does not carry it. Cached capabilities are bound to the server, profile and installation credential. Purchased capabilities are never published into a profile's shared synchronization history.
 
-`ProfileSoundGrant` records operator overrides without an expiry. A granted profile can upload and select sounds in Full, Lite, Debug and GitHub installations. It reports `requires_play_entitlement=false`, so the app skips Play verification. Purchase verification never replaces or removes an operator grant. Both access sources use the same sound selection, upload and worker authorization checks, including group editing permissions.
+`ProfileSoundGrant` records operator overrides without an expiry. A granted profile can upload sounds in Full, Lite, Debug and GitHub installations. It reports `requires_play_entitlement=false`, so the app skips Play verification. Purchase verification never replaces or removes an operator grant. Both access sources use the same new-sound creation, upload and worker authorization checks, including group editing permissions.
 
 The `grant_sound_access` management command grants or revokes operator access and publishes the updated profile capabilities through normal synchronization. It accepts an existing identity ID or prompts for an exported profile link. Granted profiles are excluded from inactivity cleanup; explicit profile deletion still retires them. Revoking an operator grant does not revoke an independently verified paid installation.
 
-For example, the same profile can select audio in paid Jay and then edit the alarm's label in Lite. Lite preserves and plays the selected audio but cannot select another shared sound. Granting an operator override to that profile enables sound selection in both editions.
+For example, the same profile can upload audio in paid Jay and then edit the alarm's label in Lite. Lite preserves and plays the selected audio but cannot upload a new file. Granting an operator override to that profile enables new uploads in both editions.
 
 Changing the server setting back to `play` restores the server-side checks immediately. The app learns about it on its next sync or refresh, but an old cached grant cannot get an upload past the server. Sounds already selected remain playable, and unrelated edits preserve them.
 

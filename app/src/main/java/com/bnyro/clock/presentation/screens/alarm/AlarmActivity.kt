@@ -61,10 +61,11 @@ class AlarmActivity : RingingActivity() {
     override fun snooze() = snooze(alarm.snoozeMinutes)
 
     private fun snooze(minutes: Int) {
+        val snoozedUntil = AlarmHelper.snooze(this@AlarmActivity, alarm, minutes)
         SocialAlarmEvents.snooze(
             this,
             alarm.id,
-            minutes,
+            snoozedUntil,
             intent.getStringExtra(AlarmService.EXTRA_OCCURRENCE_ID)
                 ?: "${alarm.id}:${System.currentTimeMillis()}"
         )
@@ -74,7 +75,6 @@ class AlarmActivity : RingingActivity() {
                 AlarmService::class.java
             )
         )
-        AlarmHelper.snooze(this@AlarmActivity, alarm, minutes)
         this@AlarmActivity.finish()
     }
 

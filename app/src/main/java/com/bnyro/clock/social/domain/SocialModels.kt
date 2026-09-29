@@ -245,7 +245,8 @@ data class AlarmActivityRequest(
     @SerialName("occurred_at") val occurredAt: String,
     @SerialName("occurrence_key") val occurrenceId: String? = null,
     val reason: String? = null,
-    @SerialName("membership_id") val membershipId: String
+    @SerialName("membership_id") val membershipId: String,
+    @SerialName("snoozed_until") val snoozedUntil: String? = null
 )
 
 @Serializable
@@ -405,5 +406,6 @@ data class SocialOccurrenceDto(
     @SerialName("alarm_id") val alarmId: String,
     @SerialName("occurrence_key") val occurrenceId: String,
     @SerialName("state") val status: String,
-    @SerialName("alarm_revision") val alarmRevision: Int
+    @SerialName("alarm_revision") val alarmRevision: Int,
+    @SerialName("snoozed_until") val snoozedUntil: String? = null
 )

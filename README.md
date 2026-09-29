@@ -57,13 +57,13 @@ The alarm's recurrence, label, snooze settings, vibration, and sound selection a
 
 ### Answering together
 
-With **Answer as one** enabled, dismissing or snoozing an alarm also answers the corresponding occurrence for the group. An ignored outcome is shared too. For snoozing, the current ring stops for everyone, but the later snooze ring only happens on the device that answered. This is useful when one person taking care of the alarm is enough.
+With **Answer as one** enabled, dismissing an alarm or leaving it unanswered resolves the corresponding occurrence for the group. Snoozing stops the current ring for everyone and schedules the later ring on every member's device. This is useful when the group wants one response to control the alarm together.
 
 For a group timer, a member with edit permission can dismiss it for everyone when this setting is enabled. Otherwise, dismissing its ring stays local. Adding time, resetting, and cancelling a shared timer always follow the group's edit permissions.
 
 ### Shared sounds
 
-You can use each device's default sound, keep it silent, or send a custom sound to the group. Jay prepares the audio and downloads it to the other devices so they can play it locally.
+You can use each device's default sound, keep it silent, or send a custom sound to the group. Custom files can include video when they have an audio track that your device can decode. Jay prepares the audio and downloads it to the other devices so they can play it locally.
 
 <details>
 <summary><strong>A note on shared sounds</strong></summary>

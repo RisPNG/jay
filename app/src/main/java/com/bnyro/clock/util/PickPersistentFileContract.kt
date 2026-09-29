@@ -15,6 +15,7 @@ class PickPersistentFileContract : ActivityResultContract<Array<String>, Uri?>()
         this.context = context
 
         return Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
             .putExtra(Intent.EXTRA_MIME_TYPES, input)
             .setFlags(
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION

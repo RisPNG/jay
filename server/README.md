@@ -2,7 +2,7 @@
 
 The server keeps the group side of Jay in sync: identities, memberships, shared alarms and timers, delivery records, and alarm responses. Django REST Framework handles JSON requests and the Django ORM owns PostgreSQL state. Channels handles authenticated live streams. A separate worker handles alarm deadlines, push delivery and audio verification.
 
-It also tracks when each member is expected to answer an alarm. If no dismissal or snooze arrives before the ringing deadline, the server records an ignored outcome, including when the device is offline. With **Answer as one**, a member's dismissal, snooze, or missed response applies to the group's corresponding occurrences. Devices using the same imported profile are one member and always answer together.
+It also tracks when each member is expected to answer an alarm. If no dismissal or snooze arrives before the ringing deadline, the server records an ignored outcome, including when the device is offline. With **Answer as one**, a member's dismissal or missed response resolves the group's corresponding occurrences, while a snooze moves every member's next ring and response deadline to the same time. Devices using the same imported profile are one member and always answer together.
 
 While Jay is open, authenticated server-sent events tell it when something changes. Firebase and periodic synchronisation help it catch up in the background.
 
@@ -49,7 +49,7 @@ The Android emulator can reach this API at `http://10.0.2.2:8000`. Use a debug b
 | `TRUST_PROXY` | Trust the HTTPS forwarding header only when requests pass through a trusted proxy |
 | `DATABASE_POOL_SIZE` | Maximum pooled connections per process; size against the database connection budget |
 | `IDENTITY_INACTIVITY_TIMEOUT_DAYS` | Removes identities unseen for this many days together with the groups they solely lead, defaulting to 120; profiles with operator-granted sound access are retained; 0 disables the sweep |
-| `SHARED_SOUND_ACCESS` | Shared-sound upload and selection policy: `play` (default) requires a verified paid installation or an operator grant for the current profile; `everyone` grants access to every authenticated device, subject to group edit permissions |
+| `SHARED_SOUND_ACCESS` | Shared-sound upload policy: `play` (default) requires a verified paid installation or an operator grant for the current profile; `everyone` grants access to every authenticated device, subject to group edit permissions |
 | `B2_S3_ENDPOINT` | Backblaze B2 S3-compatible endpoint |
 | `B2_BUCKET_NAME` | Private B2 bucket that stores normalised shared sounds |
 | `B2_APPLICATION_KEY_ID` | B2 application key ID scoped to the sound bucket |
@@ -78,7 +78,7 @@ With the included Compose file, run this from the repository root:
 SHARED_SOUND_ACCESS=everyone mise exec -- docker compose -f server/compose.yaml up --build -d
 ```
 
-This allows uploads and sound selection without a Play purchase, including from GitHub and debug builds. The app learns what is available during synchronisation, and access on an `everyone` server does not expire or need Play verification.
+This allows new sound uploads without a Play purchase, including from GitHub and debug builds. Any group member can receive and play sounds already uploaded to their group, and the API permits selecting an existing group sound. The app learns what is available during synchronisation, and access on an `everyone` server does not expire or need Play verification.
 
 You still decide who can edit each group, and you still provide the storage. The access setting makes shared sounds available without Play verification, it does not supply somewhere to store the audio. Google Play credentials are not needed for `everyone` mode.
 
@@ -164,6 +164,8 @@ mise exec -- .venv/bin/python manage.py run_worker
 ```
 
 Use `/health/live` for web liveness, `/health/ready` for database and schema readiness, and `manage.py check_worker` for worker progress and failures. Stop processes gracefully, keep database backups, and test restoration. Rolling deployments require schema compatibility between overlapping versions.
+
+After updating a worker affected by the shared-sound verification `NotSupportedError`, run `mise exec -- .venv/bin/python manage.py retry_sound_verifications` once. Run it after every worker is updated and older workers have stopped: the command requeues failed verification jobs for sounds still awaiting verification with a fresh retry window.
 
 ## Performance
 

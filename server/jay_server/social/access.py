@@ -34,13 +34,13 @@ def identity_capabilities(identity, installation=None):
     }
 
 
-def select_shared_sound(group, identity, selection, current_sound_id=None, installation=None):
+def select_shared_sound(group, identity, selection, installation=None):
     if selection["mode"] != SoundMode.SHARED:
         return None
-    if selection["sound_id"] != current_sound_id and not identity_capabilities(identity, installation)["shared_sound_upload"]:
-        raise DomainError("entitlement_required", "A current Play entitlement is required", 403)
     sound = SharedSound.objects.filter(pk=selection["sound_id"], group=group).first()
     if sound is None and selection.get("title"):
+        if not identity_capabilities(identity, installation)["shared_sound_upload"]:
+            raise DomainError("entitlement_required", "Shared sound upload access is required", 403)
         sound = SharedSound.objects.create(
             id=selection["sound_id"], group=group, uploaded_by=identity, title=selection["title"],
             object_key=f"sounds/{selection['sound_id']}/verified.flac",

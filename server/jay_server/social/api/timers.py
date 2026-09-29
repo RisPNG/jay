@@ -51,7 +51,7 @@ class TimerView(APIView):
             accept_saved_state(timer, data.pop("saved_at"), receipt.operation_id, TimerRepresentation(timer).data)
             data.pop("membership_id")
             selection = data.pop("sound")
-            timer.sound = select_shared_sound(timer.group, request.user, selection, timer.sound_id, installation=request.auth)
+            timer.sound = select_shared_sound(timer.group, request.user, selection, installation=request.auth)
             timer.sound_mode = selection["mode"]
             for name, value in data.items():
                 setattr(timer, name, value)

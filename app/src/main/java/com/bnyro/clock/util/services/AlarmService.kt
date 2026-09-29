@@ -81,14 +81,14 @@ class AlarmService : Service() {
                 SNOOZE_ACTION -> {
                     currentAlarm?.let {
                         outcomeRecorded = true
+                        val snoozedUntil = AlarmHelper.snooze(this@AlarmService, it)
                         SocialAlarmEvents.snooze(
                             this@AlarmService,
                             it.id,
-                            it.snoozeMinutes,
+                            snoozedUntil,
                             occurrenceId!!
                         )
                     }
-                    AlarmHelper.snooze(this@AlarmService, currentAlarm!!)
                     stopSelf()
                 }
                 ALERT_SHOWN_ACTION, ALERT_HIDDEN_ACTION -> {

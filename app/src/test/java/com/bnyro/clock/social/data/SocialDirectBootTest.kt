@@ -23,7 +23,7 @@ class SocialDirectBootTest {
         shadowOf(application.getSystemService(UserManager::class.java)).setUserUnlocked(false)
         SocialStartup.initialize(application)
         SocialAlarmEvents.dismiss(application, 7L, "occurrence")
-        SocialAlarmEvents.snooze(application, 8L, 5, "next-occurrence")
+        SocialAlarmEvents.snooze(application, 8L, System.currentTimeMillis() + 5 * 60_000L, "next-occurrence")
         assertEquals(2, Preferences.instance.all.keys.count { it.startsWith("jayPendingAlarmActivity:") })
         assertFalse(application.getDatabasePath("androidx.work.workdb").exists())
         assertFalse(application.getDatabasePath("jay_social").exists())

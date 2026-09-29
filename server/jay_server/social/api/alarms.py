@@ -53,7 +53,7 @@ class AlarmView(APIView):
             data.pop("membership_id")
             previous = AlarmRepresentation(alarm).data
             selection = data.pop("sound")
-            alarm.sound = select_shared_sound(alarm.group, request.user, selection, alarm.sound_id, installation=request.auth)
+            alarm.sound = select_shared_sound(alarm.group, request.user, selection, installation=request.auth)
             alarm.sound_mode = selection["mode"]
             for name, value in data.items():
                 setattr(alarm, name, value)

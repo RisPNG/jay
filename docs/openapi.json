@@ -2040,6 +2040,11 @@
                         "nullable": true,
                         "minLength": 1,
                         "maxLength": 40
+                    },
+                    "snoozed_until": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -3215,6 +3220,12 @@
                         "format": "date-time",
                         "readOnly": true
                     },
+                    "snoozed_until": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
                     "state": {
                         "allOf": [
                             {
@@ -3240,6 +3251,7 @@
                     "identity_id",
                     "occurrence_key",
                     "resolved_at",
+                    "snoozed_until",
                     "state",
                     "trigger_at"
                 ]
