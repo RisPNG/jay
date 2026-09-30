@@ -372,8 +372,10 @@ class SocialRepository(
                     scheduleIgnoredOutcome(it, remote.id, remote.revision)
                 }
             } else {
-                alarmRepository.getAlarmById(link.localAlarmId)?.takeIf { it.soundUri != soundUri }?.let {
-                    alarmRepository.updateAlarm(it.copy(soundUri = soundUri))
+                alarmRepository.getAlarmById(link.localAlarmId)?.takeIf {
+                    it.soundUri != soundUri || it.labelColor != remote.labelColor
+                }?.let {
+                    alarmRepository.updateAlarm(it.copy(soundUri = soundUri, labelColor = remote.labelColor))
                 }
             }
         }
