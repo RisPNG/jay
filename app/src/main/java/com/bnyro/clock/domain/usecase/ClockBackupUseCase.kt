@@ -46,7 +46,7 @@ class ClockBackupUseCase(private val context: Context) {
     }
 
     suspend fun restore(backup: ClockBackup) {
-        require(backup.version == 1)
+        require(backup.version in 1..2)
         val preferences = backup.preferences?.filterKeys { !it.startsWith("jay") }?.mapValues { (_, preference) ->
             when (preference.type) {
                 "boolean" -> preference.value.jsonPrimitive.boolean

@@ -82,7 +82,13 @@ class SettingsModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             val appContext = context.applicationContext
             val alarmRepository = (appContext as App).container.alarmRepository
-            alarmRepository.getAlarms().forEach { AlarmHelper.enqueue(appContext, it) }
+            alarmRepository.getAlarms().forEach { alarm ->
+                if (alarm.enabled && !AlarmHelper.hasRecurrenceEnded(alarm)) {
+                    AlarmHelper.getAlarmTime(alarm)?.let {
+                        AlarmHelper.reschedulePreAlarm(appContext, alarm, it)
+                    }
+                }
+            }
         }
     }
 
