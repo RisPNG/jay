@@ -5,8 +5,7 @@
 <h1 align="center">Jay</h1>
 
 <p align="center">
-  <strong>A social clock app for Android.</strong><br>
-  Alarms and timers, for yourself and the people around you.
+  <strong>A better clock app, with socials!</strong><br>
 </p>
 
 <p align="center">
@@ -28,11 +27,11 @@
 
 ---
 
-Jay is your run-of-the-mill [clock app](https://github.com/you-apps/ClockYou) for Android, but with groups, allowing for shared alarms and shared timers. I built it to replace your personal clock app, so you still get the personal alarms, world clocks, stopwatch, and widgets you would expect. Groups are there for when you want them.
+Jay is your upgraded [clock app](https://github.com/you-apps/ClockYou) designed to replace your default clock app, with an added groups feature for shared alarms and timers. You get all the normal clock features and groups are there for when you want them.
 
-**No email or password registration. No ads. Self-hostable.**
+**No registration. No ads. Self-hostable.**
 
-Jay creates a profile for you automatically, so getting started is basically choosing a name (or stick with the auto-generated one), creating a group, and inviting someone. If you use more than one device, you can bring the same profile over and continue as the same member.
+Jay creates your profile automatically. Choose a name, create a group, and invite someone. Export and import your profile to use it across devices.
 
 ## What you can do
 
