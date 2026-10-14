@@ -15,7 +15,7 @@ class SharedTimer(SavedState):
     increment_seconds = models.PositiveIntegerField()
     expires_at = models.DateTimeField()
     run_id = models.UUIDField(default=uuid.uuid4)
-    timeout_minutes = models.PositiveSmallIntegerField(default=10)
+    timeout_minutes = models.PositiveSmallIntegerField(default=5)
     repeat_enabled = models.BooleanField(default=False)
     repeat_count = models.PositiveSmallIntegerField(default=0)
     repeat_index = models.PositiveIntegerField(default=0)

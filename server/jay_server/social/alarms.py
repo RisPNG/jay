@@ -120,7 +120,15 @@ def record_alarm_response(alarm, identity, data):
     changes.append(("outcome", str(activity.pk), "upsert", OutcomeRepresentation(activity).data, None))
     if occurrence:
         if activity.kind == "snoozed":
-            snoozed_until = activity.occurred_at + timedelta(minutes=alarm.missed_restart_minutes) if automatic_restart else data.get("snoozed_until") or (activity.occurred_at + timedelta(minutes=alarm.snooze_minutes)).replace(second=0, microsecond=0)
+            if automatic_restart:
+                snoozed_until = activity.occurred_at + timedelta(minutes=alarm.missed_restart_minutes)
+            else:
+                snoozed_until = data.get("snoozed_until")
+                if snoozed_until is None:
+                    ring_time = occurrence.snoozed_until or occurrence.trigger_at
+                    snoozed_until = (ring_time + timedelta(minutes=alarm.snooze_minutes)).replace(second=0, microsecond=0)
+                    if snoozed_until <= activity.occurred_at:
+                        snoozed_until = activity.occurred_at.replace(second=0, microsecond=0) + timedelta(minutes=1)
             occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "pending", None, snoozed_until, activity.occurred_at
             occurrence.deadline_at = snoozed_until + timedelta(minutes=alarm.timeout_minutes)
         else:

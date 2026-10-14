@@ -10,6 +10,7 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.bnyro.clock.App
+import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.domain.model.TimerObject
 import com.bnyro.clock.util.Preferences
 
@@ -39,7 +40,7 @@ class SocialTimerWorker(context: Context, parameters: WorkerParameters) :
                 timerId, groupId, membershipId,
                 inputData.getString("run_id") ?: return Result.failure(),
                 inputData.getInt("repeat_index", 0), inputData.getLong(EXPIRES_AT, 0),
-                inputData.getInt("timeout_minutes", 10), operationId,
+                inputData.getInt("timeout_minutes", TimerSettings.DEFAULT_TIMEOUT_MINUTES), operationId,
                 inputData.getLong("saved_at", 0)
             )
 

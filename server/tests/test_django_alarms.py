@@ -128,7 +128,7 @@ def test_snooze_postpones_other_members_only_when_shared(client, group, member, 
     for identity in Identity.objects.all():
         AlarmOccurrence.objects.create(alarm=alarm, group=group, identity=identity, alarm_revision=1, occurrence_key=key, cycle_date=trigger.date(), trigger_at=trigger, deadline_at=trigger + timedelta(minutes=10))
     occurred_at = timezone.now().replace(second=37, microsecond=456000)
-    snoozed_until = (occurred_at + timedelta(minutes=alarm.snooze_minutes)).replace(second=0, microsecond=0) if legacy else occurred_at + timedelta(minutes=7)
+    snoozed_until = (trigger + timedelta(minutes=alarm.snooze_minutes)).replace(second=0, microsecond=0) if legacy else occurred_at + timedelta(minutes=7)
     response_data = {"id": str(uuid4()), "membership_id": alarm_payload["membership_id"], "alarm_revision": 1, "kind": "snoozed", "occurred_at": occurred_at.isoformat(), "occurrence_key": key, "reason": None}
     if not legacy:
         response_data["snoozed_until"] = snoozed_until.isoformat()
@@ -151,7 +151,7 @@ def test_snooze_postpones_other_members_only_when_shared(client, group, member, 
     assert source.deadline_at == snoozed_until + timedelta(minutes=alarm.timeout_minutes)
 
     if shared:
-        stale_ignore = member.post(f"/v1/alarms/{alarm.pk}/activity", {"id": str(uuid4()), "membership_id": str(GroupMembership.objects.get(group=group, identity_id="2" * 64).pk), "alarm_revision": 1, "kind": "ignored", "occurred_at": (trigger + timedelta(minutes=10)).isoformat(), "occurrence_key": key, "reason": "no_response"}, format="json", headers={"Idempotency-Key": str(uuid4())})
+        stale_ignore = member.post(f"/v1/alarms/{alarm.pk}/activity", {"id": str(uuid4()), "membership_id": str(GroupMembership.objects.get(group=group, identity_id="2" * 64).pk), "alarm_revision": 1, "kind": "ignored", "occurred_at": (trigger + timedelta(minutes=alarm.timeout_minutes)).isoformat(), "occurrence_key": key, "reason": "no_response"}, format="json", headers={"Idempotency-Key": str(uuid4())})
         assert stale_ignore.status_code == 409, stale_ignore.data
         assert stale_ignore.data["code"] == "response_outdated"
         other.refresh_from_db()
@@ -191,3 +191,62 @@ def test_alarm_history_describes_edits_enabled_state_and_delivery(client, group,
     assert history["action"] == "delivered"
     assert history["subject_id"] == history["actor_id"]
     assert history["subject_label"] == history["actor_label"]
+
+
+@pytest.mark.parametrize("shared", [False, True])
+@pytest.mark.parametrize("ring_offset,pressed_offset,next_offset", [
+    (0, timedelta(minutes=1, seconds=40), timedelta(minutes=5)),
+    (0, timedelta(minutes=6, seconds=17), timedelta(minutes=7)),
+    (0, timedelta(minutes=5), timedelta(minutes=6)),
+    (5, timedelta(minutes=6, seconds=40), timedelta(minutes=10)),
+])
+def test_legacy_snooze_uses_current_ring_and_next_minute_when_elapsed(client, group, member, alarm_payload, shared, ring_offset, pressed_offset, next_offset):
+    group.shared_answers = shared
+    group.save(update_fields=["shared_answers"])
+    trigger = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
+    alarm_payload.update(local_time_ms=9 * 3600000, start_date=trigger.date().isoformat(), end_occurrences=1, timeout_minutes=12)
+    assert client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 201
+    alarm = SharedAlarm.objects.get(pk=alarm_payload["id"])
+    key = str(int(trigger.timestamp() * 1000))
+    ring_time = trigger + timedelta(minutes=ring_offset)
+    for identity in Identity.objects.all():
+        AlarmOccurrence.objects.create(alarm=alarm, group=group, identity=identity, alarm_revision=1, occurrence_key=key, cycle_date=trigger.date(), trigger_at=trigger, deadline_at=ring_time + timedelta(minutes=alarm.timeout_minutes), snoozed_until=ring_time if ring_offset else None, snoozed_at=trigger + timedelta(minutes=1, seconds=40) if ring_offset else None)
+    original = AlarmOccurrence.objects.get(alarm=alarm, identity_id="1" * 64, occurrence_key=key)
+    occurred_at = trigger + pressed_offset
+    response = client.post(f"/v1/alarms/{alarm.pk}/activity", {"id": str(uuid4()), "membership_id": alarm_payload["membership_id"], "alarm_revision": 1, "kind": "snoozed", "occurred_at": occurred_at.isoformat(), "occurrence_key": key, "reason": None}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert response.status_code == 201, response.data
+    source = AlarmOccurrence.objects.get(pk=original.pk)
+    other = AlarmOccurrence.objects.get(alarm=alarm, identity_id="2" * 64, occurrence_key=key)
+    expected = trigger + next_offset
+    assert source.state == "pending" and source.resolved_at is None
+    assert source.snoozed_until == expected
+    assert source.snoozed_at == occurred_at
+    assert source.deadline_at == expected + timedelta(minutes=alarm.timeout_minutes)
+    assert source.trigger_at == trigger and source.occurrence_key == key and source.cycle_date == trigger.date()
+    assert AlarmOccurrence.objects.filter(alarm=alarm, identity_id="1" * 64).count() == 1
+    assert other.snoozed_until == (expected if shared else ring_time if ring_offset else None)
+    assert other.deadline_at == (source.deadline_at if shared else ring_time + timedelta(minutes=alarm.timeout_minutes))
+    assert other.trigger_at == trigger and other.occurrence_key == key and other.cycle_date == trigger.date()
+
+
+@pytest.mark.parametrize("processing_delay", [timedelta(0), timedelta(seconds=20)])
+def test_explicit_snooze_preserves_a_response_just_before_its_target_when_processing_is_delayed(client, group, alarm_payload, monkeypatch, processing_delay):
+    trigger = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
+    alarm_payload.update(local_time_ms=9 * 3600000, start_date=trigger.date().isoformat(), end_occurrences=1, timeout_minutes=5)
+    assert client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 201
+    alarm = SharedAlarm.objects.get(pk=alarm_payload["id"])
+    key = str(int(trigger.timestamp() * 1000))
+    target = trigger + timedelta(minutes=5)
+    original = AlarmOccurrence.objects.create(alarm=alarm, group=group, identity_id="1" * 64, alarm_revision=1, occurrence_key=key, cycle_date=trigger.date(), trigger_at=trigger, deadline_at=target)
+    occurred_at = target - timedelta(milliseconds=1)
+    monkeypatch.setattr(timezone, "now", lambda: target + processing_delay)
+    response = client.post(f"/v1/alarms/{alarm.pk}/activity", {"id": str(uuid4()), "membership_id": alarm_payload["membership_id"], "alarm_revision": 1, "kind": "snoozed", "occurred_at": occurred_at.isoformat(), "occurrence_key": key, "snoozed_until": target.isoformat(), "reason": None}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert response.status_code == 201, response.data
+    activity = AlarmActivity.objects.get(pk=response.data["id"])
+    assert activity.occurred_at == occurred_at
+    source = AlarmOccurrence.objects.get(pk=original.pk)
+    assert source.state == "pending" and source.resolved_at is None
+    assert source.snoozed_until == target and source.snoozed_at == occurred_at
+    assert source.deadline_at == trigger + timedelta(minutes=10)
+    assert source.trigger_at == trigger and source.occurrence_key == key and source.cycle_date == trigger.date()
+    assert AlarmOccurrence.objects.filter(alarm=alarm, identity_id="1" * 64).count() == 1

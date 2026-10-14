@@ -5,6 +5,7 @@ import androidx.room.Index
 import kotlinx.serialization.SerialName
 import com.bnyro.clock.ui.theme.DefaultLabelColor
 import kotlinx.serialization.Serializable
+import com.bnyro.clock.domain.model.TimerSettings
 import kotlinx.serialization.json.JsonObject
 
 enum class AlarmPermission {
@@ -388,7 +389,7 @@ data class SharedTimerRequest(
     val sound: SharedSoundSelection,
     @SerialName("expires_at") val expiresAt: String,
     @SerialName("run_id") val runId: String,
-    @SerialName("timeout_minutes") val timeoutMinutes: Int = 10,
+    @SerialName("timeout_minutes") val timeoutMinutes: Int = TimerSettings.DEFAULT_TIMEOUT_MINUTES,
     @SerialName("repeat_enabled") val repeatEnabled: Boolean = false,
     @SerialName("repeat_count") val repeatCount: Int = 0,
     @SerialName("repeat_index") val repeatIndex: Int = 0,
@@ -407,7 +408,7 @@ data class SharedTimerDto(
     @SerialName("expires_at") val expiresAt: String,
     @SerialName("run_id") val runId: String? = null,
     @SerialName("command_source") val commandSource: SharedTimerCommandSource? = null,
-    @SerialName("timeout_minutes") val timeoutMinutes: Int = 10,
+    @SerialName("timeout_minutes") val timeoutMinutes: Int = TimerSettings.DEFAULT_TIMEOUT_MINUTES,
     @SerialName("repeat_enabled") val repeatEnabled: Boolean = false,
     @SerialName("repeat_count") val repeatCount: Int = 0,
     @SerialName("repeat_index") val repeatIndex: Int = 0,

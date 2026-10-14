@@ -33,14 +33,14 @@ def answer(client, timer, index=0, identity_id="1" * 64, key=None, run_id=None, 
 
 def test_old_client_timer_payload_receives_independent_defaults(client, group, timer_payload):
     timer, _ = create_timer(client, group, timer_payload)
-    assert timer.timeout_minutes == 10
+    assert timer.timeout_minutes == 5
     assert not timer.repeat_enabled
     assert timer.repeat_count == timer.repeat_index == 0
     assert isinstance(timer.run_id, UUID)
     snapshot = client.get(f"/v1/groups/{group.pk}/sync")
     metadata = next(item["data"] for item in snapshot.data["items"] if item["kind"] == "timer")
     assert metadata["run_id"] == str(timer.run_id)
-    assert metadata["timeout_minutes"] == 10
+    assert metadata["timeout_minutes"] == 5
 
 
 @pytest.mark.parametrize("field,value", [
@@ -69,7 +69,7 @@ def test_positive_repeat_count_means_additional_copies(client, group, timer_payl
         assert response.data["repeat_index"] == index
         occurrence = TimerOccurrence.objects.get(pk=response.data["id"])
         assert occurrence.trigger_at == timer.expires_at + timedelta(seconds=index)
-        assert occurrence.deadline_at == occurrence.trigger_at + timedelta(minutes=10)
+        assert occurrence.deadline_at == occurrence.trigger_at + timedelta(minutes=5)
     assert answer(client, timer, 3).status_code == 400
     assert TimerOccurrence.objects.count() == 3
     timer.refresh_from_db()
@@ -144,7 +144,7 @@ def test_old_client_adjustment_gets_a_new_run_without_new_fields(client, group, 
     assert response.status_code == 200, response.data
     timer.refresh_from_db()
     assert timer.run_id != original_run
-    assert timer.timeout_minutes == 10
+    assert timer.timeout_minutes == 5
     assert timer.repeat_index == 0
 
 
@@ -331,3 +331,30 @@ def test_timer_upgrade_preserves_initial_run_lineage_and_later_reset_uses_a_new_
     assert answer(client, original, run_id=original.pk).status_code == 409
     created, _ = create_timer(client, group, timer_payload)
     assert created.run_id != created.pk
+
+
+def test_timer_timeout_default_upgrade_preserves_saved_policies_and_run_progress(client, group, timer_payload):
+    before = [("social", "0010_timer_repetitions")]
+    executor = MigrationExecutor(connection)
+    after = executor.loader.graph.leaf_nodes()
+    executor.migrate(before)
+    existing = []
+    try:
+        apps = executor.loader.project_state(before).apps
+        timers = apps.get_model("social", "SharedTimer")
+        for label, policy in [("Previous default", {}), ("Explicit ten minutes", {"timeout_minutes": 10}), ("Custom timeout", {"timeout_minutes": 25})]:
+            timer = timers.objects.create(group_id=group.pk, label=label, duration_seconds=300, increment_seconds=60, expires_at=timezone.now() + timedelta(minutes=20), repeat_enabled=True, repeat_count=5, repeat_index=2, vibrate=True, vibration_pattern=[0, 100], vibration_pattern_name="Default", **policy)
+            existing.append(timer)
+    finally:
+        MigrationExecutor(connection).migrate(after)
+    for previous in existing:
+        upgraded = SharedTimer.objects.get(pk=previous.pk)
+        assert upgraded.timeout_minutes == previous.timeout_minutes
+        assert upgraded.run_id == previous.run_id
+        assert upgraded.repeat_enabled and upgraded.repeat_count == 5 and upgraded.repeat_index == 2
+        assert upgraded.expires_at == previous.expires_at
+        assert upgraded.saved_at == previous.saved_at and upgraded.save_id == previous.save_id
+    default, _ = create_timer(client, group, timer_payload)
+    explicit, _ = create_timer(client, group, timer_payload, timeout_minutes=10)
+    assert default.timeout_minutes == 5
+    assert explicit.timeout_minutes == 10

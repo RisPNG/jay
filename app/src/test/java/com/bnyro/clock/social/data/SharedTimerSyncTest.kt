@@ -74,6 +74,7 @@ class SharedTimerSyncTest {
             assertEquals(TimerService.SYNC_SHARED_TIMER_ACTION, start.action)
             assertEquals(-15584170, start.getIntExtra(TimerService.SHARED_TIMER_LABEL_COLOR_EXTRA_KEY, -1))
             assertEquals(expiresAt, start.getLongExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, 0))
+            assertEquals(5, start.getIntExtra(TimerService.SHARED_TIMER_TIMEOUT_EXTRA_KEY, -1))
             assertEquals(1, registrations)
             cursor = 3L
             val rejecting = object : ContextWrapper(context) {
