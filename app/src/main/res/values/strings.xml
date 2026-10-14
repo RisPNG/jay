@@ -107,6 +107,15 @@
     <string name="timeout_after">Timeout after</string>
     <string name="select_alarm_timeout">Select alarm timeout</string>
     <string name="select_timer_timeout">Select timer timeout</string>
+    <string name="timer_timeout_info">Stops this timer from ringing after the selected number of minutes. Repeating timers start their next run when the countdown ends, independently of this timeout.</string>
+    <string name="timer_repeat_info">Starts another timer with the original duration when this timer ends, while the completed timer rings. Choose how many additional runs to start after the first, or 0 to repeat indefinitely. Answering a completed timer leaves the next run counting.</string>
+    <string name="timer_repeat_indefinitely">Indefinitely</string>
+    <string name="select_timer_repeats">Select additional repeats</string>
+    <string name="timer_repeats_unit">repeats</string>
+    <plurals name="timer_repeat_count">
+        <item quantity="one">%d additional repeat</item>
+        <item quantity="other">%d additional repeats</item>
+    </plurals>
     <string name="volume_ramp">Gradually increase volume</string>
     <string name="select_volume_ramp">Select volume ramp</string>
     <string name="volume_ramp_never">Never</string>
@@ -372,4 +381,9 @@
     <string name="toggle_selected_alarms">Toggle selected alarms</string>
     <string name="toggle_selected_alarms_confirmation">Turn each selected alarm on if it is off, or off if it is on?</string>
     <string name="toggle">Toggle</string>
+    <string name="option_information">About %1$s</string>
+    <string name="snooze_info">Stop the current ring and postpone it by the selected number of minutes. The next ring gets a fresh timeout.</string>
+    <string name="alarm_repeat_info">Repeat on the selected weekdays. Turn this off to ring once at the next scheduled time.</string>
+    <string name="repeats_for_info">Choose how long each repeating run lasts. Selected weekdays still control which days ring within a weekly run.</string>
+    <string name="upcoming_alarm_info">Show a reminder this long before an alarm is due to ring.</string>
 </resources>

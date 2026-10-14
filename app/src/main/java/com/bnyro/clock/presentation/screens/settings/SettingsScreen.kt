@@ -66,7 +66,6 @@ import com.bnyro.clock.presentation.screens.settings.components.SwitchPref
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.AlarmService
-import com.bnyro.clock.util.services.TimerService
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -81,7 +80,6 @@ fun SettingsScreen(
         rememberTopAppBarState()
     )
     var showAlarmTimeoutDialog by remember { mutableStateOf(false) }
-    var showTimerTimeoutDialog by remember { mutableStateOf(false) }
     var showTimerIncrementDialog by remember { mutableStateOf(false) }
     var showAlarmVolumeRampDialog by remember { mutableStateOf(false) }
     var showTimerVolumeRampDialog by remember { mutableStateOf(false) }
@@ -95,14 +93,6 @@ fun SettingsScreen(
             Preferences.instance.getInt(
                 Preferences.alarmTimeoutMinutesKey,
                 AlarmService.ALARM_TIMEOUT_MINUTES
-            )
-        )
-    }
-    var timerTimeoutMinutes by remember {
-        mutableIntStateOf(
-            Preferences.instance.getInt(
-                Preferences.timerTimeoutMinutesKey,
-                TimerService.TIMER_TIMEOUT_MINUTES
             )
         )
     }
@@ -334,6 +324,7 @@ fun SettingsScreen(
             }
             IconPreference(
                 title = stringResource(R.string.upcoming_alarm),
+                info = stringResource(R.string.upcoming_alarm_info),
                 summary = pluralStringResource(
                     R.plurals.duration_minutes,
                     upcomingAlarmDurationMinutes,
@@ -467,18 +458,6 @@ fun SettingsScreen(
             }
 
             IconPreference(
-                title = stringResource(R.string.timeout_after),
-                summary = pluralStringResource(
-                    R.plurals.duration_minutes,
-                    timerTimeoutMinutes,
-                    timerTimeoutMinutes
-                ),
-                imageVector = Icons.Rounded.Timer
-            ) {
-                showTimerTimeoutDialog = true
-            }
-
-            IconPreference(
                 title = stringResource(R.string.volume_ramp),
                 summary = volumeRampSummary(timerVolumeRampSeconds),
                 imageVector = Icons.AutoMirrored.Rounded.VolumeUp
@@ -581,22 +560,6 @@ fun SettingsScreen(
                 alarmTimeoutMinutes = it
                 Preferences.edit { putInt(Preferences.alarmTimeoutMinutesKey, it) }
                 showAlarmTimeoutDialog = false
-            }
-        )
-    }
-    if (showTimerTimeoutDialog) {
-        ScrollPickerDialog(
-            onDismissRequest = { showTimerTimeoutDialog = false },
-            title = stringResource(R.string.select_timer_timeout),
-            unit = stringResource(R.string.minutes),
-            value = timerTimeoutMinutes,
-            maxValue = 120,
-            offset = 1,
-            label = { it.toString() },
-            onValueSet = {
-                timerTimeoutMinutes = it
-                Preferences.edit { putInt(Preferences.timerTimeoutMinutesKey, it) }
-                showTimerTimeoutDialog = false
             }
         )
     }
