@@ -47,6 +47,7 @@ class AlarmService : Service() {
     private var vibrator: Vibrator? = null
     private var mediaPlayer: MediaPlayer? = null
     private var currentAlarm: Alarm? = null
+    private var currentRingTime: Long? = null
     private var alertScreenVisible = false
 
     private val timeoutHandler = Handler(Looper.getMainLooper())
@@ -111,6 +112,26 @@ class AlarmService : Service() {
         val alarm = runBlocking {
             alarmRepository.getAlarmById(id)
         } ?: return START_STICKY
+        var triggerTime = intent?.getLongExtra(
+            AlarmHelper.EXTRA_TRIGGER_TIME,
+            System.currentTimeMillis()
+        ) ?: System.currentTimeMillis()
+        val timeoutMillis = alarm.timeoutMinutes * 60_000L
+        val now = System.currentTimeMillis()
+        if (alarm.missedRestartEnabled && now >= triggerTime + timeoutMillis) {
+            val cycleMillis = timeoutMillis + alarm.missedRestartMinutes * 60_000L
+            triggerTime += (now - triggerTime) / cycleMillis * cycleMillis
+            if (now >= triggerTime + timeoutMillis) {
+                AlarmHelper.snooze(
+                    this,
+                    alarm,
+                    snoozedUntil = triggerTime + cycleMillis
+                )
+                if (!isPlaying || currentAlarm?.id == alarm.id) stopSelf()
+                return START_STICKY
+            }
+        }
+        currentRingTime = triggerTime
         val notification = createNotification(this, alarm)
         startForeground(notificationId, notification)
 
@@ -121,12 +142,15 @@ class AlarmService : Service() {
             putExtra(AlarmHelper.EXTRA_ID, alarm.id)
         }
         startActivity(alarmActivityIntent)
-        val alarmTimeoutMinutes = Preferences.instance.getInt(
-            Preferences.alarmTimeoutMinutesKey,
-            ALARM_TIMEOUT_MINUTES
-        )
+        val deadlineAt = triggerTime + timeoutMillis
         timeoutHandler.postDelayed({
-            if (Permission.NotificationPermission.hasPermission(this@AlarmService)) {
+            if (alarm.missedRestartEnabled) {
+                AlarmHelper.snooze(
+                    this@AlarmService,
+                    alarm,
+                    snoozedUntil = deadlineAt + alarm.missedRestartMinutes * 60_000L
+                )
+            } else if (Permission.NotificationPermission.hasPermission(this@AlarmService)) {
                 val contentIntent = PendingIntent.getActivity(
                     this@AlarmService,
                     alarm.id.toInt(),
@@ -157,8 +181,8 @@ class AlarmService : Service() {
                         .setContentText(
                             resources.getQuantityString(
                                 R.plurals.alarm_rang_for_minutes,
-                                alarmTimeoutMinutes,
-                                alarmTimeoutMinutes
+                                alarm.timeoutMinutes,
+                                alarm.timeoutMinutes
                             )
                         )
                         .setContentIntent(contentIntent)
@@ -167,7 +191,7 @@ class AlarmService : Service() {
                 )
             }
             stopSelf()
-        }, alarmTimeoutMinutes * 60 * 1000L)
+        }, (deadlineAt - System.currentTimeMillis()).coerceAtLeast(0L))
         return START_STICKY
     }
 
@@ -280,7 +304,7 @@ class AlarmService : Service() {
             getString(R.string.dismiss),
             getPendingIntent(dismissIntent, 2)
         )
-        val targetAlarmTimeMs = AlarmHelper.getAlarmTime(alarm) ?: System.currentTimeMillis()
+        val targetAlarmTimeMs = currentRingTime ?: System.currentTimeMillis()
 
         return NotificationCompat.Builder(context, NotificationHelper.ALARM_CHANNEL).apply {
             val formattedTime = TimeHelper.formatTime(
@@ -340,7 +364,6 @@ class AlarmService : Service() {
         const val SNOOZE_ACTION = "SNOOZE"
         const val ALERT_SHOWN_ACTION = "ALERT_SHOWN"
         const val ALERT_HIDDEN_ACTION = "ALERT_HIDDEN"
-        const val ALARM_TIMEOUT_MINUTES = 10
         private const val MISSED_ALARM_ID_OFFSET = 8000
 
     }

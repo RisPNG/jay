@@ -106,6 +106,10 @@
     <string name="delete">Delete</string>
     <string name="timeout_after">Timeout after</string>
     <string name="select_alarm_timeout">Select alarm timeout</string>
+    <string name="missed_restart">Missed restart</string>
+    <string name="select_missed_restart_time">Select missed restart delay</string>
+    <string name="missed_restart_info">After the alarm times out, wait this long before ringing again. It keeps restarting until you dismiss it, even when Snooze is off.</string>
+    <string name="alarm_timeout_info">Stop ringing after this duration if you have not answered the alarm. With Missed restart enabled, the alarm waits before ringing again.</string>
     <string name="select_timer_timeout">Select timer timeout</string>
     <string name="volume_ramp">Gradually increase volume</string>
     <string name="select_volume_ramp">Select volume ramp</string>
@@ -378,4 +382,9 @@
     <string name="toggle_selected_alarms">Toggle selected alarms</string>
     <string name="toggle_selected_alarms_confirmation">Turn each selected alarm on if it is off, or off if it is on?</string>
     <string name="toggle">Toggle</string>
+    <string name="option_information">About %1$s</string>
+    <string name="snooze_info">Stop the current ring and postpone it by the selected number of minutes. The next ring gets a fresh timeout.</string>
+    <string name="alarm_repeat_info">Repeat on the selected weekdays. Turn this off to ring once at the next scheduled time.</string>
+    <string name="repeats_for_info">Choose how long each repeating run lasts. Selected weekdays still control which days ring within a weekly run.</string>
+    <string name="upcoming_alarm_info">Show a reminder this long before an alarm is due to ring.</string>
 </resources>
