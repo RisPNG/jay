@@ -64,7 +64,6 @@
     <string name="load_more">Load more</string>
     <string name="no_activity">No activity yet</string>
     <string name="alarm_logs">Alarm logs</string>
-    <string name="close">Close</string>
     <string name="log_occurred">Occurred %1$s</string>
     <string name="group_log_created">%1$s created the group</string>
     <string name="group_log_joined">%1$s joined</string>
