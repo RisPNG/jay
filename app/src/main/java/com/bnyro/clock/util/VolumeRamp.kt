@@ -27,7 +27,7 @@ class VolumeRamp(private val player: MediaPlayer, private val seconds: Int) {
         if (seconds <= 0) return
 
         volume = START_VOLUME
-        handler.post(rise)
+        rise.run()
     }
 
     fun cancel() {

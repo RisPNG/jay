@@ -207,11 +207,11 @@ class AlarmService : Service() {
         player.isLooping = true
         player.setAudioAttributes(NotificationHelper.audioAttributes)
         player.prepare()
-        player.start()
         volumeRamp = VolumeRamp(
             player,
             Preferences.instance.getInt(Preferences.alarmVolumeRampSecondsKey, 0)
         ).apply { start() }
+        player.start()
     }
     /**
      * Stops alarm
