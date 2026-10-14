@@ -61,13 +61,20 @@ class AlarmActivity : RingingActivity() {
     override fun snooze() = snooze(alarm.snoozeMinutes)
 
     private fun snooze(minutes: Int) {
-        val snoozedUntil = AlarmHelper.snooze(this@AlarmActivity, alarm, minutes)
+        val occurredAt = System.currentTimeMillis()
+        val snoozedUntil = AlarmHelper.snooze(
+            this@AlarmActivity,
+            alarm,
+            intent.getLongExtra(AlarmHelper.EXTRA_TRIGGER_TIME, occurredAt),
+            minutes
+        )
         SocialAlarmEvents.snooze(
             this,
             alarm,
             snoozedUntil,
             intent.getStringExtra(AlarmService.EXTRA_OCCURRENCE_ID)
-                ?: "${alarm.id}:${System.currentTimeMillis()}"
+                ?: "${alarm.id}:$occurredAt",
+            occurredAtMillis = occurredAt
         )
         stopService(
             Intent(

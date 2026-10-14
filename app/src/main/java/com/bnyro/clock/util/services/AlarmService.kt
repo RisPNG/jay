@@ -88,14 +88,16 @@ class AlarmService : Service() {
                     stopSelf()
                 }
                 SNOOZE_ACTION -> {
-                    currentAlarm?.let {
+                    currentAlarm?.let { alarm ->
+                        val occurredAt = System.currentTimeMillis()
                         outcomeRecorded = true
-                        val snoozedUntil = AlarmHelper.snooze(this@AlarmService, it)
+                        val snoozedUntil = AlarmHelper.snooze(this@AlarmService, alarm, currentRingTime!!, alarm.snoozeMinutes)
                         SocialAlarmEvents.snooze(
                             this@AlarmService,
-                            it,
+                            alarm,
                             snoozedUntil,
-                            occurrenceId!!
+                            occurrenceId!!,
+                            occurredAtMillis = occurredAt
                         )
                     }
                     stopSelf()
@@ -228,6 +230,7 @@ class AlarmService : Service() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
             putExtra(AlarmHelper.EXTRA_ID, alarm.id)
             putExtra(EXTRA_OCCURRENCE_ID, occurrenceId)
+            putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, currentRingTime!!)
         }
         startActivity(alarmActivityIntent)
         timeoutHandler.postDelayed({
@@ -418,6 +421,7 @@ class AlarmService : Service() {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
             .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
             .putExtra(EXTRA_OCCURRENCE_ID, occurrenceId)
+            .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, currentRingTime!!)
 
         val pendingIntent = PendingIntent.getActivity(
             this@AlarmService,
