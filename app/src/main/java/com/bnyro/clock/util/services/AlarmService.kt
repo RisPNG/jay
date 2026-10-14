@@ -9,6 +9,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
@@ -46,6 +48,8 @@ class AlarmService : Service() {
     private var isPlaying = false
     private var vibrator: Vibrator? = null
     private var mediaPlayer: MediaPlayer? = null
+    private lateinit var audioManager: AudioManager
+    private var audioFocusRequest: AudioFocusRequest? = null
     private var currentAlarm: Alarm? = null
     private var currentRingTime: Long? = null
     private var alertScreenVisible = false
@@ -83,6 +87,7 @@ class AlarmService : Service() {
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate() {
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         ContextCompat.registerReceiver(
             this,
@@ -220,7 +225,7 @@ class AlarmService : Service() {
         /* Start the vibrator after everything is ok with the media player */
         if (alarm.vibrate) {
             val vibrationPattern = alarm.vibrationPattern.map(Int::toLong).toLongArray()
-            vibrator!!.vibrate(vibrationPattern, 0)
+            vibrator!!.vibrate(vibrationPattern, 0, NotificationHelper.audioAttributes)
         } else {
             vibrator!!.cancel()
         }
@@ -231,6 +236,21 @@ class AlarmService : Service() {
         player.isLooping = true
         player.setAudioAttributes(NotificationHelper.audioAttributes)
         player.prepare()
+        val focusResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(NotificationHelper.audioAttributes)
+                .build()
+            audioFocusRequest = request
+            audioManager.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                null,
+                AudioManager.STREAM_ALARM,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+            )
+        }
+        if (focusResult != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return
         player.start()
         volumeRamp = VolumeRamp(
             player,
@@ -252,6 +272,13 @@ class AlarmService : Service() {
             mediaPlayer?.stop()
             mediaPlayer?.release()
             mediaPlayer = null
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(null)
         }
         NotificationManagerCompat.from(this).cancel(notificationId)
         // Stop vibrator
