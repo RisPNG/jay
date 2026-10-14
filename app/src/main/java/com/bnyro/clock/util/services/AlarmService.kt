@@ -112,10 +112,25 @@ class AlarmService : Service() {
         val alarm = runBlocking {
             alarmRepository.getAlarmById(id)
         } ?: return START_STICKY
-        val triggerTime = intent?.getLongExtra(
+        var triggerTime = intent?.getLongExtra(
             AlarmHelper.EXTRA_TRIGGER_TIME,
             System.currentTimeMillis()
         ) ?: System.currentTimeMillis()
+        val timeoutMillis = alarm.timeoutMinutes * 60_000L
+        val now = System.currentTimeMillis()
+        if (alarm.missedRestartEnabled && now >= triggerTime + timeoutMillis) {
+            val cycleMillis = timeoutMillis + alarm.missedRestartMinutes * 60_000L
+            triggerTime += (now - triggerTime) / cycleMillis * cycleMillis
+            if (now >= triggerTime + timeoutMillis) {
+                AlarmHelper.snooze(
+                    this,
+                    alarm,
+                    snoozedUntil = triggerTime + cycleMillis
+                )
+                if (!isPlaying || currentAlarm?.id == alarm.id) stopSelf()
+                return START_STICKY
+            }
+        }
         currentRingTime = triggerTime
         val notification = createNotification(this, alarm)
         startForeground(notificationId, notification)
@@ -127,7 +142,7 @@ class AlarmService : Service() {
             putExtra(AlarmHelper.EXTRA_ID, alarm.id)
         }
         startActivity(alarmActivityIntent)
-        val deadlineAt = triggerTime + alarm.timeoutMinutes * 60_000L
+        val deadlineAt = triggerTime + timeoutMillis
         timeoutHandler.postDelayed({
             if (alarm.missedRestartEnabled) {
                 AlarmHelper.snooze(
