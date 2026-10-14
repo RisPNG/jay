@@ -28,6 +28,9 @@ class SharedAlarm(SavedState):
     advanced = models.BooleanField(default=False)
     snooze_enabled = models.BooleanField()
     snooze_minutes = models.PositiveSmallIntegerField()
+    timeout_minutes = models.PositiveSmallIntegerField(default=5)
+    missed_restart_enabled = models.BooleanField(default=False)
+    missed_restart_minutes = models.PositiveSmallIntegerField(default=10)
     vibration_pattern = ArrayField(models.PositiveIntegerField(), size=256)
     vibration_pattern_name = models.CharField(max_length=80)
     sound_mode = models.CharField(max_length=16, choices=SoundMode, default=SoundMode.MEMBER_DEFAULT)
@@ -46,6 +49,8 @@ class SharedAlarm(SavedState):
             models.CheckConstraint(condition=models.Q(repeat_duration=None) | models.Q(repeat_duration__range=(1, 999)), name="alarm_repeat_duration_valid"),
             models.CheckConstraint(condition=models.Q(end_occurrences=None) | models.Q(end_occurrences__range=(1, 999)), name="alarm_end_count_valid"),
             models.CheckConstraint(condition=models.Q(snooze_minutes__range=(1, 1440)), name="alarm_snooze_valid"),
+            models.CheckConstraint(condition=models.Q(timeout_minutes__range=(1, 1440)), name="alarm_timeout_valid"),
+            models.CheckConstraint(condition=models.Q(missed_restart_minutes__range=(1, 1440)), name="alarm_restart_delay_valid"),
             models.CheckConstraint(condition=models.Q(days__contained_by=[0, 1, 2, 3, 4, 5, 6]), name="alarm_days_valid"),
             models.CheckConstraint(condition=models.Q(repeat_unit__in=RepeatUnit.values), name="alarm_repeat_unit_valid"),
             models.CheckConstraint(condition=models.Q(repeat_duration_unit__in=RepeatUnit.values), name="alarm_duration_unit_valid"),
@@ -74,6 +79,7 @@ class AlarmOccurrence(models.Model):
     trigger_at = models.DateTimeField()
     deadline_at = models.DateTimeField()
     snoozed_until = models.DateTimeField(null=True)
+    snoozed_at = models.DateTimeField(null=True)
     state = models.CharField(max_length=16, choices=State, default=State.PENDING)
     resolved_at = models.DateTimeField(null=True)
 
@@ -81,7 +87,7 @@ class AlarmOccurrence(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["alarm", "identity", "occurrence_key"], name="occurrence_identity_key_unique"),
             models.CheckConstraint(condition=models.Q(alarm_revision__gte=1), name="occurrence_revision_positive"),
-            models.CheckConstraint(condition=models.Q(deadline_at__gt=models.F("trigger_at")), name="occurrence_deadline_after_trigger"),
+            models.CheckConstraint(condition=~models.Q(state="pending") | models.Q(snoozed_until=None, deadline_at__gt=models.F("trigger_at")) | models.Q(snoozed_until__isnull=False, deadline_at__gt=models.F("snoozed_until")), name="occurrence_deadline_after_ring"),
             models.CheckConstraint(condition=models.Q(state__in=["pending", "snoozed", "dismissed", "ignored", "canceled"]), name="occurrence_state_valid"),
         ]
         indexes = [

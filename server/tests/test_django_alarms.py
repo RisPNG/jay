@@ -140,7 +140,7 @@ def test_snooze_postpones_other_members_only_when_shared(client, group, member, 
     assert source.snoozed_until == snoozed_until
     if legacy:
         assert source.snoozed_until.second == source.snoozed_until.microsecond == 0
-    assert source.deadline_at == snoozed_until + timedelta(minutes=10)
+    assert source.deadline_at == snoozed_until + timedelta(minutes=alarm.timeout_minutes)
     assert other.snoozed_until == (snoozed_until if shared else None)
     assert other.deadline_at == (source.deadline_at if shared else trigger + timedelta(minutes=10))
 
@@ -148,7 +148,7 @@ def test_snooze_postpones_other_members_only_when_shared(client, group, member, 
     assert stale_schedule.status_code == 200, stale_schedule.data
     source.refresh_from_db()
     assert source.snoozed_until == snoozed_until
-    assert source.deadline_at == snoozed_until + timedelta(minutes=10)
+    assert source.deadline_at == snoozed_until + timedelta(minutes=alarm.timeout_minutes)
 
     if shared:
         stale_ignore = member.post(f"/v1/alarms/{alarm.pk}/activity", {"id": str(uuid4()), "membership_id": str(GroupMembership.objects.get(group=group, identity_id="2" * 64).pk), "alarm_revision": 1, "kind": "ignored", "occurred_at": (trigger + timedelta(minutes=10)).isoformat(), "occurrence_key": key, "reason": "no_response"}, format="json", headers={"Idempotency-Key": str(uuid4())})

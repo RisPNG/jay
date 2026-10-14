@@ -15,6 +15,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
 import java.util.UUID
 
@@ -55,7 +56,14 @@ class SocialSynchronization(
             serverMillis = wall, wallMillis = wall, elapsedMillis = elapsed,
             bootCount = boot, lastSavedMillis = effective
         ))
-        val savedAt = JsonPrimitive(Instant.ofEpochMilli(effective).toString())
+        val previous = if (capturedSavedAt != null && ordered) dao.getLatestOperation(scopeId, kind, targetId) else null
+        val previousSavedAt = previous?.payload?.let {
+            Json.parseToJsonElement(it).jsonObject["saved_at"]?.jsonPrimitive?.content?.let(Instant::parse)
+        }
+        val savedInstant = if (previous?.rawSavedAt == capturedSavedAt && previous?.effectiveSavedAt == effective && previousSavedAt != null) {
+            maxOf(Instant.ofEpochMilli(effective), previousSavedAt.plusNanos(1_000))
+        } else Instant.ofEpochMilli(effective)
+        val savedAt = JsonPrimitive(savedInstant.toString())
         val body = payload?.let { if (ordered) JsonObject(it + ("saved_at" to savedAt)) else it }
         val optimistic = optimisticState?.let {
             if (ordered) JsonObject(it + mapOf("saved_at" to savedAt, "save_id" to JsonPrimitive(operationId))) else it
@@ -84,7 +92,9 @@ class SocialSynchronization(
             } catch (error: SocialApiException) {
                 if (error.status == 429 || error.status >= 500 || error.status == 401) throw error
                 database.withTransaction {
-                    dao.resolveOperation(operation.operationId, "rejected", error.code)
+                    val outdatedTimeout = error.code == "response_outdated" && operation.kind == "outcome" &&
+                        Json.parseToJsonElement(requireNotNull(operation.payload)).jsonObject["reason"]?.jsonPrimitive?.content == "timed_out"
+                    dao.resolveOperation(operation.operationId, if (outdatedTimeout) "confirmed" else "rejected", error.code)
                     if (error.code == "clock_invalid") {
                         dao.getClock()?.let { dao.putClock(it.copy(lastSavedMillis = 0)) }
                     }
@@ -140,6 +150,13 @@ class SocialSynchronization(
                             dao.putResources(listOf(SyncedResource(resource.scopeId, resource.kind, resource.key, resource.representation)))
                         }
                     }
+                    val cutoff = java.time.OffsetDateTime.parse(page.serverTime).toInstant().toEpochMilli() - 2 * 24 * 60 * 60_000L
+                    dao.getResources().filter { it.scopeId == page.scopeId && it.kind == "timer_occurrence" }.forEach {
+                        val resolvedAt = Json.parseToJsonElement(it.representation).jsonObject["resolved_at"]!!.jsonPrimitive.content
+                        if (java.time.OffsetDateTime.parse(resolvedAt).toInstant().toEpochMilli() < cutoff) {
+                            dao.deleteResource(it.scopeId, it.kind, it.key)
+                        }
+                    }
                     dao.clearStaging(page.scopeId)
                 }
                 dao.putScope(SyncScopeState(
@@ -159,7 +176,7 @@ class SocialSynchronization(
     suspend fun projectedResources(): List<SyncedResource> {
         val resources = dao.getResources().associateBy { Triple(it.scopeId, it.kind, it.key) }.toMutableMap()
         for (operation in dao.getProjectedOperations().sortedWith(
-            compareBy<PendingOperation> { it.method == "DELETE" }.thenBy { it.effectiveSavedAt }.thenBy { it.operationId }
+            compareBy<PendingOperation> { it.method == "DELETE" }.thenBy { it.effectiveSavedAt }.thenBy { it.sequence }
         )) {
             val key = Triple(operation.scopeId, operation.kind, operation.targetId)
             if (operation.optimisticState == null) {

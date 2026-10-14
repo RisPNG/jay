@@ -23,7 +23,7 @@ def remove_membership(member, actor):
         raise DomainError("last_leader", "The group must retain a leader")
     member.removed_at = timezone.now()
     member.save(update_fields=["removed_at"])
-    AlarmOccurrence.objects.filter(group=member.group, identity=member.identity, state="pending").update(state="canceled", resolved_at=timezone.now())
+    AlarmOccurrence.objects.filter(group=member.group, identity=member.identity, state="pending").update(state="canceled", resolved_at=timezone.now(), snoozed_until=None, snoozed_at=None)
     publish_membership(member, actor, "delete")
     if not active.exists():
         member.group.deleted_at = timezone.now()

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 from django.core import signing
@@ -34,12 +35,13 @@ class OccurrenceView(APIView):
             zone = alarm.group.alarm_time_zone if alarm.group.alarm_time_basis == "group_time_zone" else request.user.time_zone
             if data["trigger_at"].astimezone(ZoneInfo(zone)).date() != data["cycle_date"]:
                 raise DomainError("cycle_invalid", "The cycle date does not match the trigger", 400)
+            data["deadline_at"] = data["trigger_at"] + timedelta(minutes=alarm.timeout_minutes)
             data.pop("membership_id")
             occurrence, created = AlarmOccurrence.objects.get_or_create(alarm=alarm, identity=request.user, occurrence_key=data["occurrence_key"], defaults={"group": alarm.group, **{key: value for key, value in data.items() if key != "occurrence_key"}})
             if not created and occurrence.state in {"pending", "canceled"} and (occurrence.snoozed_until is None or occurrence.alarm_revision != data["alarm_revision"]):
                 for name, value in data.items():
                     setattr(occurrence, name, value)
-                occurrence.state, occurrence.resolved_at, occurrence.snoozed_until = "pending", None, None
+                occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "pending", None, None, None
                 occurrence.save()
             publish_changes(alarm.group.scope_id, [("occurrence", str(occurrence.pk), "upsert", OccurrenceRepresentation(occurrence).data, request.user.pk)], group=alarm.group)
             receipt.status, receipt.response = 200, OccurrenceRepresentation(occurrence).data

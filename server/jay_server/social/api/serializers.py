@@ -156,6 +156,9 @@ class AlarmPayload(MemberCommand):
     advanced = serializers.BooleanField()
     snooze_enabled = serializers.BooleanField()
     snooze_minutes = serializers.IntegerField(min_value=1, max_value=1440)
+    timeout_minutes = serializers.IntegerField(min_value=1, max_value=1440, required=False)
+    missed_restart_enabled = serializers.BooleanField(required=False)
+    missed_restart_minutes = serializers.IntegerField(min_value=1, max_value=1440, required=False)
     vibration_pattern = serializers.ListField(child=serializers.IntegerField(min_value=0), min_length=1, max_length=256)
     vibration_pattern_name = serializers.CharField(min_length=1, max_length=80)
     sound = SoundSelection()
@@ -179,14 +182,36 @@ class TimerPayload(MemberCommand):
     duration_seconds = serializers.IntegerField(min_value=1, max_value=86400)
     increment_seconds = serializers.IntegerField(min_value=1, max_value=3600)
     expires_at = serializers.DateTimeField()
+    run_id = serializers.UUIDField(required=False)
+    timeout_minutes = serializers.IntegerField(min_value=1, max_value=120, required=False)
+    repeat_enabled = serializers.BooleanField(required=False)
+    repeat_count = serializers.IntegerField(min_value=0, max_value=100, required=False)
+    repeat_index = serializers.IntegerField(min_value=0, max_value=2147483647, required=False)
     vibrate = serializers.BooleanField()
     vibration_pattern = serializers.ListField(child=serializers.IntegerField(min_value=0), min_length=1, max_length=256)
     vibration_pattern_name = serializers.CharField(min_length=1, max_length=80)
     sound = SoundSelection()
 
 
+    def validate(self, data):
+        repeat_enabled = data.get("repeat_enabled", self.instance.repeat_enabled if self.instance is not None else False)
+        repeat_count = data.get("repeat_count", self.instance.repeat_count if self.instance is not None else 0)
+        repeat_index = data.get("repeat_index", self.instance.repeat_index if self.instance is not None else 0)
+        if not repeat_enabled and repeat_index != 0:
+            raise serializers.ValidationError({"repeat_index": "A nonrepeating timer starts at index 0"})
+        if repeat_enabled and repeat_count and repeat_index > repeat_count:
+            raise serializers.ValidationError({"repeat_index": "The repeat index exceeds the configured number of additional repeats"})
+        return data
+
+
 class TimerCreate(TimerPayload):
     id = serializers.UUIDField()
+
+
+class TimerOccurrenceCommand(MembershipCommand):
+    run_id = serializers.UUIDField()
+    repeat_index = serializers.IntegerField(min_value=0, max_value=2147483647)
+    occurred_at = serializers.DateTimeField()
 
 
 class SoundUpload(CommandSerializer):

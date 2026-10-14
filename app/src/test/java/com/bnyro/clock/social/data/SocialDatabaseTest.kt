@@ -21,7 +21,7 @@ class SocialDatabaseTest {
         val name = "social-reopen-test"
         var database = Room.databaseBuilder(context, SocialDatabase::class.java, name).build()
         try {
-            database.socialDao().putDismissedTimer(DismissedSharedTimer("timer", 123456, 100000))
+            database.socialDao().putDismissedTimer(DismissedSharedTimer("timer", "member", "run", 0, 123456))
             database.socialDao().enqueueOperation(PendingOperation(
                 operationId = "operation", scopeId = "group", kind = "timer", targetId = "timer",
                 method = "PUT", path = "/v1/timers/timer", payload = "{}", optimisticState = "{}",
@@ -29,7 +29,7 @@ class SocialDatabaseTest {
             ))
             database.close()
             database = Room.databaseBuilder(context, SocialDatabase::class.java, name).build()
-            assertEquals(100000L, database.socialDao().getDismissedTimers().single().timerExpiresAt)
+            assertEquals(123456L, database.socialDao().getDismissedTimers().single().expiresAt)
             val operation = database.socialDao().getPendingOperations().single()
             assertEquals("operation", operation.operationId)
             assertEquals(101L, operation.effectiveSavedAt)

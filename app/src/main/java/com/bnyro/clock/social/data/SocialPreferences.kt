@@ -7,6 +7,8 @@ object SocialPreferences {
     const val pendingProfileKey = "jayPendingProfile"
     const val pendingInvitationKey = "jayPendingInvitation"
     const val alarmOccurrencePrefix = "jayAlarmOccurrence:"
+    const val alarmDeadlinePrefix = "jayAlarmDeadline:"
+    const val alarmSnoozedAtPrefix = "jayAlarmSnoozedAt:"
     const val alarmTimeZonePrefix = "jayAlarmTimeZone:"
     const val capabilitiesInstallationKey = "jayCapabilitiesInstallation"
     const val capabilitiesKey = "jayDeviceCapabilities"

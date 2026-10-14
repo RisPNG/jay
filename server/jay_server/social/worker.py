@@ -12,7 +12,8 @@ from uuid import uuid4
 from channels.db import database_sync_to_async
 from django.conf import settings
 from django.db import close_old_connections, transaction
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Case, DateTimeField, DurationField, Exists, ExpressionWrapper, F, OuterRef, Q, Value, When
+from django.db.models.functions import Greatest
 from django.utils import timezone
 
 from .access import identity_capabilities, require_membership
@@ -21,7 +22,7 @@ from .api.representations import AlarmRepresentation, SoundRepresentation
 from .errors import DomainError
 from .groups import publish_membership, remove_membership
 from .identities import retire_identity
-from .models import AlarmActivity, AlarmDelivery, AlarmOccurrence, DeliveryWork, Group, GroupActivity, GroupInvitation, GroupMembership, Identity, OperationReceipt, PushSubscription, SharedAlarm, SharedSound, ProfileSoundGrant, SharedTimer, SyncScope, SyncVersion, WorkerHeartbeat
+from .models import AlarmActivity, AlarmDelivery, AlarmOccurrence, DeliveryWork, Group, GroupActivity, GroupInvitation, GroupMembership, Identity, OperationReceipt, PushSubscription, SharedAlarm, SharedSound, ProfileSoundGrant, SharedTimer, SyncScope, SyncVersion, TimerOccurrence, WorkerHeartbeat
 from .providers import object_storage_client, validate_sound_object
 from .synchronization import publish_changes
 
@@ -114,17 +115,23 @@ def process_deadlines():
         due = list(AlarmOccurrence.objects.filter(group=group, state="pending", deadline_at__lte=timezone.now()).select_related("identity").order_by("deadline_at")[:100])
         for occurrence in due:
             occurrence.refresh_from_db()
-            if occurrence.state != "pending":
+            if occurrence.state != "pending" or occurrence.deadline_at > timezone.now():
                 continue
             alarm = SharedAlarm.objects.select_for_update().select_related("group").get(pk=occurrence.alarm_id)
             if group.deleted_at or alarm.deleted_at or not alarm.enabled or alarm.revision != occurrence.alarm_revision or occurrence.identity.retired_at or not GroupMembership.objects.filter(group=group, identity=occurrence.identity, removed_at=None).exists():
-                occurrence.state, occurrence.resolved_at = "canceled", timezone.now()
-                occurrence.save(update_fields=["state", "resolved_at"])
+                occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "canceled", timezone.now(), None, None
+                occurrence.save(update_fields=["state", "resolved_at", "snoozed_until", "snoozed_at"])
                 progressed = True
                 continue
             if DeliveryWork.objects.filter(kind="reschedule", failed_at=None).filter(Q(payload__alarm_id=str(alarm.pk)) | Q(payload__group_id=str(group.pk))).exists():
                 continue
-            record_alarm_response(alarm, occurrence.identity, {"id": uuid4(), "alarm_revision": alarm.revision, "kind": "ignored", "occurred_at": occurrence.deadline_at, "occurrence_key": occurrence.occurrence_key, "reason": "deadline"})
+            record_alarm_response(alarm, occurrence.identity, {
+                "id": uuid4(), "alarm_revision": alarm.revision,
+                "kind": "snoozed" if alarm.missed_restart_enabled else "ignored",
+                "occurred_at": occurrence.deadline_at, "occurrence_key": occurrence.occurrence_key,
+                "reason": "timed_out" if alarm.missed_restart_enabled else "deadline",
+                "snoozed_until": occurrence.deadline_at + timedelta(minutes=alarm.missed_restart_minutes) if alarm.missed_restart_enabled else None,
+            })
             progressed = True
     return progressed
 
@@ -182,7 +189,7 @@ def process_group_cleanup(work):
         SyncScope.objects.select_for_update().get(pk=group.scope_id)
         SharedAlarm.objects.filter(group=group, deleted_at=None).update(deleted_at=group.deleted_at)
         SharedTimer.objects.filter(group=group, deleted_at=None).update(deleted_at=group.deleted_at)
-        AlarmOccurrence.objects.filter(group=group, state="pending").update(state="canceled", resolved_at=timezone.now())
+        AlarmOccurrence.objects.filter(group=group, state="pending").update(state="canceled", resolved_at=timezone.now(), snoozed_until=None, snoozed_at=None)
         SharedSound.objects.filter(group=group).delete()
     return True
 
@@ -217,11 +224,18 @@ def maintain_state():
                 if identity.retired_at or identity.last_seen_at >= now - timedelta(days=settings.IDENTITY_INACTIVITY_TIMEOUT_DAYS) or ProfileSoundGrant.objects.filter(identity=identity).exists():
                     continue
                 retire_identity(identity)
-    for timer in SharedTimer.objects.select_related("group").filter(deleted_at=None, expires_at__lt=now - timedelta(minutes=15))[:50]:
+    expired_timers = SharedTimer.objects.filter(deleted_at=None).exclude(repeat_enabled=True, repeat_count=0).annotate(
+        remaining_duration=ExpressionWrapper(
+            Case(When(repeat_enabled=True, then=F("repeat_count") - F("repeat_index")), default=Value(0)) * F("duration_seconds") * Value(timedelta(seconds=1)),
+            output_field=DurationField(),
+        ),
+        linger_duration=ExpressionWrapper(Greatest(F("timeout_minutes"), Value(15)) * Value(timedelta(minutes=1)), output_field=DurationField()),
+    ).annotate(retire_at=ExpressionWrapper(F("expires_at") + F("remaining_duration") + F("linger_duration"), output_field=DateTimeField())).filter(retire_at__lt=now)
+    for candidate in expired_timers.select_related("group")[:50]:
         with transaction.atomic():
-            SyncScope.objects.select_for_update().get(pk=timer.group.scope_id)
-            timer = SharedTimer.objects.select_for_update().select_related("group").get(pk=timer.pk)
-            if timer.deleted_at or timer.expires_at >= now - timedelta(minutes=15):
+            SyncScope.objects.select_for_update().get(pk=candidate.group.scope_id)
+            timer = expired_timers.select_for_update().select_related("group").filter(pk=candidate.pk).first()
+            if timer is None:
                 continue
             timer.deleted_at = now
             timer.save(update_fields=["deleted_at"])
@@ -250,7 +264,7 @@ def maintain_state():
                 continue
             publish_changes(sound.group.scope_id, [("sound", str(sound.pk), "delete", {"id": str(sound.pk)}, None)], group=sound.group)
             sound.delete()
-    expired_versions = Q(superseded_at__lt=cutoff) | Q(kind__in=["activity", "outcome"], created_at__lt=cutoff)
+    expired_versions = Q(superseded_at__lt=cutoff) | Q(kind__in=["activity", "outcome", "timer_occurrence"], created_at__lt=cutoff)
     candidates = SyncVersion.objects.filter(expired_versions).values_list("scope_id", flat=True)[:50]
     for scope_id in set(candidates):
         with transaction.atomic():
@@ -262,6 +276,10 @@ def maintain_state():
                 scope.save(update_fields=["retention_floor"])
                 obsolete.delete()
     OperationReceipt.objects.filter(completed_at__lt=cutoff).exclude(response=None).update(response=None)
+    for occurrence in TimerOccurrence.objects.filter(resolved_at__lt=cutoff).select_related("group")[:50]:
+        with transaction.atomic():
+            SyncScope.objects.select_for_update().get(pk=occurrence.group.scope_id)
+            TimerOccurrence.objects.filter(pk=occurrence.pk, resolved_at__lt=cutoff).delete()
     for model in [SharedAlarm, SharedTimer]:
         for resource in model.objects.filter(deleted_at__lt=cutoff).select_related("group")[:20]:
             with transaction.atomic():
@@ -297,6 +315,7 @@ def maintain_state():
             GroupActivity.objects.filter(Q(actor=identity) | Q(subject=identity) | Q(recipient=identity)).delete()
             AlarmActivity.objects.filter(identity=identity).delete()
             AlarmOccurrence.objects.filter(identity=identity).delete()
+            TimerOccurrence.objects.filter(identity=identity).delete()
             AlarmDelivery.objects.filter(identity=identity).delete()
             GroupInvitation.objects.filter(Q(created_by=identity) | Q(consumed_by=identity)).delete()
             GroupMembership.objects.filter(identity=identity).delete()

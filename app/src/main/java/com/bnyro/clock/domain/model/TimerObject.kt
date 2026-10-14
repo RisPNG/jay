@@ -29,10 +29,12 @@ data class TimerObject(
     var expiresAt: Long = 0L,
     var elapsedRealtimeDeadline: Long = 0L,
     var sharedTimerId: String? = null,
-    var sharedExpiresAt: Long = 0L,
+    var sharedGroupId: String? = null,
+    var sharedMembershipId: String? = null,
+    var sharedRunId: String? = null,
+    var sharedAnsweredIndices: Set<Int> = emptySet(),
     var sharedGroupName: String? = null,
-    var sharedCanEdit: Boolean = true,
-    var sharedAnswerAsOne: Boolean = false
+    var sharedCanEdit: Boolean = true
 ) {
     val secondsLeft: Int
         get() = ceil(currentPosition.value / 1000.0).toInt()

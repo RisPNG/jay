@@ -7,7 +7,7 @@ from .social.api.alarms import AlarmDeliveryView, AlarmListView, AlarmView
 from .social.api.groups import GroupListView, GroupSyncView, GroupView, InvitationJoinView, InvitationListView, MemberView, MembershipPreferencesView, MembershipView
 from .social.api.identities import CapabilitiesView, EntitlementView, IdentitySyncView, IdentityView, PushSubscriptionView, RegistrationView
 from .social.api.sounds import SoundCompleteView, SoundDownloadView, SoundUploadListView, SoundUploadView, SoundView
-from .social.api.timers import TimerListView, TimerView
+from .social.api.timers import TimerListView, TimerOccurrenceView, TimerView
 from .views import AppLinksView, HealthLiveView, HealthReadyView, InstallView, app_link_script, documentation, documentation_asset
 
 
@@ -45,6 +45,7 @@ urlpatterns = [
     path("v1/alarms/<uuid:alarm_id>/occurrence", OccurrenceView.as_view()),
     path("v1/alarms/<uuid:alarm_id>/deliveries", AlarmDeliveryView.as_view()),
     path("v1/timers/<uuid:timer_id>", TimerView.as_view()),
+    path("v1/timers/<uuid:timer_id>/occurrence", TimerOccurrenceView.as_view()),
     path("v1/sounds/<uuid:sound_id>", SoundView.as_view()),
     path("v1/sounds/<uuid:sound_id>/upload", SoundUploadView.as_view()),
     path("v1/sounds/<uuid:sound_id>/complete", SoundCompleteView.as_view()),

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema_field
 
-from ..models import AlarmActivity, AlarmOccurrence, Group, GroupActivity, GroupMembership, Identity, SharedAlarm, SharedSound, SharedTimer
+from ..models import AlarmActivity, AlarmOccurrence, Group, GroupActivity, GroupMembership, Identity, SharedAlarm, SharedSound, SharedTimer, TimerOccurrence
 
 
 class IdentityRepresentation(serializers.ModelSerializer):
@@ -46,21 +46,28 @@ class SoundRepresentation(serializers.ModelSerializer):
 class AlarmRepresentation(serializers.ModelSerializer):
     class Meta:
         model = SharedAlarm
-        fields = ["id", "group_id", "revision", "local_time_ms", "label", "label_color", "enabled", "days", "vibrate", "start_date", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "advanced", "snooze_enabled", "snooze_minutes", "vibration_pattern", "vibration_pattern_name", "sound_mode", "sound_id", "saved_at", "save_id"]
+        fields = ["id", "group_id", "revision", "local_time_ms", "label", "label_color", "enabled", "days", "vibrate", "start_date", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "advanced", "snooze_enabled", "snooze_minutes", "timeout_minutes", "missed_restart_enabled", "missed_restart_minutes", "vibration_pattern", "vibration_pattern_name", "sound_mode", "sound_id", "saved_at", "save_id"]
         read_only_fields = fields
 
 
 class TimerRepresentation(serializers.ModelSerializer):
     class Meta:
         model = SharedTimer
-        fields = ["id", "group_id", "label", "label_color", "duration_seconds", "increment_seconds", "expires_at", "vibrate", "vibration_pattern", "vibration_pattern_name", "sound_mode", "sound_id", "saved_at", "save_id"]
+        fields = ["id", "group_id", "label", "label_color", "duration_seconds", "increment_seconds", "expires_at", "run_id", "timeout_minutes", "repeat_enabled", "repeat_count", "repeat_index", "vibrate", "vibration_pattern", "vibration_pattern_name", "sound_mode", "sound_id", "saved_at", "save_id"]
+        read_only_fields = fields
+
+
+class TimerOccurrenceRepresentation(serializers.ModelSerializer):
+    class Meta:
+        model = TimerOccurrence
+        fields = ["id", "timer_id", "group_id", "identity_id", "membership_id", "run_id", "repeat_index", "trigger_at", "deadline_at", "state", "resolved_at"]
         read_only_fields = fields
 
 
 class OccurrenceRepresentation(serializers.ModelSerializer):
     class Meta:
         model = AlarmOccurrence
-        fields = ["id", "alarm_id", "group_id", "identity_id", "alarm_revision", "occurrence_key", "cycle_date", "trigger_at", "deadline_at", "snoozed_until", "state", "resolved_at"]
+        fields = ["id", "alarm_id", "group_id", "identity_id", "alarm_revision", "occurrence_key", "cycle_date", "trigger_at", "deadline_at", "snoozed_until", "snoozed_at", "state", "resolved_at"]
         read_only_fields = fields
 
 
@@ -90,7 +97,7 @@ class DeletedResourceRepresentation(serializers.Serializer):
 
 @extend_schema_field(PolymorphicProxySerializer(
     component_name="SynchronizedResource",
-    serializers=[IdentityRepresentation, CapabilitiesRepresentation, MembershipAccessRepresentation, GroupRepresentation, MembershipRepresentation, AlarmRepresentation, TimerRepresentation, SoundRepresentation, OccurrenceRepresentation, OutcomeRepresentation, ActivityRepresentation, DeletedResourceRepresentation],
+    serializers=[IdentityRepresentation, CapabilitiesRepresentation, MembershipAccessRepresentation, GroupRepresentation, MembershipRepresentation, AlarmRepresentation, TimerRepresentation, SoundRepresentation, OccurrenceRepresentation, TimerOccurrenceRepresentation, OutcomeRepresentation, ActivityRepresentation, DeletedResourceRepresentation],
     resource_type_field_name=None,
 ))
 class SynchronizedResourceField(serializers.JSONField):
@@ -98,7 +105,7 @@ class SynchronizedResourceField(serializers.JSONField):
 
 
 class SyncItemRepresentation(serializers.Serializer):
-    kind = serializers.ChoiceField(choices=["identity", "capabilities", "membership", "group", "member", "alarm", "timer", "sound", "occurrence", "outcome", "activity"])
+    kind = serializers.ChoiceField(choices=["identity", "capabilities", "membership", "group", "member", "alarm", "timer", "sound", "occurrence", "timer_occurrence", "outcome", "activity"])
     key = serializers.CharField()
     action = serializers.CharField()
     data = SynchronizedResourceField()

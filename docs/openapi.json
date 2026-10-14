@@ -1970,6 +1970,71 @@
                 }
             }
         },
+        "/v1/timers/{timer_id}/occurrence": {
+            "post": {
+                "operationId": "v1_timers_occurrence_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "Idempotency-Key",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Stable UUID for this exact saved operation; reuse on every retry.",
+                        "required": true
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Installation",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "path",
+                        "name": "timer_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "v1"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TimerOccurrenceCommandRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "bearerIdentity": [],
+                        "identityId": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TimerOccurrenceRepresentation"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/v1/events": {
             "get": {
                 "operationId": "v1_events_listen",
@@ -2274,6 +2339,19 @@
                         "maximum": 1440,
                         "minimum": 1
                     },
+                    "timeout_minutes": {
+                        "type": "integer",
+                        "maximum": 1440,
+                        "minimum": 1
+                    },
+                    "missed_restart_enabled": {
+                        "type": "boolean"
+                    },
+                    "missed_restart_minutes": {
+                        "type": "integer",
+                        "maximum": 1440,
+                        "minimum": 1
+                    },
                     "vibration_pattern": {
                         "type": "array",
                         "items": {
@@ -2409,6 +2487,19 @@
                         "type": "boolean"
                     },
                     "snooze_minutes": {
+                        "type": "integer",
+                        "maximum": 1440,
+                        "minimum": 1
+                    },
+                    "timeout_minutes": {
+                        "type": "integer",
+                        "maximum": 1440,
+                        "minimum": 1
+                    },
+                    "missed_restart_enabled": {
+                        "type": "boolean"
+                    },
+                    "missed_restart_minutes": {
                         "type": "integer",
                         "maximum": 1440,
                         "minimum": 1
@@ -2571,6 +2662,18 @@
                         "type": "integer",
                         "readOnly": true
                     },
+                    "timeout_minutes": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "missed_restart_enabled": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "missed_restart_minutes": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "vibration_pattern": {
                         "type": "array",
                         "items": {
@@ -2620,6 +2723,8 @@
                     "label",
                     "label_color",
                     "local_time_ms",
+                    "missed_restart_enabled",
+                    "missed_restart_minutes",
                     "repeat_anchor",
                     "repeat_duration",
                     "repeat_duration_unit",
@@ -2633,6 +2738,7 @@
                     "sound_id",
                     "sound_mode",
                     "start_date",
+                    "timeout_minutes",
                     "vibrate",
                     "vibration_pattern",
                     "vibration_pattern_name"
@@ -3226,10 +3332,16 @@
                         "readOnly": true,
                         "nullable": true
                     },
+                    "snoozed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
                     "state": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/StateEnum"
+                                "$ref": "#/components/schemas/OccurrenceRepresentationStateEnum"
                             }
                         ],
                         "readOnly": true
@@ -3251,10 +3363,22 @@
                     "identity_id",
                     "occurrence_key",
                     "resolved_at",
+                    "snoozed_at",
                     "snoozed_until",
                     "state",
                     "trigger_at"
                 ]
+            },
+            "OccurrenceRepresentationStateEnum": {
+                "enum": [
+                    "pending",
+                    "snoozed",
+                    "dismissed",
+                    "ignored",
+                    "canceled"
+                ],
+                "type": "string",
+                "description": "* `pending` - Pending\n* `snoozed` - Snoozed\n* `dismissed` - Dismissed\n* `ignored` - Ignored\n* `canceled` - Canceled"
             },
             "OutcomeRepresentation": {
                 "type": "object",
@@ -3579,17 +3703,6 @@
                     "title"
                 ]
             },
-            "StateEnum": {
-                "enum": [
-                    "pending",
-                    "snoozed",
-                    "dismissed",
-                    "ignored",
-                    "canceled"
-                ],
-                "type": "string",
-                "description": "* `pending` - Pending\n* `snoozed` - Snoozed\n* `dismissed` - Dismissed\n* `ignored` - Ignored\n* `canceled` - Canceled"
-            },
             "StatusEnum": {
                 "enum": [
                     "pending",
@@ -3645,11 +3758,12 @@
                     "timer",
                     "sound",
                     "occurrence",
+                    "timer_occurrence",
                     "outcome",
                     "activity"
                 ],
                 "type": "string",
-                "description": "* `identity` - identity\n* `capabilities` - capabilities\n* `membership` - membership\n* `group` - group\n* `member` - member\n* `alarm` - alarm\n* `timer` - timer\n* `sound` - sound\n* `occurrence` - occurrence\n* `outcome` - outcome\n* `activity` - activity"
+                "description": "* `identity` - identity\n* `capabilities` - capabilities\n* `membership` - membership\n* `group` - group\n* `member` - member\n* `alarm` - alarm\n* `timer` - timer\n* `sound` - sound\n* `occurrence` - occurrence\n* `timer_occurrence` - timer_occurrence\n* `outcome` - outcome\n* `activity` - activity"
             },
             "SynchronizedResource": {
                 "oneOf": [
@@ -3679,6 +3793,9 @@
                     },
                     {
                         "$ref": "#/components/schemas/OccurrenceRepresentation"
+                    },
+                    {
+                        "$ref": "#/components/schemas/TimerOccurrenceRepresentation"
                     },
                     {
                         "$ref": "#/components/schemas/OutcomeRepresentation"
@@ -3726,6 +3843,28 @@
                         "type": "string",
                         "format": "date-time"
                     },
+                    "run_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "timeout_minutes": {
+                        "type": "integer",
+                        "maximum": 120,
+                        "minimum": 1
+                    },
+                    "repeat_enabled": {
+                        "type": "boolean"
+                    },
+                    "repeat_count": {
+                        "type": "integer",
+                        "maximum": 100,
+                        "minimum": 0
+                    },
+                    "repeat_index": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0
+                    },
                     "vibrate": {
                         "type": "boolean"
                     },
@@ -3765,6 +3904,115 @@
                     "vibration_pattern_name"
                 ]
             },
+            "TimerOccurrenceCommandRequest": {
+                "type": "object",
+                "properties": {
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "run_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "repeat_index": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0
+                    },
+                    "occurred_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "membership_id",
+                    "occurred_at",
+                    "repeat_index",
+                    "run_id"
+                ]
+            },
+            "TimerOccurrenceRepresentation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "timer_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "identity_id": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "run_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "repeat_index": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "trigger_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "deadline_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "state": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/TimerOccurrenceRepresentationStateEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "resolved_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "deadline_at",
+                    "group_id",
+                    "id",
+                    "identity_id",
+                    "membership_id",
+                    "repeat_index",
+                    "resolved_at",
+                    "run_id",
+                    "state",
+                    "timer_id",
+                    "trigger_at"
+                ]
+            },
+            "TimerOccurrenceRepresentationStateEnum": {
+                "enum": [
+                    "dismissed"
+                ],
+                "type": "string",
+                "description": "* `dismissed` - Dismissed"
+            },
             "TimerPayloadRequest": {
                 "type": "object",
                 "properties": {
@@ -3799,6 +4047,28 @@
                     "expires_at": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "run_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "timeout_minutes": {
+                        "type": "integer",
+                        "maximum": 120,
+                        "minimum": 1
+                    },
+                    "repeat_enabled": {
+                        "type": "boolean"
+                    },
+                    "repeat_count": {
+                        "type": "integer",
+                        "maximum": 100,
+                        "minimum": 0
+                    },
+                    "repeat_index": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": 0
                     },
                     "vibrate": {
                         "type": "boolean"
@@ -3869,6 +4139,27 @@
                         "format": "date-time",
                         "readOnly": true
                     },
+                    "run_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "timeout_minutes": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "repeat_enabled": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "repeat_count": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "repeat_index": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "vibrate": {
                         "type": "boolean",
                         "readOnly": true
@@ -3919,10 +4210,15 @@
                     "increment_seconds",
                     "label",
                     "label_color",
+                    "repeat_count",
+                    "repeat_enabled",
+                    "repeat_index",
+                    "run_id",
                     "save_id",
                     "saved_at",
                     "sound_id",
                     "sound_mode",
+                    "timeout_minutes",
                     "vibrate",
                     "vibration_pattern",
                     "vibration_pattern_name"

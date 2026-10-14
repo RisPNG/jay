@@ -100,11 +100,13 @@ data class AlarmGroupName(
     val groupName: String
 )
 
-@Entity(tableName = "dismissed_shared_timers")
+@Entity(tableName = "dismissed_shared_timers", primaryKeys = ["timerId", "membershipId", "runId", "repeatIndex"])
 data class DismissedSharedTimer(
-    @androidx.room.PrimaryKey val timerId: String,
-    val expiresAt: Long,
-    @androidx.room.ColumnInfo(defaultValue = "0") val timerExpiresAt: Long
+    val timerId: String,
+    val membershipId: String,
+    val runId: String,
+    val repeatIndex: Int,
+    val expiresAt: Long
 )
 
 data class SocialChange(
@@ -230,6 +232,9 @@ data class SharedAlarmRequest(
     val advanced: Boolean = false,
     @SerialName("snooze_enabled") val snoozeEnabled: Boolean,
     @SerialName("snooze_minutes") val snoozeMinutes: Int,
+    @SerialName("timeout_minutes") val timeoutMinutes: Int = 5,
+    @SerialName("missed_restart_enabled") val missedRestartEnabled: Boolean = false,
+    @SerialName("missed_restart_minutes") val missedRestartMinutes: Int = 10,
     @SerialName("vibration_pattern") val vibrationPattern: List<Int>,
     @SerialName("vibration_pattern_name") val vibrationPatternName: String,
     val sound: SharedSoundSelection,
@@ -336,6 +341,9 @@ data class SharedAlarmDto(
     val advanced: Boolean = false,
     @SerialName("snooze_enabled") val snoozeEnabled: Boolean,
     @SerialName("snooze_minutes") val snoozeMinutes: Int,
+    @SerialName("timeout_minutes") val timeoutMinutes: Int = 5,
+    @SerialName("missed_restart_enabled") val missedRestartEnabled: Boolean = false,
+    @SerialName("missed_restart_minutes") val missedRestartMinutes: Int = 10,
     @SerialName("vibration_pattern") val vibrationPattern: List<Int>,
     @SerialName("vibration_pattern_name") val vibrationPatternName: String,
     @SerialName("sound_mode") val soundMode: String = "member_default",
@@ -379,6 +387,11 @@ data class SharedTimerRequest(
     @SerialName("vibration_pattern_name") val vibrationPatternName: String,
     val sound: SharedSoundSelection,
     @SerialName("expires_at") val expiresAt: String,
+    @SerialName("run_id") val runId: String,
+    @SerialName("timeout_minutes") val timeoutMinutes: Int = 10,
+    @SerialName("repeat_enabled") val repeatEnabled: Boolean = false,
+    @SerialName("repeat_count") val repeatCount: Int = 0,
+    @SerialName("repeat_index") val repeatIndex: Int = 0,
     @SerialName("membership_id") val membershipId: String,
     val id: String? = null
 )
@@ -392,6 +405,12 @@ data class SharedTimerDto(
     @SerialName("duration_seconds") val durationSeconds: Int,
     @SerialName("increment_seconds") val incrementSeconds: Int,
     @SerialName("expires_at") val expiresAt: String,
+    @SerialName("run_id") val runId: String? = null,
+    @SerialName("command_source") val commandSource: SharedTimerCommandSource? = null,
+    @SerialName("timeout_minutes") val timeoutMinutes: Int = 10,
+    @SerialName("repeat_enabled") val repeatEnabled: Boolean = false,
+    @SerialName("repeat_count") val repeatCount: Int = 0,
+    @SerialName("repeat_index") val repeatIndex: Int = 0,
     @SerialName("started_by") val startedBy: String? = null,
     val vibrate: Boolean = true,
     @SerialName("vibration_pattern") val vibrationPattern: List<Int> = emptyList(),
@@ -407,5 +426,39 @@ data class SocialOccurrenceDto(
     @SerialName("occurrence_key") val occurrenceId: String,
     @SerialName("state") val status: String,
     @SerialName("alarm_revision") val alarmRevision: Int,
-    @SerialName("snoozed_until") val snoozedUntil: String? = null
+    @SerialName("snoozed_until") val snoozedUntil: String? = null,
+    @SerialName("snoozed_at") val snoozedAt: String? = null,
+    @SerialName("trigger_at") val triggerAt: String? = null,
+    @SerialName("deadline_at") val deadlineAt: String? = null
+)
+
+@Serializable
+data class TimerOccurrenceRequest(
+    @SerialName("membership_id") val membershipId: String,
+    @SerialName("run_id") val runId: String,
+    @SerialName("repeat_index") val repeatIndex: Int,
+    @SerialName("occurred_at") val occurredAt: String
+)
+
+@Serializable
+data class TimerOccurrenceDto(
+    val id: String,
+    @SerialName("timer_id") val timerId: String,
+    @SerialName("group_id") val groupId: String,
+    @SerialName("identity_id") val identityId: String,
+    @SerialName("membership_id") val membershipId: String,
+    @SerialName("run_id") val runId: String,
+    @SerialName("repeat_index") val repeatIndex: Int,
+    @SerialName("trigger_at") val triggerAt: String,
+    @SerialName("deadline_at") val deadlineAt: String,
+    @SerialName("state") val status: String,
+    @SerialName("resolved_at") val resolvedAt: String
+)
+
+@Serializable
+data class SharedTimerCommandSource(
+    @SerialName("membership_id") val membershipId: String,
+    @SerialName("run_id") val runId: String,
+    @SerialName("repeat_index") val repeatIndex: Int,
+    val finished: Boolean
 )

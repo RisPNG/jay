@@ -88,6 +88,9 @@ interface SocialDao {
     @Query("SELECT * FROM pending_operations WHERE kind = 'invitation' AND state IN ('accepted', 'confirmed') AND response IS NOT NULL ORDER BY sequence")
     fun getReadyInvitationsStream(): Flow<List<PendingOperation>>
 
+    @Query("SELECT * FROM pending_operations WHERE scopeId = :scopeId AND kind = :kind AND targetId = :targetId ORDER BY sequence DESC LIMIT 1")
+    suspend fun getLatestOperation(scopeId: String, kind: String, targetId: String): PendingOperation?
+
     @Query("SELECT * FROM pending_operations WHERE operationId = :operationId")
     suspend fun getOperation(operationId: String): PendingOperation?
 

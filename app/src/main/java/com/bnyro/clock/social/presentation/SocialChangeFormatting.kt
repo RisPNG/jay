@@ -139,7 +139,11 @@ fun SocialChange.alarmLogTitle(context: Context): String {
         } else {
             context.getString(R.string.alarm_log_deleted, actor)
         }
-        "snoozed" -> context.getString(R.string.alarm_log_snoozed, actor)
+        "snoozed" -> if ((details?.get("reason") as? JsonPrimitive)?.contentOrNull == "timed_out") {
+            context.getString(R.string.alarm_log_restarted)
+        } else {
+            context.getString(R.string.alarm_log_snoozed, actor)
+        }
         "dismissed" -> context.getString(R.string.alarm_log_dismissed, actor)
         "ignored" -> context.getString(R.string.alarm_log_ignored, actor)
         "delivered", "received" -> context.getString(R.string.alarm_log_delivered, subjectName ?: actor)
@@ -216,6 +220,15 @@ fun SocialChange.logDetails(context: Context): String? {
                 }
                 if (details?.get("previous_snooze_minutes") != details?.get("snooze_minutes")) {
                     add(context.getString(R.string.alarm_log_snooze_duration))
+                }
+                if (details?.get("previous_timeout_minutes") != details?.get("timeout_minutes")) {
+                    add(context.getString(R.string.timeout_after))
+                }
+                if (details?.get("previous_missed_restart_enabled") != details?.get("missed_restart_enabled")) {
+                    add(context.getString(R.string.missed_restart))
+                }
+                if (details?.get("previous_missed_restart_minutes") != details?.get("missed_restart_minutes")) {
+                    add(context.getString(R.string.alarm_log_restart_delay))
                 }
                 if (details?.get("previous_sound_mode") != details?.get("sound_mode") ||
                     details?.get("previous_sound_id") != details?.get("sound_id")

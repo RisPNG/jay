@@ -4,4 +4,4 @@ from .groups import Group, GroupInvitation, GroupMembership
 from .identity import Identity, PlayInstallation, ProfileSoundGrant, PushSubscription
 from .sounds import SharedSound
 from .synchronization import DeletedResource, DeliveryWork, GroupActivity, OperationReceipt, SyncScope, SyncVersion, WorkerHeartbeat
-from .timers import SharedTimer
+from .timers import SharedTimer, TimerOccurrence

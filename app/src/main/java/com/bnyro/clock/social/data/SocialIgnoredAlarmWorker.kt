@@ -14,7 +14,7 @@ import com.bnyro.clock.App
 import com.bnyro.clock.social.domain.AlarmActivityKind
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
-import com.bnyro.clock.util.services.AlarmService
+import com.bnyro.clock.domain.model.Alarm
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 import java.util.UUID
@@ -27,20 +27,31 @@ class SocialIgnoredAlarmWorker(context: Context, parameters: WorkerParameters) :
         val occurrenceId = inputData.getString(OCCURRENCE_ID) ?: return Result.failure()
         val deadlineAt = inputData.getLong(DEADLINE_AT, -1L).takeIf { it != -1L }
             ?: return Result.failure()
+        if (
+            Preferences.instance.getString("${SocialPreferences.alarmOccurrencePrefix}$alarmId", null) != occurrenceId ||
+            Preferences.instance.getLong("${SocialPreferences.alarmDeadlinePrefix}$alarmId", -1L) != deadlineAt
+        ) return Result.success()
+        val alarm = (applicationContext as App).container.alarmRepository.getAlarmById(alarmId)
+            ?: return Result.success()
         (applicationContext as App).container.socialRepository.recordActivity(
             alarmId,
-            AlarmActivityKind.IGNORED,
+            if (alarm.missedRestartEnabled) AlarmActivityKind.SNOOZED else AlarmActivityKind.IGNORED,
             inputData.getString(EVENT_ID) ?: return Result.failure(),
             Instant.ofEpochMilli(deadlineAt).toString(),
             occurrenceId,
-            "no_response"
+            if (alarm.missedRestartEnabled) "timed_out" else "no_response",
+            if (alarm.missedRestartEnabled) {
+                Instant.ofEpochMilli(deadlineAt + alarm.missedRestartMinutes * 60_000L).toString()
+            } else null
         )
-        val alarm = (applicationContext as App).container.alarmRepository.getAlarmById(alarmId)
-        if (alarm?.enabled == true && !alarm.isOneTime) {
+        if (
+            !alarm.missedRestartEnabled && alarm.enabled && !alarm.isOneTime &&
+            Preferences.instance.getLong("${SocialPreferences.alarmDeadlinePrefix}$alarmId", -1L) == deadlineAt
+        ) {
             AlarmHelper.getAlarmTime(alarm)?.let { triggerAt ->
                 schedule(
                     applicationContext,
-                    alarmId,
+                    alarm,
                     triggerAt,
                     triggerAt.toString()
                 )
@@ -61,20 +72,20 @@ class SocialIgnoredAlarmWorker(context: Context, parameters: WorkerParameters) :
 
         fun schedule(
             context: Context,
-            alarmId: Long,
+            alarm: Alarm,
             triggerAtMillis: Long,
-            occurrenceId: String
+            occurrenceId: String,
+            snoozedAtMillis: Long? = null
         ) {
+            val deadlineAt = triggerAtMillis + alarm.timeoutMinutes * 60_000L
             Preferences.edit {
-                putString("${SocialPreferences.alarmOccurrencePrefix}$alarmId", occurrenceId)
+                putString("${SocialPreferences.alarmOccurrencePrefix}${alarm.id}", occurrenceId)
+                putLong("${SocialPreferences.alarmDeadlinePrefix}${alarm.id}", deadlineAt)
+                putLong("${SocialPreferences.alarmSnoozedAtPrefix}${alarm.id}", snoozedAtMillis ?: 0L)
             }
-            val deadlineAt = triggerAtMillis + Preferences.instance.getInt(
-                Preferences.alarmTimeoutMinutesKey,
-                AlarmService.ALARM_TIMEOUT_MINUTES
-            ) * 60_000L
             if (!UserManagerCompat.isUserUnlocked(context)) return
             WorkManager.getInstance(context).enqueueUniqueWork(
-                "jay_ignored_alarm_$alarmId",
+                "jay_ignored_alarm_${alarm.id}",
                 ExistingWorkPolicy.REPLACE,
                 OneTimeWorkRequestBuilder<SocialIgnoredAlarmWorker>()
                     .setInitialDelay(
@@ -88,7 +99,7 @@ class SocialIgnoredAlarmWorker(context: Context, parameters: WorkerParameters) :
                     )
                     .setInputData(
                         Data.Builder()
-                            .putLong(ALARM_ID, alarmId)
+                            .putLong(ALARM_ID, alarm.id)
                             .putString(EVENT_ID, UUID.randomUUID().toString())
                             .putString(OCCURRENCE_ID, occurrenceId)
                             .putLong(DEADLINE_AT, deadlineAt)

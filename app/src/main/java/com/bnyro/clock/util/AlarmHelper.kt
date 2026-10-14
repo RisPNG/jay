@@ -19,6 +19,8 @@ import com.bnyro.clock.domain.model.RepeatUnit
 import com.bnyro.clock.domain.model.WeekStart
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.social.data.SocialAlarmSchedule
+import com.bnyro.clock.social.data.SocialPreferences
+import com.bnyro.clock.util.services.AlarmService
 import com.bnyro.clock.util.receivers.AlarmReceiver
 import com.bnyro.clock.util.receivers.PreAlarmReceiver
 import kotlinx.coroutines.runBlocking
@@ -169,7 +171,12 @@ object AlarmHelper {
     private fun getPendingIntent(context: Context, alarm: Alarm, triggerTime: Long? = null): PendingIntent {
         val intent = Intent(context.applicationContext,
             AlarmReceiver::class.java).putExtra(EXTRA_ID, alarm.id).apply {
-            triggerTime?.let { putExtra(EXTRA_TRIGGER_TIME, it) }
+            triggerTime?.let { scheduledAt ->
+                putExtra(EXTRA_TRIGGER_TIME, scheduledAt)
+                Preferences.instance.getString("${SocialPreferences.alarmOccurrencePrefix}${alarm.id}", null)?.let { occurrenceId ->
+                    putExtra(AlarmService.EXTRA_OCCURRENCE_ID, if (alarm.snoozedUntil != null) occurrenceId else scheduledAt.toString())
+                }
+            }
         }
         return PendingIntent.getBroadcast(context.applicationContext, alarm.id.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }

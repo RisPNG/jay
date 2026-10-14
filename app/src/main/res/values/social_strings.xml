@@ -83,6 +83,8 @@
     <string name="alarm_log_disabled">%1$s disabled the alarm</string>
     <string name="alarm_log_deleted">%1$s deleted the alarm</string>
     <string name="alarm_log_snoozed">%1$s snoozed the alarm</string>
+    <string name="alarm_log_restarted">The alarm restarted automatically</string>
+    <string name="alarm_log_restart_delay">Missed restart delay</string>
     <string name="alarm_log_dismissed">%1$s dismissed the alarm</string>
     <string name="alarm_log_ignored">%1$s did not respond to the alarm</string>
     <string name="alarm_log_delivered">Alarm delivered to %1$s</string>

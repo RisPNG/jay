@@ -56,14 +56,15 @@ class SocialActivityWorker(context: Context, parameters: WorkerParameters) :
             kind: AlarmActivityKind,
             occurrenceId: String? = null,
             reason: String? = null,
-            snoozedUntil: String? = null
+            snoozedUntil: String? = null,
+            occurredAt: String = Instant.now().toString()
         ) {
             val eventId = UUID.randomUUID().toString()
             val event = JSONObject()
                 .put(ALARM_ID, alarmId)
                 .put(ACTIVITY_KIND, kind.name)
                 .put(EVENT_ID, eventId)
-                .put(OCCURRED_AT, Instant.now().toString())
+                .put(OCCURRED_AT, occurredAt)
                 .put(OCCURRENCE_ID, occurrenceId)
                 .put(REASON, reason)
                 .put(SNOOZED_UNTIL, snoozedUntil)

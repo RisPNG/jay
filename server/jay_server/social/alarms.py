@@ -22,8 +22,8 @@ def schedule_occurrences(alarm, identity_ids, after=None):
     if alarm.enabled and alarm.deleted_at is None:
         outdated = outdated.exclude(alarm_revision=alarm.revision)
     for occurrence in outdated:
-        occurrence.state, occurrence.resolved_at = "canceled", now
-        occurrence.save(update_fields=["state", "resolved_at"])
+        occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "canceled", now, None, None
+        occurrence.save(update_fields=["state", "resolved_at", "snoozed_until", "snoozed_at"])
         changes.append(("occurrence", str(occurrence.pk), "upsert", OccurrenceRepresentation(occurrence).data, occurrence.identity_id))
     if not alarm.enabled or alarm.deleted_at or alarm.group.deleted_at:
         return changes
@@ -39,7 +39,7 @@ def schedule_occurrences(alarm, identity_ids, after=None):
         key = str(int(trigger.timestamp() * 1000))
         occurrence, created = AlarmOccurrence.objects.get_or_create(
             alarm=alarm, identity=member.identity, occurrence_key=key,
-            defaults={"group": alarm.group, "alarm_revision": alarm.revision, "cycle_date": trigger.astimezone(ZoneInfo(zone)).date(), "trigger_at": trigger, "deadline_at": trigger + timedelta(minutes=10)},
+            defaults={"group": alarm.group, "alarm_revision": alarm.revision, "cycle_date": trigger.astimezone(ZoneInfo(zone)).date(), "trigger_at": trigger, "deadline_at": trigger + timedelta(minutes=alarm.timeout_minutes)},
         )
         if not created:
             if occurrence.state not in {"pending", "canceled"}:
@@ -48,9 +48,9 @@ def schedule_occurrences(alarm, identity_ids, after=None):
                 continue
             occurrence.alarm_revision = alarm.revision
             occurrence.trigger_at = trigger
-            occurrence.deadline_at = trigger + timedelta(minutes=10)
+            occurrence.deadline_at = trigger + timedelta(minutes=alarm.timeout_minutes)
             occurrence.cycle_date = trigger.astimezone(ZoneInfo(zone)).date()
-            occurrence.state, occurrence.resolved_at, occurrence.snoozed_until = "pending", None, None
+            occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "pending", None, None, None
             occurrence.save()
         changes.append(("occurrence", str(occurrence.pk), "upsert", OccurrenceRepresentation(occurrence).data, member.identity_id))
     return changes
@@ -69,7 +69,7 @@ def evaluate_alarm_cycle(alarm, cycle_date):
     if alarm.inactive_cycle_streak == 3:
         alarm.deleted_at = timezone.now()
         alarm.revision += 1
-        AlarmOccurrence.objects.filter(alarm=alarm, state="pending").update(state="canceled", resolved_at=timezone.now())
+        AlarmOccurrence.objects.filter(alarm=alarm, state="pending").update(state="canceled", resolved_at=timezone.now(), snoozed_until=None, snoozed_at=None)
     alarm.save()
     return [("alarm", str(alarm.pk), "delete" if alarm.deleted_at else "upsert", {"id": str(alarm.pk)} if alarm.deleted_at else AlarmRepresentation(alarm).data, None)]
 
@@ -95,6 +95,16 @@ def record_alarm_response(alarm, identity, data):
         occurrence_key = occurrence.occurrence_key
         if occurrence.snoozed_until and data["kind"] == "ignored" and data["occurred_at"] < occurrence.deadline_at:
             raise DomainError("response_outdated", "The alarm was snoozed before this response deadline")
+    if occurrence and data["kind"] == "snoozed" and occurrence.snoozed_at and data["occurred_at"] < occurrence.snoozed_at:
+        raise DomainError("response_outdated", "A newer snooze already advanced this alarm phase")
+    automatic_restart = data["kind"] == "snoozed" and data.get("reason") == "timed_out"
+    if automatic_restart:
+        if not alarm.missed_restart_enabled or occurrence is None or occurrence.state != "pending" or data["occurred_at"] != occurrence.deadline_at:
+            raise DomainError("response_outdated", "This timeout no longer belongs to the pending alarm phase")
+        if data.get("snoozed_until") not in (None, occurrence.deadline_at + timedelta(minutes=alarm.missed_restart_minutes)):
+            raise DomainError("restart_time_invalid", "Restart time must follow the current timeout by the alarm restart delay", 400)
+    if data["kind"] == "ignored" and alarm.missed_restart_enabled:
+        raise DomainError("response_outdated", "This alarm restarts instead of becoming missed")
     previous = AlarmActivity.objects.filter(alarm=alarm, identity=identity, occurrence_key=occurrence_key, kind__in=["dismissed", "ignored"]).exclude(reason="corrected").order_by("-created_at").first() if occurrence_key else None
     changes = []
     if previous:
@@ -110,12 +120,12 @@ def record_alarm_response(alarm, identity, data):
     changes.append(("outcome", str(activity.pk), "upsert", OutcomeRepresentation(activity).data, None))
     if occurrence:
         if activity.kind == "snoozed":
-            snoozed_until = data.get("snoozed_until") or (activity.occurred_at + timedelta(minutes=alarm.snooze_minutes)).replace(second=0, microsecond=0)
-            occurrence.state, occurrence.resolved_at, occurrence.snoozed_until = "pending", None, snoozed_until
-            occurrence.deadline_at = snoozed_until + timedelta(minutes=10)
+            snoozed_until = activity.occurred_at + timedelta(minutes=alarm.missed_restart_minutes) if automatic_restart else data.get("snoozed_until") or (activity.occurred_at + timedelta(minutes=alarm.snooze_minutes)).replace(second=0, microsecond=0)
+            occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "pending", None, snoozed_until, activity.occurred_at
+            occurrence.deadline_at = snoozed_until + timedelta(minutes=alarm.timeout_minutes)
         else:
             occurrence.state, occurrence.resolved_at = activity.kind, timezone.now()
-            occurrence.snoozed_until = None
+            occurrence.snoozed_until, occurrence.snoozed_at = None, None
         occurrence.save()
         changes.append(("occurrence", str(occurrence.pk), "upsert", OccurrenceRepresentation(occurrence).data, identity.pk))
         changes.extend(schedule_occurrences(alarm, [identity.pk], occurrence.trigger_at + timedelta(milliseconds=1)))
@@ -123,10 +133,10 @@ def record_alarm_response(alarm, identity, data):
             shared = AlarmOccurrence.objects.filter(alarm=alarm, alarm_revision=alarm.revision, cycle_date=occurrence.cycle_date, state="pending").exclude(identity=identity)
             for other in shared:
                 if activity.kind == "snoozed":
-                    other.state, other.resolved_at, other.snoozed_until = "pending", None, snoozed_until
-                    other.deadline_at = snoozed_until + timedelta(minutes=10)
+                    other.state, other.resolved_at, other.snoozed_until, other.snoozed_at = "pending", None, snoozed_until, activity.occurred_at
+                    other.deadline_at = snoozed_until + timedelta(minutes=alarm.timeout_minutes)
                 else:
-                    other.state, other.resolved_at, other.snoozed_until = activity.kind, timezone.now(), None
+                    other.state, other.resolved_at, other.snoozed_until, other.snoozed_at = activity.kind, timezone.now(), None, None
                 other.save()
                 changes.append(("occurrence", str(other.pk), "upsert", OccurrenceRepresentation(other).data, other.identity_id))
                 changes.extend(schedule_occurrences(alarm, [other.identity_id], other.trigger_at + timedelta(milliseconds=1)))

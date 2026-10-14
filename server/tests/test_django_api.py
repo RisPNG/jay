@@ -331,6 +331,7 @@ def test_api_contract_exposes_the_supported_operations():
         ("post", "/v1/identities/register"),
         ("post", "/v1/identity/play-entitlement"),
         ("post", "/v1/sounds/{sound_id}/complete"),
+        ("post", "/v1/timers/{timer_id}/occurrence"),
         ("put", "/v1/alarms/{alarm_id}"),
         ("put", "/v1/alarms/{alarm_id}/occurrence"),
         ("put", "/v1/groups/{group_id}"),

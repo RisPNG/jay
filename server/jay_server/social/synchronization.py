@@ -84,7 +84,7 @@ def synchronize_scope(scope, identity, membership_id, cursor_token):
     if state["mode"] == "snapshot":
         latest = visible.exclude(kind__in=["activity", "outcome"]).order_by("kind", "key", "-revision", "-ordinal").distinct("kind", "key").values("pk")
         rows = SyncVersion.objects.filter(pk__in=Subquery(latest)).exclude(action="delete").order_by("kind", "key")
-        rows = rows.annotate(resolved_at=Cast(KT("representation__resolved_at"), DateTimeField())).exclude(Q(kind="occurrence") & (Q(representation__state="canceled") | (Q(resolved_at__isnull=False) & Q(resolved_at__lt=state["recent_after"]))))
+        rows = rows.annotate(resolved_at=Cast(KT("representation__resolved_at"), DateTimeField())).exclude(Q(kind__in=["occurrence", "timer_occurrence"]) & (Q(representation__state="canceled") | (Q(resolved_at__isnull=False) & Q(resolved_at__lt=state["recent_after"]))))
         if state["position"]:
             kind, key = state["position"]
             rows = rows.filter(Q(kind__gt=kind) | Q(kind=kind, key__gt=key))

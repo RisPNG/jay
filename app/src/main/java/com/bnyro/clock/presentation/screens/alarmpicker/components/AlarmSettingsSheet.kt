@@ -349,6 +349,7 @@ fun AlarmPicker(
                 )
                 SwitchWithDivider(
                     title = stringResource(R.string.missed_restart),
+                    enabled = canSave,
                     description = pluralStringResource(
                         R.plurals.duration_minutes,
                         missedRestartMinutes,
@@ -363,7 +364,7 @@ fun AlarmPicker(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { showTimeoutDialog = true }
+                        .clickable(enabled = canSave) { showTimeoutDialog = true }
                         .padding(8.dp, 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

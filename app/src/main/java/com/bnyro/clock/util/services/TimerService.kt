@@ -45,7 +45,7 @@ import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.ui.theme.DefaultLabelColor
 import com.bnyro.clock.util.Preferences
-import com.bnyro.clock.social.data.SocialTimerActions
+import com.bnyro.clock.social.data.SocialTimerWorker
 import com.bnyro.clock.util.widgets.TextColor
 import com.bnyro.clock.util.widgets.getColorValue
 import com.bnyro.clock.util.TimeHelper
@@ -147,23 +147,16 @@ class TimerService : Service() {
             val obj = timerObjects.find { it.id == id } ?: return
             when (val action = intent.getStringExtra(ACTION_EXTRA_KEY)) {
                 ACTION_STOP -> {
-                    // answering a ring is each member's own answer unless the group answers
-                    // as one, while stopping one that is still counting cancels it for the
-                    // whole group when this member may edit it
-                    val answeringTheRing = ringingTimerId == obj.id
-                    obj.sharedTimerId?.let { sharedId ->
-                        val answersForEveryone = obj.sharedCanEdit &&
-                            (!answeringTheRing || obj.sharedAnswerAsOne)
-                        if (answersForEveryone) {
-                            SocialTimerActions.cancel(applicationContext, sharedId)
-                        } else {
-                            SocialTimerActions.dismissed(applicationContext, sharedId, obj.sharedExpiresAt)
-                        }
+                    if (obj.sharedTimerId != null) {
+                        SocialTimerWorker.enqueue(applicationContext, obj,
+                            if (obj.currentPosition.value > 0 && obj.sharedCanEdit) SocialTimerWorker.ACTION_CANCEL
+                            else SocialTimerWorker.ACTION_DISMISSED)
                     }
-                    stop(obj, cancelled = true)
+                    stop(obj)
                 }
 
                 ACTION_PAUSE_RESUME -> {
+                    if (obj.sharedTimerId != null) return
                     if (obj.state.value == WatchState.PAUSED) resume(obj) else pause(obj)
                 }
 
@@ -181,6 +174,14 @@ class TimerService : Service() {
                     val addedmskek = obj.effectiveIncrementSeconds * 1000
                     val expiresAt = if (finished) System.currentTimeMillis() + addedmskek
                     else obj.expiresAt + addedmskek
+
+                    if (obj.sharedTimerId != null) {
+                        if (!obj.sharedCanEdit) return
+                        SocialTimerWorker.enqueue(applicationContext, obj, SocialTimerWorker.ACTION_ADJUST, expiresAt, if (finished) 0 else obj.repeatIndex,
+                            adjustmentSeconds = obj.effectiveIncrementSeconds)
+                        if (finished) endRinging(obj)
+                        return
+                    }
 
                     if (finished) {
                         endRinging(obj)
@@ -207,14 +208,15 @@ class TimerService : Service() {
                     }
 
                     updateNotification(obj)
-
-                    obj.sharedTimerId?.takeIf { obj.sharedCanEdit }?.let { sharedId ->
-                        obj.sharedExpiresAt = maxOf(obj.sharedExpiresAt, System.currentTimeMillis()) + obj.effectiveIncrementSeconds * 1000L
-                        SocialTimerActions.adjust(applicationContext, sharedId, obj.sharedExpiresAt)
-                    }
                 }
 
                 TIMER_RESTART -> {
+                    if (obj.sharedTimerId != null) {
+                        if (!obj.sharedCanEdit) return
+                        SocialTimerWorker.enqueue(applicationContext, obj, SocialTimerWorker.ACTION_ADJUST, System.currentTimeMillis() + obj.initialPosition.value, 0)
+                        endRinging(obj)
+                        return
+                    }
                     endRinging(obj)
 
                     obj.repeatIndex = 0
@@ -237,11 +239,6 @@ class TimerService : Service() {
                     promoteForeground()
                     invokeChangeListener()
                     updateNotification(obj)
-
-                    obj.sharedTimerId?.takeIf { obj.sharedCanEdit }?.let { sharedId ->
-                        obj.sharedExpiresAt = System.currentTimeMillis() + obj.initialPosition.value
-                        SocialTimerActions.adjust(applicationContext, sharedId, obj.sharedExpiresAt)
-                    }
                 }
             }
         }
@@ -412,18 +409,34 @@ class TimerService : Service() {
 
             if (obj.repeatEnabled) {
                 val now = System.currentTimeMillis()
-                val elapsedRepeats = ((now - expiresAt).coerceAtLeast(0) / obj.repeatDurationMillis).toInt()
-                val nextIndex = obj.repeatIndex + elapsedRepeats + 1
+                var elapsedRepeats = ((now - expiresAt).coerceAtLeast(0) / obj.repeatDurationMillis).toInt()
+                var nextIndex = obj.repeatIndex + elapsedRepeats + 1
+                while (nextIndex in obj.sharedAnsweredIndices) {
+                    nextIndex++
+                    elapsedRepeats++
+                }
                 if (obj.repeatCount == 0 || nextIndex <= obj.repeatCount) {
                     val nextExpiry = expiresAt + (elapsedRepeats + 1) * obj.repeatDurationMillis.toLong()
-                    val successor = TimerDescriptor(
-                        id = (timerObjects.maxOfOrNull { it.id } ?: 0) + 1,
-                        settings = obj.settings.copy(seconds = obj.repeatDurationMillis / 1000)
-                    ).asScheduledObject()
-                    successor.repeatIndex = nextIndex
-                    successor.expiresAt = nextExpiry
+                    val existingSuccessor = obj.sharedTimerId?.let { sharedId ->
+                        timerObjects.firstOrNull {
+                            it.sharedTimerId == sharedId && it.sharedMembershipId == obj.sharedMembershipId &&
+                                it.sharedRunId == obj.sharedRunId && it.repeatIndex == nextIndex
+                        }
+                    }
                     obj.hasSuccessor = true
-                    enqueueNew(successor)
+                    if (existingSuccessor == null) {
+                        val successor = obj.copy(
+                            id = (timerObjects.maxOfOrNull { it.id } ?: 0) + 1,
+                            label = mutableStateOf(obj.label.value),
+                            labelColor = mutableStateOf(obj.labelColor.value),
+                            currentPosition = mutableStateOf(obj.repeatDurationMillis),
+                            initialPosition = mutableStateOf(obj.repeatDurationMillis),
+                            state = mutableStateOf(WatchState.RUNNING),
+                            repeatIndex = nextIndex, hasSuccessor = false,
+                            expiresAt = nextExpiry, elapsedRealtimeDeadline = 0L
+                        )
+                        enqueueNew(successor)
+                    }
                 }
             }
 
@@ -547,85 +560,101 @@ class TimerService : Service() {
         updateNotification(timerObject)
     }
 
-    /**
-     * Brings a group timer this device has not answered onto this device: a new one is
-     * materialized from the group's shared expiry, and one already here is corrected to whatever
-     * the group has since done with it, which also answers a ring the group has moved on from.
-     */
     private fun syncSharedTimer(intent: Intent) {
         val sharedId = intent.getStringExtra(SHARED_TIMER_ID_EXTRA_KEY) ?: return
+        val groupId = intent.getStringExtra(SHARED_TIMER_GROUP_ID_EXTRA_KEY) ?: return
+        val membershipId = intent.getStringExtra(SHARED_TIMER_MEMBERSHIP_ID_EXTRA_KEY) ?: return
+        val runId = intent.getStringExtra(SHARED_TIMER_RUN_ID_EXTRA_KEY) ?: return
         val groupName = intent.getStringExtra(SHARED_TIMER_GROUP_NAME_EXTRA_KEY)
         val label = intent.getStringExtra(SHARED_TIMER_LABEL_EXTRA_KEY)
         val labelColor = intent.getIntExtra(SHARED_TIMER_LABEL_COLOR_EXTRA_KEY, DefaultLabelColor)
-        val durationSeconds = intent.getIntExtra(SHARED_TIMER_DURATION_EXTRA_KEY, 0)
+        val durationMillis = intent.getIntExtra(SHARED_TIMER_DURATION_EXTRA_KEY, 0) * 1000
+        if (durationMillis <= 0) return
         val incrementSeconds = intent.getIntExtra(SHARED_TIMER_INCREMENT_EXTRA_KEY, 60)
-        val expiresAt = intent.getLongExtra(SHARED_TIMER_EXPIRES_EXTRA_KEY, 0L)
+        val baseExpiry = intent.getLongExtra(SHARED_TIMER_EXPIRES_EXTRA_KEY, 0L)
+        val baseIndex = intent.getIntExtra(SHARED_TIMER_REPEAT_INDEX_EXTRA_KEY, 0)
+        val repeatEnabled = intent.getBooleanExtra(SHARED_TIMER_REPEAT_ENABLED_EXTRA_KEY, false)
+        val repeatCount = intent.getIntExtra(SHARED_TIMER_REPEAT_COUNT_EXTRA_KEY, 0)
+        val timeoutMinutes = intent.getIntExtra(SHARED_TIMER_TIMEOUT_EXTRA_KEY, TimerSettings.DEFAULT_TIMEOUT_MINUTES)
+        val answeredIndices = (intent.getIntArrayExtra(SHARED_TIMER_ANSWERED_INDICES_EXTRA_KEY) ?: intArrayOf()).toSet()
         val canEdit = intent.getBooleanExtra(SHARED_TIMER_CAN_EDIT_EXTRA_KEY, false)
-        val answerAsOne = intent.getBooleanExtra(SHARED_TIMER_ANSWER_AS_ONE_EXTRA_KEY, false)
         val soundEnabled = intent.getBooleanExtra(SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY, true)
         val soundName = intent.getStringExtra(SHARED_TIMER_SOUND_NAME_EXTRA_KEY)
         val soundUri = intent.getStringExtra(SHARED_TIMER_SOUND_URI_EXTRA_KEY)
         val vibrate = intent.getBooleanExtra(SHARED_TIMER_VIBRATE_EXTRA_KEY, true)
         val vibrationPattern = intent.getIntArrayExtra(SHARED_TIMER_VIBRATION_PATTERN_EXTRA_KEY)
             ?.toList() ?: listOf(0, 1000, 1000, 1000, 1000)
-        val vibrationPatternName = intent.getStringExtra(SHARED_TIMER_VIBRATION_PATTERN_NAME_EXTRA_KEY)
-            ?: "Default"
-        if (durationSeconds <= 0) return
-
-        val existing = timerObjects.find { it.sharedTimerId == sharedId }
-        val remaining = expiresAt - System.currentTimeMillis()
+        val vibrationPatternName = intent.getStringExtra(SHARED_TIMER_VIBRATION_PATTERN_NAME_EXTRA_KEY) ?: "Default"
+        timerObjects.filter {
+            it.sharedTimerId == sharedId && (it.sharedMembershipId != membershipId || it.sharedRunId != runId || it.repeatIndex in answeredIndices)
+        }.forEach { stop(it, keepService = true) }
+        val now = System.currentTimeMillis()
+        val skipped = if (repeatEnabled && baseExpiry <= now) (now - baseExpiry) / durationMillis + 1 else 0L
+        var targetIndex = baseIndex + skipped
+        var targetExpiry = baseExpiry + skipped * durationMillis
+        while (repeatEnabled && targetIndex <= Int.MAX_VALUE && targetIndex.toInt() in answeredIndices) {
+            targetIndex++
+            targetExpiry += durationMillis
+        }
+        val hasFuture = targetExpiry > now && targetIndex <= Int.MAX_VALUE &&
+            (!repeatEnabled && targetIndex == 0L || repeatEnabled && (repeatCount == 0 || targetIndex <= repeatCount)) &&
+            targetIndex.toInt() !in answeredIndices
+        val existing = timerObjects.firstOrNull {
+            it.sharedTimerId == sharedId && it.sharedMembershipId == membershipId && it.sharedRunId == runId &&
+                it.repeatIndex.toLong() == targetIndex
+        }
+        timerObjects.filter { it.sharedTimerId == sharedId }.forEach {
+            it.label.value = label ?: TimeHelper.durationToName(durationMillis / 1000)
+            it.labelColor.value = labelColor
+            it.sharedAnsweredIndices = answeredIndices
+            it.sharedGroupName = groupName
+            it.sharedCanEdit = canEdit
+            it.incrementSeconds = incrementSeconds
+            it.timeoutMinutes = timeoutMinutes
+            it.repeatEnabled = repeatEnabled
+            it.repeatCount = repeatCount
+            it.repeatDurationMillis = durationMillis
+            it.soundEnabled = soundEnabled
+            it.soundName = soundName
+            it.soundUri = soundUri
+            it.vibrate = vibrate
+            it.vibrationPattern = vibrationPattern
+            it.vibrationPatternName = vibrationPatternName
+            if (hasFuture && it.repeatIndex < targetIndex) it.hasSuccessor = true
+            updateNotification(it)
+        }
+        if (!hasFuture) {
+            invokeChangeListener()
+            promoteForeground()
+            return
+        }
+        val remaining = (targetExpiry - now).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         if (existing == null) {
-            // a timer first received at or after its deadline has missed its ring
-            if (remaining <= 0) return
             val obj = TimerObject(
-                id = sharedId.hashCode(),
-                label = mutableStateOf(label ?: TimeHelper.durationToName(durationSeconds)),
+                id = "$sharedId/$membershipId/$runId/$targetIndex".hashCode(),
+                label = mutableStateOf(label ?: TimeHelper.durationToName(durationMillis / 1000)),
                 labelColor = mutableStateOf(labelColor),
-                currentPosition = mutableStateOf(remaining.toInt()),
-                initialPosition = mutableStateOf(durationSeconds * 1000),
+                currentPosition = mutableStateOf(remaining), initialPosition = mutableStateOf(durationMillis),
                 state = mutableStateOf(WatchState.RUNNING),
-                incrementSeconds = incrementSeconds,
-                sharedTimerId = sharedId,
-                sharedExpiresAt = expiresAt,
-                sharedGroupName = groupName,
-                sharedCanEdit = canEdit,
-                sharedAnswerAsOne = answerAsOne,
-                soundEnabled = soundEnabled,
-                soundName = soundName,
-                soundUri = soundUri,
-                vibrate = vibrate,
-                vibrationPattern = vibrationPattern,
-                vibrationPatternName = vibrationPatternName
+                incrementSeconds = incrementSeconds, timeoutMinutes = timeoutMinutes,
+                repeatEnabled = repeatEnabled, repeatCount = repeatCount, repeatIndex = targetIndex.toInt(),
+                repeatDurationMillis = durationMillis, expiresAt = targetExpiry,
+                sharedTimerId = sharedId, sharedGroupId = groupId, sharedMembershipId = membershipId,
+                sharedRunId = runId, sharedAnsweredIndices = answeredIndices, sharedGroupName = groupName, sharedCanEdit = canEdit,
+                soundEnabled = soundEnabled, soundName = soundName, soundUri = soundUri,
+                vibrate = vibrate, vibrationPattern = vibrationPattern, vibrationPatternName = vibrationPatternName
             )
             startForeground(obj.id, getNotification(obj))
             enqueueNew(obj)
             return
         }
-
-        existing.label.value = label ?: TimeHelper.durationToName(durationSeconds)
-        existing.labelColor.value = labelColor
-        existing.sharedExpiresAt = expiresAt
-        existing.sharedGroupName = groupName
-        existing.sharedCanEdit = canEdit
-        existing.sharedAnswerAsOne = answerAsOne
-        existing.incrementSeconds = incrementSeconds
-        existing.soundEnabled = soundEnabled
-        existing.soundName = soundName
-        existing.soundUri = soundUri
-        existing.vibrate = vibrate
-        existing.vibrationPattern = vibrationPattern
-        existing.vibrationPatternName = vibrationPatternName
-        existing.initialPosition.value = durationSeconds * 1000
-        if (remaining > 0) {
-            val drifted = abs(existing.currentPosition.value - remaining.toInt()) > 1000
-            if (existing.state.value != WatchState.RUNNING || drifted) {
-                endRinging(existing)
-                existing.state.value = WatchState.RUNNING
-                existing.currentPosition.value = remaining.toInt()
-                cancelAlarm(existing)
-                scheduleAlarm(existing)
-                acquireWakeLock()
-            }
+        val drifted = abs(existing.currentPosition.value - remaining) > 1000
+        if (existing.state.value != WatchState.RUNNING || existing.expiresAt != targetExpiry || drifted) {
+            existing.state.value = WatchState.RUNNING
+            existing.currentPosition.value = remaining
+            cancelAlarm(existing)
+            scheduleAlarm(existing, targetExpiry)
+            acquireWakeLock()
         }
         invokeChangeListener()
         promoteForeground()
@@ -636,7 +665,7 @@ class TimerService : Service() {
         val active = intent.getStringArrayListExtra(ACTIVE_SHARED_TIMER_IDS_EXTRA_KEY)
             .orEmpty().toSet()
         timerObjects.filter { it.sharedTimerId != null && it.sharedTimerId !in active }.forEach {
-            stop(it, cancelled = true)
+            stop(it)
         }
     }
 
@@ -669,7 +698,7 @@ class TimerService : Service() {
         }
     }
 
-    private fun stop(timerObject: TimerObject, cancelled: Boolean) {
+    private fun stop(timerObject: TimerObject, keepService: Boolean = false) {
         cancelAlarm(timerObject)
         endRinging(timerObject)
         timerObjects.remove(timerObject)
@@ -684,7 +713,7 @@ class TimerService : Service() {
         notificationManager.cancel(timerObject.id)
         notificationManager.cancel(finishedNotificationId(timerObject))
 
-        if (timerObjects.isEmpty()) {
+        if (timerObjects.isEmpty() && !keepService) {
             stopSelf()
         }
     }
@@ -704,7 +733,7 @@ class TimerService : Service() {
             override fun run() {
                 handler.post {
                     if (timerObject.hasSuccessor) {
-                        stop(timerObject, cancelled = false)
+                        stop(timerObject)
                     } else {
                         val rangFor = endRinging(timerObject)
                         promoteForeground()
@@ -717,7 +746,7 @@ class TimerService : Service() {
         promoteForeground(announcing = true)
         // the foreground moves first so removing the earlier timer's notification cannot remove the new timer's announcement
         silenced?.let { (ringing, rangFor) ->
-            if (ringing.hasSuccessor) stop(ringing, cancelled = false)
+            if (ringing.hasSuccessor) stop(ringing)
             else showFinishedNotification(ringing, rangFor)
         }
         if (fullScreenAlertEnabled) startActivity(alertIntent(timerObject))
@@ -1020,7 +1049,14 @@ class TimerService : Service() {
         const val SHARED_TIMER_INCREMENT_EXTRA_KEY = "shared_timer_increment"
         const val SHARED_TIMER_EXPIRES_EXTRA_KEY = "shared_timer_expires"
         const val SHARED_TIMER_CAN_EDIT_EXTRA_KEY = "shared_timer_can_edit"
-        const val SHARED_TIMER_ANSWER_AS_ONE_EXTRA_KEY = "shared_timer_answer_as_one"
+        const val SHARED_TIMER_GROUP_ID_EXTRA_KEY = "shared_timer_group_id"
+        const val SHARED_TIMER_MEMBERSHIP_ID_EXTRA_KEY = "shared_timer_membership_id"
+        const val SHARED_TIMER_RUN_ID_EXTRA_KEY = "shared_timer_run_id"
+        const val SHARED_TIMER_TIMEOUT_EXTRA_KEY = "shared_timer_timeout"
+        const val SHARED_TIMER_REPEAT_ENABLED_EXTRA_KEY = "shared_timer_repeat_enabled"
+        const val SHARED_TIMER_REPEAT_COUNT_EXTRA_KEY = "shared_timer_repeat_count"
+        const val SHARED_TIMER_REPEAT_INDEX_EXTRA_KEY = "shared_timer_repeat_index"
+        const val SHARED_TIMER_ANSWERED_INDICES_EXTRA_KEY = "shared_timer_answered_indices"
         const val SHARED_TIMER_SOUND_ENABLED_EXTRA_KEY = "shared_timer_sound_enabled"
         const val SHARED_TIMER_SOUND_NAME_EXTRA_KEY = "shared_timer_sound_name"
         const val SHARED_TIMER_SOUND_URI_EXTRA_KEY = "shared_timer_sound_uri"

@@ -1,34 +1,47 @@
 package com.bnyro.clock.social.data
 
 import android.content.Context
-import androidx.work.Constraints
+import android.os.Build
 import androidx.work.CoroutineWorker
 import androidx.work.Data
-import androidx.work.NetworkType
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.bnyro.clock.App
+import com.bnyro.clock.domain.model.TimerObject
 import com.bnyro.clock.util.Preferences
 
 class SocialTimerWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result = try {
         val timerId = inputData.getString(TIMER_ID) ?: return Result.failure()
+        val groupId = inputData.getString("group_id") ?: return Result.failure()
+        val membershipId = inputData.getString("membership_id") ?: return Result.failure()
+        val operationId = inputData.getString("operation_id") ?: return Result.failure()
         val server = Preferences.instance.getString(SocialPreferences.serverUrlKey, SocialRepository.DEFAULT_SERVER_URL) ?: SocialRepository.DEFAULT_SERVER_URL
         if (server != inputData.getString("server") || DeviceIdentityStore.loadOrCreate(applicationContext, server).id != inputData.getString("identity")) return Result.success()
         val repository = (applicationContext as App).container.socialRepository
         when (inputData.getString(ACTION)) {
             ACTION_ADJUST -> repository.adjustSharedTimer(
-                timerId,
-                inputData.getLong(EXPIRES_AT, 0),
-                inputData.getString("operation_id") ?: return Result.failure(),
-                inputData.getLong("saved_at", 0)
+                timerId, groupId, membershipId,
+                inputData.getString("run_id") ?: return Result.failure(),
+                inputData.getInt("repeat_index", 0), inputData.getLong(EXPIRES_AT, 0),
+                operationId, inputData.getLong("saved_at", 0),
+                inputData.getString("source_run_id"), inputData.getInt("adjustment_seconds", 0),
+                inputData.getInt("source_repeat_index", 0), inputData.getBoolean("source_finished", false)
             )
 
-            ACTION_CANCEL -> repository.cancelSharedTimer(timerId, inputData.getString("operation_id") ?: return Result.failure())
+            ACTION_CANCEL -> repository.cancelSharedTimer(timerId, groupId, membershipId, operationId)
 
-            ACTION_DISMISSED -> repository.suppressSharedTimer(timerId, inputData.getLong(EXPIRES_AT, 0L))
+            ACTION_DISMISSED -> repository.dismissSharedTimer(
+                timerId, groupId, membershipId,
+                inputData.getString("run_id") ?: return Result.failure(),
+                inputData.getInt("repeat_index", 0), inputData.getLong(EXPIRES_AT, 0),
+                inputData.getInt("timeout_minutes", 10), operationId,
+                inputData.getLong("saved_at", 0)
+            )
 
             else -> return Result.failure()
         }
@@ -43,56 +56,46 @@ class SocialTimerWorker(context: Context, parameters: WorkerParameters) :
         private const val EXPIRES_AT = "expires_at"
         private const val TIMER_ID = "timer_id"
         private const val ACTION = "action"
-        private const val ACTION_ADJUST = "adjust"
-        private const val ACTION_CANCEL = "cancel"
-        private const val ACTION_DISMISSED = "dismissed"
+        const val ACTION_ADJUST = "adjust"
+        const val ACTION_CANCEL = "cancel"
+        const val ACTION_DISMISSED = "dismissed"
 
-        fun adjust(context: Context, timerId: String, expiresAt: Long) {
-            enqueue(context, ACTION_ADJUST, timerId) { putLong(EXPIRES_AT, expiresAt) }
-        }
-
-        fun cancel(context: Context, timerId: String) {
-            enqueue(context, ACTION_CANCEL, timerId)
-        }
-
-        fun dismissed(context: Context, timerId: String, expiresAt: Long) {
-            enqueue(context, ACTION_DISMISSED, timerId, requiresNetwork = false) {
-                putLong(EXPIRES_AT, expiresAt)
-            }
-        }
-
-        private fun enqueue(
+        fun enqueue(
             context: Context,
+            timer: TimerObject,
             action: String,
-            timerId: String,
-            requiresNetwork: Boolean = false,
-            extraData: Data.Builder.() -> Unit = {}
+            expiresAt: Long = timer.expiresAt,
+            repeatIndex: Int = timer.repeatIndex,
+            adjustmentSeconds: Int = 0
         ) {
             val server = Preferences.instance.getString(SocialPreferences.serverUrlKey, SocialRepository.DEFAULT_SERVER_URL) ?: SocialRepository.DEFAULT_SERVER_URL
-            WorkManager.getInstance(context).enqueue(
-                OneTimeWorkRequestBuilder<SocialTimerWorker>()
-                    .setConstraints(
-                        if (requiresNetwork) {
-                            Constraints.Builder()
-                                .setRequiredNetworkType(NetworkType.CONNECTED)
-                                .build()
-                        } else {
-                            Constraints.NONE
-                        }
-                    )
-                    .setInputData(
-                        Data.Builder()
-                            .putString(TIMER_ID, timerId)
-                            .putString(ACTION, action)
-                            .putString("server", server)
-                            .putString("identity", DeviceIdentityStore.loadOrCreate(context, server).id)
-                            .putString("operation_id", java.util.UUID.randomUUID().toString())
-                            .putLong("saved_at", System.currentTimeMillis())
-                            .apply(extraData)
-                            .build()
-                    )
-                    .build()
-            )
+            val identityId = DeviceIdentityStore.loadOrCreate(context, server).id
+            val request = OneTimeWorkRequestBuilder<SocialTimerWorker>()
+                .setInputData(
+                    Data.Builder()
+                        .putString(TIMER_ID, requireNotNull(timer.sharedTimerId))
+                        .putString(ACTION, action)
+                        .putString("group_id", requireNotNull(timer.sharedGroupId))
+                        .putString("membership_id", requireNotNull(timer.sharedMembershipId))
+                        .putString("run_id", if (action == ACTION_ADJUST) java.util.UUID.randomUUID().toString() else requireNotNull(timer.sharedRunId))
+                        .putInt("repeat_index", repeatIndex)
+                        .putString("source_run_id", timer.sharedRunId)
+                        .putInt("source_repeat_index", timer.repeatIndex)
+                        .putBoolean("source_finished", timer.currentPosition.value == 0)
+                        .putInt("adjustment_seconds", adjustmentSeconds)
+                        .putLong(EXPIRES_AT, expiresAt)
+                        .putInt("timeout_minutes", timer.timeoutMinutes)
+                        .putString("server", server)
+                        .putString("identity", identityId)
+                        .putString("operation_id", java.util.UUID.randomUUID().toString())
+                        .putLong("saved_at", System.currentTimeMillis())
+                        .build()
+                )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) request.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            WorkManager.getInstance(context).beginUniqueWork(
+                "timer:$server:$identityId:${timer.sharedMembershipId}:${timer.sharedTimerId}",
+                ExistingWorkPolicy.APPEND_OR_REPLACE, request.build()
+            ).enqueue()
         }
     }
 }

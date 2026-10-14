@@ -22,25 +22,24 @@ def test_migration_retains_operator_grants_and_discards_profile_purchase_access(
     before = [("social", "0005_identity_purge")]
     after = [("social", "0006_installation_access")]
     executor = MigrationExecutor(connection)
-    executor.migrate(before)
+    latest = executor.loader.graph.leaf_nodes()
     try:
+        executor.migrate(before)
         apps = executor.loader.project_state(before).apps
         for key, source in [("a", "play"), ("b", "operator")]:
             scope = apps.get_model("social", "SyncScope").objects.create()
             identity = apps.get_model("social", "Identity").objects.create(id=key * 64, name=source, token_hash=b"a" * 32, scope=scope)
             apps.get_model("social", "SharedSoundEntitlement").objects.create(identity=identity, source=source, expires_at=timezone.now() + timedelta(hours=47) if source == "play" else None)
-    finally:
         MigrationExecutor(connection).migrate(after)
-    assert not ProfileSoundGrant.objects.filter(identity_id="a" * 64).exists()
-    assert ProfileSoundGrant.objects.filter(identity_id="b" * 64).exists()
-    assert not PlayInstallation.objects.exists()
-    try:
+        assert not ProfileSoundGrant.objects.filter(identity_id="a" * 64).exists()
+        assert ProfileSoundGrant.objects.filter(identity_id="b" * 64).exists()
+        assert not PlayInstallation.objects.exists()
         executor = MigrationExecutor(connection)
         executor.migrate(before)
         old_grants = executor.loader.project_state(before).apps.get_model("social", "SharedSoundEntitlement")
         assert old_grants.objects.get(identity_id="b" * 64).source == "operator"
     finally:
-        MigrationExecutor(connection).migrate(after)
+        MigrationExecutor(connection).migrate(latest)
 
 
 def test_operator_access_is_scoped_revocable_and_synchronized(client, group, member):

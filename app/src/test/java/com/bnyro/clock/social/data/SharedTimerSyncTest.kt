@@ -8,6 +8,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.bnyro.clock.data.database.AppDatabase
 import com.bnyro.clock.domain.repository.AlarmRepository
+import com.bnyro.clock.social.domain.DismissedSharedTimer
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.TimerService
 import com.sun.net.httpserver.HttpServer
@@ -33,6 +34,7 @@ class SharedTimerSyncTest {
         Preferences.init(context)
         Preferences.instance.edit().clear().commit()
         var expiresAt = System.currentTimeMillis() + 600_000L
+        var runId = "first-run"
         var cursor = 1L
         var registrations = 0
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
@@ -40,7 +42,7 @@ class SharedTimerSyncTest {
             if (exchange.requestURI.path == "/v1/identities/register") registrations++
             val items = when (exchange.requestURI.path) {
                 "/v1/sync" -> """[{"kind":"membership","key":"membership","action":"upsert","revision":$cursor,"ordinal":0,"data":{"id":"membership","group_id":"group","scope_id":"group","role":"leader","notify_membership":true,"notify_administrative":true}}]"""
-                "/v1/groups/group/sync" -> """[{"kind":"group","key":"group","action":"upsert","revision":$cursor,"ordinal":0,"data":{"id":"group","name":"Kitchen","alarm_permission":"everyone","notify_alarm_changes":true,"notify_snoozed":true,"notify_dismissed":true,"notify_ignored":true}},{"kind":"timer","key":"timer","action":"upsert","revision":$cursor,"ordinal":1,"data":{"id":"timer","group_id":"group","label":"Pasta","label_color":-15584170,"duration_seconds":600,"increment_seconds":60,"expires_at":"${Instant.ofEpochMilli(expiresAt)}","sound_mode":"off"}}]"""
+                "/v1/groups/group/sync" -> """[{"kind":"group","key":"group","action":"upsert","revision":$cursor,"ordinal":0,"data":{"id":"group","name":"Kitchen","alarm_permission":"everyone","notify_alarm_changes":true,"notify_snoozed":true,"notify_dismissed":true,"notify_ignored":true}},{"kind":"timer","key":"timer","action":"upsert","revision":$cursor,"ordinal":1,"data":{"id":"timer","group_id":"group","label":"Pasta","label_color":-15584170,"duration_seconds":600,"increment_seconds":60,"expires_at":"${Instant.ofEpochMilli(expiresAt)}","run_id":"$runId","sound_mode":"off"}}]"""
                 else -> null
             }
             val body = if (items != null) {
@@ -58,10 +60,13 @@ class SharedTimerSyncTest {
         try {
             Preferences.instance.edit().putString(SocialPreferences.serverUrlKey, "http://127.0.0.1:${server.address.port}").commit()
             val repository = SocialRepository(context, social, AlarmRepository(alarms.alarmsDao()))
-            repository.suppressSharedTimer("timer", expiresAt)
+            social.socialDao().putDismissedTimer(DismissedSharedTimer("timer", "membership", runId, 0, expiresAt + 1_800_000))
             repository.synchronize()
-            assertEquals(null, shadowOf(context).nextStartedService)
+            val suppressed = shadowOf(context).nextStartedService
+            assertNotNull(suppressed)
+            assertEquals(listOf(0), suppressed.getIntArrayExtra(TimerService.SHARED_TIMER_ANSWERED_INDICES_EXTRA_KEY)!!.toList())
             expiresAt += 60_000L
+            runId = "new-run"
             cursor = 2L
             repository.synchronize()
             val start = shadowOf(context).nextStartedService
