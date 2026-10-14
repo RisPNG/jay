@@ -38,7 +38,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.bnyro.clock.presentation.components.InfoButton
 import com.bnyro.clock.presentation.components.LabelColorPreference
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -119,7 +118,6 @@ fun TimerEditSheet(
                         } else {
                             pluralStringResource(R.plurals.timer_repeat_count, repeatCount, repeatCount)
                         },
-                        info = stringResource(R.string.timer_repeat_info),
                         isChecked = repeatEnabled,
                         icon = Icons.Rounded.Repeat,
                         onClick = { showRepeatDialog = true },
@@ -170,17 +168,10 @@ fun TimerEditSheet(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Column(Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = stringResource(R.string.timeout_after),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                InfoButton(
-                                    title = stringResource(R.string.timeout_after),
-                                    explanation = stringResource(R.string.timer_timeout_info)
-                                )
-                            }
+                            Text(
+                                text = stringResource(R.string.timeout_after),
+                                style = MaterialTheme.typography.titleLarge
+                            )
                             Text(
                                 text = pluralStringResource(R.plurals.duration_minutes, timeoutMinutes, timeoutMinutes),
                                 style = MaterialTheme.typography.bodyMedium
