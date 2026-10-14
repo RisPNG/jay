@@ -291,6 +291,34 @@ fun AlarmPicker(
                     )
                 }
                 LabelColorPreference(color = labelColor, onColorSelected = { labelColor = it })
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = canSave) { showTimeoutDialog = true }
+                        .padding(8.dp, 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Timer,
+                        contentDescription = null,
+                        modifier = Modifier.padding(start = 8.dp, end = 16.dp).size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.timeout_after),
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            text = pluralStringResource(
+                                R.plurals.duration_minutes,
+                                timeoutMinutes,
+                                timeoutMinutes
+                            ),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
                 SwitchWithDivider(
                     title = stringResource(R.string.sound),
                     description = soundName ?: stringResource(R.string.default_sound),
@@ -359,34 +387,6 @@ fun AlarmPicker(
                     onClick = { showMissedRestartDialog = true },
                     onChecked = { missedRestartEnabled = it }
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = canSave) { showTimeoutDialog = true }
-                        .padding(8.dp, 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Timer,
-                        contentDescription = null,
-                        modifier = Modifier.padding(start = 8.dp, end = 16.dp).size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.timeout_after),
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            text = pluralStringResource(
-                                R.plurals.duration_minutes,
-                                timeoutMinutes,
-                                timeoutMinutes
-                            ),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
             }
         }
 
