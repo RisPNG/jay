@@ -65,7 +65,9 @@ class AlarmService : Service() {
                     stopSelf()
                 }
                 SNOOZE_ACTION -> {
-                    AlarmHelper.snooze(this@AlarmService, currentAlarm!!)
+                    currentAlarm?.let { alarm ->
+                        AlarmHelper.snooze(this@AlarmService, alarm, currentRingTime!!, alarm.snoozeMinutes)
+                    }
                     stopSelf()
                 }
                 ALERT_SHOWN_ACTION, ALERT_HIDDEN_ACTION -> {
@@ -140,6 +142,7 @@ class AlarmService : Service() {
         val alarmActivityIntent = Intent(this, AlarmActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
             putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+            putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, currentRingTime!!)
         }
         startActivity(alarmActivityIntent)
         val deadlineAt = triggerTime + timeoutMillis
@@ -271,6 +274,7 @@ class AlarmService : Service() {
         val alarmActivityIntent = Intent(context, AlarmActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
             .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+            .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, currentRingTime!!)
 
         val pendingIntent = PendingIntent.getActivity(
             this@AlarmService,
