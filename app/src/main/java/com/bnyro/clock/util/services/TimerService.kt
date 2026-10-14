@@ -57,7 +57,6 @@ class TimerService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var isPlaying = false
-    private var oldnow = SystemClock.elapsedRealtime()
     private val vibrator: Vibrator by lazy {
         getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
     }
@@ -76,11 +75,18 @@ class TimerService : Service() {
     private var volumeRamp: VolumeRamp? = null
 
     @SuppressLint("ServiceCast", "ScheduleExactAlarm")
-    private fun scheduleAlarm(timerObject: TimerObject) {
+    private fun scheduleAlarm(
+        timerObject: TimerObject,
+        expiresAt: Long = System.currentTimeMillis() + timerObject.currentPosition.value
+    ) {
+        timerObject.expiresAt = expiresAt
+        timerObject.currentPosition.value = (expiresAt - System.currentTimeMillis()).coerceAtLeast(0).toInt()
+        timerObject.elapsedRealtimeDeadline = SystemClock.elapsedRealtime() + timerObject.currentPosition.value
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
         val intent = Intent(this, TimerAlarmReceiver::class.java).apply {
             putExtra(ID_EXTRA_KEY, timerObject.id)
+            putExtra(EXPIRES_AT_EXTRA_KEY, expiresAt)
             action = ACTION_TIMER_EXPIRED
         }
         val pendingIntent = PendingIntent.getBroadcast(
@@ -90,8 +96,7 @@ class TimerService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val triggerTime = System.currentTimeMillis() + timerObject.currentPosition.value
-        val alarmInfo = AlarmManager.AlarmClockInfo(triggerTime, pendingIntent)
+        val alarmInfo = AlarmManager.AlarmClockInfo(expiresAt, pendingIntent)
 
         try {
             alarmManager.setAlarmClock(alarmInfo, pendingIntent)
@@ -121,12 +126,6 @@ class TimerService : Service() {
 
     private val fullScreenAlertEnabled
         get() = Preferences.instance.getBoolean(Preferences.timerFullScreenAlertKey, true)
-
-    private val timeoutMinutes
-        get() = Preferences.instance.getInt(
-            Preferences.timerTimeoutMinutesKey,
-            TIMER_TIMEOUT_MINUTES
-        )
 
     /** How long the timer that is ringing has been ringing for. */
     private val ringDuration get() = System.currentTimeMillis() - ringingSince
@@ -158,10 +157,13 @@ class TimerService : Service() {
                     // time added starts it running again rather than sitting on a finished timer
                     val finished = obj.currentPosition.value == 0
                     val addedmskek = obj.effectiveIncrementSeconds * 1000
+                    val expiresAt = if (finished) System.currentTimeMillis() + addedmskek
+                    else obj.expiresAt + addedmskek
 
                     if (finished) {
                         endRinging(obj)
-                        oldnow = SystemClock.elapsedRealtime()
+                        obj.repeatIndex = 0
+                        obj.hasSuccessor = false
                         obj.state.value = WatchState.RUNNING
                         obj.initialPosition.value = addedmskek
                     } else {
@@ -171,7 +173,7 @@ class TimerService : Service() {
 
                     if (obj.state.value == WatchState.RUNNING) {
                         cancelAlarm(obj)
-                        scheduleAlarm(obj)
+                        scheduleAlarm(obj, expiresAt)
                         if (finished) acquireWakeLock()
                     }
 
@@ -188,7 +190,8 @@ class TimerService : Service() {
                 TIMER_RESTART -> {
                     endRinging(obj)
 
-                    oldnow = SystemClock.elapsedRealtime()
+                    obj.repeatIndex = 0
+                    obj.hasSuccessor = false
 
                     // a finished timer has no run left to return to, so it starts a new one
                     if (obj.currentPosition.value == 0) obj.state.value = WatchState.RUNNING
@@ -328,9 +331,31 @@ class TimerService : Service() {
                 return START_STICKY
             }
 
+            val expiresAt = intent.getLongExtra(EXPIRES_AT_EXTRA_KEY, obj.expiresAt)
+            if (obj.state.value != WatchState.RUNNING || expiresAt != obj.expiresAt) {
+                return START_STICKY
+            }
+
             cancelAlarm(obj)
             obj.currentPosition.value = 0
             obj.state.value = WatchState.PAUSED
+
+            if (obj.repeatEnabled) {
+                val now = System.currentTimeMillis()
+                val elapsedRepeats = ((now - expiresAt).coerceAtLeast(0) / obj.repeatDurationMillis).toInt()
+                val nextIndex = obj.repeatIndex + elapsedRepeats + 1
+                if (obj.repeatCount == 0 || nextIndex <= obj.repeatCount) {
+                    val nextExpiry = expiresAt + (elapsedRepeats + 1) * obj.repeatDurationMillis.toLong()
+                    val successor = TimerDescriptor(
+                        id = (timerObjects.maxOfOrNull { it.id } ?: 0) + 1,
+                        settings = obj.settings.copy(seconds = obj.repeatDurationMillis / 1000)
+                    ).asScheduledObject()
+                    successor.repeatIndex = nextIndex
+                    successor.expiresAt = nextExpiry
+                    obj.hasSuccessor = true
+                    enqueueNew(successor)
+                }
+            }
 
             startRinging(obj)
 
@@ -394,14 +419,12 @@ class TimerService : Service() {
 
     private fun updateState() {
         val now = SystemClock.elapsedRealtime()
-        val delta = now - oldnow
-        oldnow = now
 
         timerObjects.forEach {
             if (it.state.value == WatchState.RUNNING) {
                 val before = it.secondsLeft
                 it.currentPosition.value =
-                    (it.currentPosition.value - delta.toInt()).coerceAtLeast(0)
+                    (it.elapsedRealtimeDeadline - now).coerceAtLeast(0).toInt()
 
                 if (before != it.secondsLeft) {
                     updateNotification(it)
@@ -422,7 +445,10 @@ class TimerService : Service() {
         timerObject.state.value = WatchState.RUNNING
         timerObjects.add(timerObject)
 
-        scheduleAlarm(timerObject)
+        scheduleAlarm(
+            timerObject,
+            timerObject.expiresAt.takeIf { it > 0 } ?: System.currentTimeMillis() + timerObject.currentPosition.value
+        )
         acquireWakeLock()
 
         invokeChangeListener()
@@ -430,6 +456,8 @@ class TimerService : Service() {
     }
 
     private fun pause(timerObject: TimerObject) {
+        timerObject.currentPosition.value =
+            (timerObject.elapsedRealtimeDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(0).toInt()
         timerObject.state.value = WatchState.PAUSED
         cancelAlarm(timerObject)
         updateNotification(timerObject)
@@ -456,7 +484,6 @@ class TimerService : Service() {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.N)
     private fun stop(timerObject: TimerObject, cancelled: Boolean) {
         cancelAlarm(timerObject)
         endRinging(timerObject)
@@ -477,11 +504,7 @@ class TimerService : Service() {
         }
     }
 
-    /**
-     * A timer that has run out takes over the ringing from whichever timer was ringing before it,
-     * which keeps its own record of how long it rang for. The screen the earlier timer was showing
-     * is left standing for the new timer's intent to take over rather than closed and reopened.
-     */
+    /** A timer that runs out takes over the ringing from the previous timer. Completed copies with a successor are removed when their ringing ends, while final completions retain their finished notification. The earlier alert is left for the new timer's intent to take over. */
     private fun startRinging(timerObject: TimerObject) {
         val silenced = timerObjects.find { it.id == ringingTimerId }
             ?.let { it to endRinging(it, keepAlert = true) }
@@ -495,17 +518,23 @@ class TimerService : Service() {
         ringTimeout = object : TimerTask() {
             override fun run() {
                 handler.post {
-                    val rangFor = endRinging(timerObject)
-                    promoteForeground()
-                    showFinishedNotification(timerObject, rangFor)
+                    if (timerObject.hasSuccessor) {
+                        stop(timerObject, cancelled = false)
+                    } else {
+                        val rangFor = endRinging(timerObject)
+                        promoteForeground()
+                        showFinishedNotification(timerObject, rangFor)
+                    }
                 }
             }
-        }.also { timer.schedule(it, timeoutMinutes * 60 * 1000L) }
+        }.also { timer.schedule(it, timerObject.timeoutMinutes * 60 * 1000L) }
 
         promoteForeground(announcing = true)
-        // the silenced timer's last word is posted only after the foreground has moved to the new
-        // timer, because a notification still bound as the foreground one is removed by that move
-        silenced?.let { (ringing, rangFor) -> showFinishedNotification(ringing, rangFor) }
+        // the foreground moves first so removing the earlier timer's notification cannot remove the new timer's announcement
+        silenced?.let { (ringing, rangFor) ->
+            if (ringing.hasSuccessor) stop(ringing, cancelled = false)
+            else showFinishedNotification(ringing, rangFor)
+        }
         if (fullScreenAlertEnabled) startActivity(alertIntent(timerObject))
     }
 
@@ -726,13 +755,21 @@ class TimerService : Service() {
     fun updateTimer(id: Int, settings: TimerSettings) {
         timerObjects.firstOrNull { it.id == id }?.let {
             val duration = settings.seconds * 1000
+            val previousDuration = if (it.repeatEnabled) it.repeatDurationMillis else it.initialPosition.value
             val running = it.state.value == WatchState.RUNNING
-            it.currentPosition.value =
-                (it.currentPosition.value.toLong() * duration / it.initialPosition.value).toInt()
+            val remaining = if (running) {
+                (it.elapsedRealtimeDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(0)
+            } else it.currentPosition.value.toLong()
+            it.currentPosition.value = (remaining * duration / previousDuration).toInt()
+            it.initialPosition.value =
+                (it.initialPosition.value.toLong() * duration / previousDuration).toInt()
+            if (it.repeatEnabled != settings.repeatEnabled || it.repeatCount != settings.repeatCount) {
+                it.repeatIndex = 0
+            }
             if (running) cancelAlarm(it)
             it.label.value = settings.label
             it.labelColor.value = settings.labelColor
-            it.initialPosition.value = duration
+            it.repeatDurationMillis = duration
             it.soundName = settings.soundName
             it.soundUri = settings.soundUri
             it.soundEnabled = settings.soundEnabled
@@ -740,6 +777,9 @@ class TimerService : Service() {
             it.vibrationPattern = settings.vibrationPattern
             it.vibrationPatternName = settings.vibrationPatternName
             it.incrementSeconds = settings.incrementSeconds
+            it.timeoutMinutes = settings.timeoutMinutes
+            it.repeatEnabled = settings.repeatEnabled
+            it.repeatCount = settings.repeatCount
             if (running) scheduleAlarm(it)
             updateNotification(it)
         }
@@ -764,6 +804,7 @@ class TimerService : Service() {
         const val UPDATE_STATE_ACTION = "com.bnyro.clock.UPDATE_STATE"
         const val ACTION_EXTRA_KEY = "action"
         const val ID_EXTRA_KEY = "id"
+        const val EXPIRES_AT_EXTRA_KEY = "expires_at"
         const val INITIAL_TIMER_EXTRA_KEY = "timer"
         const val ACTION_PAUSE_RESUME = "pause_resume"
         const val ACTION_STOP = "stop"
@@ -776,7 +817,6 @@ class TimerService : Service() {
         const val LABEL_EXTRA_KEY = "label"
         const val RINGING_SINCE_EXTRA_KEY = "ringing_since"
         const val INCREMENT_EXTRA_KEY = "increment"
-        const val TIMER_TIMEOUT_MINUTES = 10
         const val TIMER_ALERT_CLOSE_ACTION = "com.bnyro.clock.TIMER_ALERT_CLOSE_ACTION"
 
         fun updateStateIntent(action: String, objectId: Int): Intent =
