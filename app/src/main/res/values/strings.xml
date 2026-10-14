@@ -106,6 +106,10 @@
     <string name="delete">Delete</string>
     <string name="timeout_after">Timeout after</string>
     <string name="select_alarm_timeout">Select alarm timeout</string>
+    <string name="missed_restart">Missed restart</string>
+    <string name="select_missed_restart_time">Select missed restart delay</string>
+    <string name="missed_restart_info">After the alarm times out, wait this long before ringing again. It keeps restarting until you dismiss it, even when Snooze is off.</string>
+    <string name="alarm_timeout_info">Stop ringing after this duration if you have not answered the alarm. With Missed restart enabled, the alarm waits before ringing again.</string>
     <string name="select_timer_timeout">Select timer timeout</string>
     <string name="volume_ramp">Gradually increase volume</string>
     <string name="select_volume_ramp">Select volume ramp</string>
