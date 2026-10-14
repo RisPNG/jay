@@ -9,20 +9,10 @@ class CreateUpdateDeleteAlarmUseCase(
     private val context: Context,
     private val alarmRepository: AlarmRepository
 ) {
-    private fun anchorStartDate(alarm: Alarm) {
-        val next = AlarmHelper.getNextOccurrence(alarm) ?: return
-        alarm.startDate =
-            if (alarm.endOccurrences != null) {
-                next.toEpochDay()
-            } else {
-                AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay() ?: alarm.startDate
-            }
-    }
-
     suspend fun createAlarm(alarm: Alarm) {
         alarm.snoozedUntil = null
         alarm.dismissedAt = null
-        anchorStartDate(alarm)
+        alarm.startDate = AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay() ?: alarm.startDate
         if (AlarmHelper.hasRecurrenceEnded(alarm)) alarm.enabled = false
         val newId = alarmRepository.addAlarm(alarm)
         val alarmWithId = alarm.copy(id = newId)
@@ -32,7 +22,7 @@ class CreateUpdateDeleteAlarmUseCase(
     suspend fun updateAlarm(alarm: Alarm) {
         alarm.snoozedUntil = null
         alarm.dismissedAt = null
-        anchorStartDate(alarm)
+        alarm.startDate = AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay() ?: alarm.startDate
         if (AlarmHelper.hasRecurrenceEnded(alarm)) alarm.enabled = false
         alarmRepository.updateAlarm(alarm)
         AlarmHelper.enqueue(context, alarm)
