@@ -1,6 +1,7 @@
 package com.bnyro.clock.social.data
 
 object SocialPreferences {
+    const val supportPromptShownKey = "jaySupportPromptShown"
     const val serverUrlKey = "jayServerUrl"
     const val deviceSecretKey = "jayDeviceSecret"
     const val deviceNameKey = "jayDeviceName"

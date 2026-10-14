@@ -10,15 +10,19 @@ import java.security.MessageDigest
 import java.net.URI
 
 object PlayInstallationStore {
-    @Synchronized
-    fun credential(context: Context, serverUrl: String): String? {
-        if (!BuildConfig.JAY_PLAY_ENTITLEMENT_ELIGIBLE || BuildConfig.DEBUG) return null
+    fun isEligible(context: Context): Boolean {
+        if (!BuildConfig.JAY_PLAY_ENTITLEMENT_ELIGIBLE || BuildConfig.DEBUG) return false
         val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
         } else {
             context.packageManager.getInstallerPackageName(context.packageName)
         }
-        if (installer != "com.android.vending") return null
+        return installer == "com.android.vending"
+    }
+
+    @Synchronized
+    fun credential(context: Context, serverUrl: String): String? {
+        if (!isEligible(context)) return null
         val server = URI(serverUrl).normalize().toString().trimEnd('/')
         val serverKey = MessageDigest.getInstance("SHA-256").digest(server.toByteArray()).joinToString("") { "%02x".format(it) }
         val file = File(context.noBackupFilesDir, "jay-play-installation-$serverKey")

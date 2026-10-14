@@ -67,6 +67,7 @@ import com.bnyro.clock.presentation.screens.settings.components.SwitchPref
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.social.presentation.SocialSettingsSection
+import com.bnyro.clock.social.presentation.JaySupportPreference
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -488,6 +489,7 @@ fun SettingsScreen(
             ) {
                 uriHandler.openUri("https://github.com/RisPNG/jay")
             }
+            JaySupportPreference()
             IconPreference(
                 title = stringResource(R.string.jay_version),
                 summary = BuildConfig.JAY_VERSION,

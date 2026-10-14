@@ -19,6 +19,7 @@ import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.presentation.screens.stopwatch.model.StopwatchModel
 import com.bnyro.clock.presentation.screens.timer.model.TimerModel
 import com.bnyro.clock.social.presentation.SocialModel
+import com.bnyro.clock.social.presentation.JaySupportDialog
 
 @Composable
 fun AppNavHost(
@@ -58,6 +59,7 @@ fun AppNavHost(
                 settingsModel = settingsModel,
                 socialModel = socialModel
             )
+            JaySupportDialog()
         }
         composable(NavRoutes.Settings.route,
             enterTransition = {
