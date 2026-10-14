@@ -69,9 +69,11 @@ flowchart LR
 | Branch | What it is for |
 | --- | --- |
 | `main` | The clean Clock You base, with its exact upstream history, original commit messages, and commit hashes. |
-| Contribution branches | Focused Clock You improvements intended for upstream. Each starts from `main` and receives base updates from there. |
+| Contribution branches | Clock You improvements in one specific area, intended for upstream. Each starts from `main` and receives base updates from there. |
 | `main-canary` | Clock You together with every active contribution still waiting upstream. It contains no social code and publishes nothing. |
 | `jay` | The social extension on top of `main-canary`, with the integration points described above. All prereleases and stable releases come from here. |
+
+Each contribution branch delivers one complete change within one application area. Changes may span files within that area. Split work across different areas into separate, ordered contribution branches, each with a focused PR and documented dependencies and overlapping changes.
 
 An `upstream` remote points to Clock You. Preserving its history in `main` means we can compare and update the base without creating another copy of the same commits. `main` always feeds into `main-canary`, even when there are no pending contributions, and every active contribution branch is merged into `main-canary` while it waits upstream.
 
@@ -88,6 +90,12 @@ An upstream update involves the contribution branches as well as the three long-
 A good starting point is fetching `origin` with pruning and fetching `upstream`, then reviewing the upstream changes alongside the local branches, their remote counterparts, and any linked worktrees. Uncommitted work needs to be preserved throughout the update. Looking at all of this first helps avoid overlooking a contribution just because it is checked out somewhere else.
 
 The upstream main branch is merged into `main` without squashing, preserving the original history. If `origin/main` already has the update, it can be used after checking that it matches `upstream/main`.
+
+### Reviewing incoming Clock You changes
+
+Before carrying the updated `main` into contribution branches or `main-canary`, review every newly imported Clock You commit and the resulting code against the applicable standards in `AGENTS.md` and the surrounding implementation. Check features, fixes, and refactors for behavior and interactions with active contributions. Report any concrete deviation to me with the upstream commit, affected code, relevant standard, practical effect, and recommended correction; say when the review finds no actionable issues.
+
+For a Clock You-owned issue worth correcting upstream, consider a contribution branch for its specific area from the updated `main`; use separate branches when the review finds issues in different areas. Keep `main` identical to upstream, verify each correction on its branch, and bring the branches into `main-canary` and then `jay` with the other pending contributions. State dependencies and overlapping changes when a correction relates to another contribution. Review the integrated behavior again during final verification.
 
 ### Keeping contributions current
 
