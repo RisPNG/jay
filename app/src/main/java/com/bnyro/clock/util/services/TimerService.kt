@@ -244,11 +244,11 @@ class TimerService : Service() {
         player.isLooping = true
         player.setAudioAttributes(NotificationHelper.audioAttributes)
         player.prepare()
-        player.start()
         volumeRamp = VolumeRamp(
             player,
             Preferences.instance.getInt(Preferences.timerVolumeRampSecondsKey, 0)
         ).apply { start() }
+        player.start()
     }
 
     /**
