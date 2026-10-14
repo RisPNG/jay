@@ -36,7 +36,7 @@ data class TimerSettings(
     val repeatCount: Int = 0
 ) : Parcelable {
     companion object {
-        const val DEFAULT_TIMEOUT_MINUTES = 10
+        const val DEFAULT_TIMEOUT_MINUTES = 5
 
         private val exampleTimers = listOf(
             60 * 5,
