@@ -382,8 +382,4 @@
     <string name="toggle_selected_alarms_confirmation">Turn each selected alarm on if it is off, or off if it is on?</string>
     <string name="toggle">Toggle</string>
     <string name="option_information">About %1$s</string>
-    <string name="snooze_info">Postpone this ring by the selected number of minutes from its scheduled start. If that time has passed, ring again at the next clock minute. The next ring gets a fresh timeout.</string>
-    <string name="alarm_repeat_info">Repeat on the selected weekdays. Turn this off to ring once at the next scheduled time.</string>
-    <string name="repeats_for_info">Choose how long each repeating run lasts. Selected weekdays still control which days ring within a weekly run.</string>
-    <string name="upcoming_alarm_info">Show a reminder this long before an alarm is due to ring.</string>
 </resources>
