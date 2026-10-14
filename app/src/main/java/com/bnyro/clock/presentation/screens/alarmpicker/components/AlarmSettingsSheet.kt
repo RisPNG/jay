@@ -56,7 +56,6 @@ import com.bnyro.clock.presentation.components.ClockTimePicker
 import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.presentation.components.LabelColorPreference
-import com.bnyro.clock.presentation.components.InfoButton
 import com.bnyro.clock.presentation.components.ScrollPickerDialog
 import com.bnyro.clock.presentation.components.SwitchWithDivider
 import com.bnyro.clock.presentation.features.RingtonePickerDialog
@@ -294,16 +293,10 @@ fun AlarmPicker(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = stringResource(R.string.timeout_after),
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                            InfoButton(
-                                title = stringResource(R.string.timeout_after),
-                                explanation = stringResource(R.string.alarm_timeout_info)
-                            )
-                        }
+                        Text(
+                            text = stringResource(R.string.timeout_after),
+                            style = MaterialTheme.typography.titleLarge
+                        )
                         Text(
                             text = pluralStringResource(
                                 R.plurals.duration_minutes,
