@@ -56,7 +56,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
-import com.bnyro.clock.presentation.components.InfoButton
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.RepeatAnchor
 import com.bnyro.clock.domain.model.RepeatUnit
@@ -135,7 +134,6 @@ fun RecurrencePicker(
     if (!advanced) {
         SwitchItem(
             title = stringResource(R.string.repeat),
-            info = stringResource(R.string.alarm_repeat_info),
             isChecked = endOccurrences != 1,
             onClick = { repeats -> onEndChange(null, 1.takeUnless { repeats }) },
             icon = Icons.Rounded.EventRepeat
@@ -204,17 +202,10 @@ fun RecurrencePicker(
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(R.string.repeats_for),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-                InfoButton(
-                    title = stringResource(R.string.repeats_for),
-                    explanation = stringResource(R.string.repeats_for_info)
-                )
-            }
+            Text(
+                text = stringResource(R.string.repeats_for),
+                style = MaterialTheme.typography.titleLarge
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
