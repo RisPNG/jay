@@ -107,7 +107,6 @@ fun SwitchWithDivider(
 fun SwitchItem(
     title: String,
     description: String? = null,
-    info: String? = null,
     icon: ImageVector? = null,
     isChecked: Boolean = true,
     enabled: Boolean = true,
@@ -146,10 +145,7 @@ fun SwitchItem(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f, fill = false))
-                    info?.let { InfoButton(title = title, explanation = it) }
-                }
+                Text(text = title, style = MaterialTheme.typography.titleLarge)
                 if (!description.isNullOrEmpty()) {
                     Text(
                         text = description,
