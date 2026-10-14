@@ -449,6 +449,8 @@ class TimerService : Service() {
             val id = (timerObjects.maxOfOrNull { it.id } ?: 0) + 1
             val restored = TimerDescriptor(id, timer.settings).asScheduledObject()
             restored.currentPosition.value = timer.remainingMillis
+            restored.initialPosition.value = timer.initialMillis
+            restored.repeatIndex = timer.repeatIndex
             restored.state.value = WatchState.PAUSED
             timerObjects.add(restored)
             updateNotification(restored)
