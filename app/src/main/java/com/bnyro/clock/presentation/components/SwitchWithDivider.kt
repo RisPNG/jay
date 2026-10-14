@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -64,7 +65,15 @@ fun SwitchWithDivider(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(text = title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f, fill = false))
-                    info?.let { InfoButton(title = title, explanation = it) }
+                    info?.let {
+                        InfoButton(
+                            title = title,
+                            explanation = it,
+                            modifier = Modifier.height(with(LocalDensity.current) {
+                                MaterialTheme.typography.titleLarge.lineHeight.toDp()
+                            })
+                        )
+                    }
                 }
                 if (!description.isNullOrEmpty()) {
                     Text(
