@@ -21,7 +21,10 @@ data class TimerDescriptor(
             vibrate = settings.vibrate,
             vibrationPattern = settings.vibrationPattern,
             vibrationPatternName = settings.vibrationPatternName,
-            incrementSeconds = settings.incrementSeconds
+            incrementSeconds = settings.incrementSeconds,
+            timeoutMinutes = settings.timeoutMinutes,
+            repeatEnabled = settings.repeatEnabled,
+            repeatCount = settings.repeatCount
         )
     }
 }
