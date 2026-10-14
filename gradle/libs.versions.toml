@@ -26,6 +26,7 @@ androidx-appcompat = "1.8.0"
 json = "1.11.0"
 sdp-android = "1.1.1"
 compose-ui = "1.12.0"
+foundation = "1.12.1"
 
 [libraries]
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
@@ -62,6 +63,7 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 
 #Kotlin Extensions and Coroutines support for Room
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room"}
+androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }

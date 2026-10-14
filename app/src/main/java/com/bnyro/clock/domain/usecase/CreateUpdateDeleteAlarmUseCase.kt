@@ -1,8 +1,6 @@
 package com.bnyro.clock.domain.usecase
 
 import android.content.Context
-import android.os.Build
-import androidx.annotation.RequiresApi
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.util.AlarmHelper
@@ -12,7 +10,6 @@ class CreateUpdateDeleteAlarmUseCase(
     private val context: Context,
     private val alarmRepository: AlarmRepository
 ) {
-    @RequiresApi(Build.VERSION_CODES.M)
     suspend fun createAlarm(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()): Long {
         alarm.snoozedUntil = null
         alarm.dismissedAt = null
@@ -23,7 +20,6 @@ class CreateUpdateDeleteAlarmUseCase(
         return newId
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
     suspend fun updateAlarm(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()) {
         alarm.snoozedUntil = null
         alarm.dismissedAt = null
@@ -40,7 +36,6 @@ class CreateUpdateDeleteAlarmUseCase(
         if (AlarmHelper.hasRecurrenceEnded(alarm, timeZone)) alarm.enabled = false
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
     suspend fun dismissUpcomingAlarm(alarm: Alarm) {
         if (alarm.snoozedUntil == null &&
             alarm.dismissedAt?.let { it > System.currentTimeMillis() } == true
@@ -58,7 +53,6 @@ class CreateUpdateDeleteAlarmUseCase(
     }
 
     suspend fun deleteAlarm(alarm: Alarm) {
-
         alarmRepository.deleteAlarm(alarm)
         AlarmHelper.cancel(context, alarm)
     }

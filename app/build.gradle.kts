@@ -156,6 +156,7 @@ android {
 
 dependencies {
 
+    implementation(libs.androidx.foundation)
     // Core And UI
     implementation(libs.core.ktx)
     implementation(libs.androidx.appcompat)
