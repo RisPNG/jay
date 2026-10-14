@@ -27,6 +27,7 @@
     <string name="selected_count">%1$d selected</string>
     <string name="timer_finished">Timer finished</string>
     <string name="stop">Stop</string>
+    <string name="close">Close</string>
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>
     <string name="label">Label</string>
