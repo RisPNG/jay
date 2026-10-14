@@ -19,7 +19,7 @@ import com.bnyro.clock.domain.model.TimeZone
 
 @Database(
     entities = [TimeZone::class, Alarm::class],
-    version = 17,
+    version = 18,
     autoMigrations = [
         AutoMigration(
             from = 2,
@@ -116,6 +116,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE alarms ADD COLUMN timeoutMinutes INTEGER NOT NULL DEFAULT 5")
+                db.execSQL("ALTER TABLE alarms ADD COLUMN missedRestartEnabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE alarms ADD COLUMN missedRestartMinutes INTEGER NOT NULL DEFAULT 10")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val targetContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -143,7 +151,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_7_8,
                         MIGRATION_11_12,
                         MIGRATION_12_13,
-                        MIGRATION_16_17
+                        MIGRATION_16_17,
+                        MIGRATION_17_18
                     )
                     .build()
                 INSTANCE = instance

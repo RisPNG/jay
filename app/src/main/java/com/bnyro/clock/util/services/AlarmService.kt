@@ -9,6 +9,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
@@ -48,9 +50,12 @@ class AlarmService : Service() {
     private var isPlaying = false
     private var vibrator: Vibrator? = null
     private var mediaPlayer: MediaPlayer? = null
+    private lateinit var audioManager: AudioManager
+    private var audioFocusRequest: AudioFocusRequest? = null
     private var currentAlarm: Alarm? = null
     private var occurrenceId: String? = null
     private var outcomeRecorded = false
+    private var currentRingTime: Long? = null
     private var alertScreenVisible = false
 
     private val timeoutHandler = Handler(Looper.getMainLooper())
@@ -106,6 +111,7 @@ class AlarmService : Service() {
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate() {
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         ContextCompat.registerReceiver(
             this,
@@ -141,6 +147,26 @@ class AlarmService : Service() {
             "${SocialPreferences.alarmOccurrencePrefix}${alarm.id}",
             null
         ) ?: "${alarm.id}:${System.currentTimeMillis()}"
+        var triggerTime = intent?.getLongExtra(
+            AlarmHelper.EXTRA_TRIGGER_TIME,
+            System.currentTimeMillis()
+        ) ?: System.currentTimeMillis()
+        val timeoutMillis = alarm.timeoutMinutes * 60_000L
+        val now = System.currentTimeMillis()
+        if (alarm.missedRestartEnabled && now >= triggerTime + timeoutMillis) {
+            val cycleMillis = timeoutMillis + alarm.missedRestartMinutes * 60_000L
+            triggerTime += (now - triggerTime) / cycleMillis * cycleMillis
+            if (now >= triggerTime + timeoutMillis) {
+                AlarmHelper.snooze(
+                    this,
+                    alarm,
+                    snoozedUntil = triggerTime + cycleMillis
+                )
+                if (!isPlaying || currentAlarm?.id == alarm.id) stopSelf()
+                return START_STICKY
+            }
+        }
+        currentRingTime = triggerTime
         val notification = createNotification(this, alarm)
         startForeground(notificationId, notification)
 
@@ -153,12 +179,15 @@ class AlarmService : Service() {
             putExtra(EXTRA_OCCURRENCE_ID, occurrenceId)
         }
         startActivity(alarmActivityIntent)
-        val alarmTimeoutMinutes = Preferences.instance.getInt(
-            Preferences.alarmTimeoutMinutesKey,
-            ALARM_TIMEOUT_MINUTES
-        )
+        val deadlineAt = triggerTime + timeoutMillis
         timeoutHandler.postDelayed({
-            if (Permission.NotificationPermission.hasPermission(this@AlarmService)) {
+            if (alarm.missedRestartEnabled) {
+                AlarmHelper.snooze(
+                    this@AlarmService,
+                    alarm,
+                    snoozedUntil = deadlineAt + alarm.missedRestartMinutes * 60_000L
+                )
+            } else if (Permission.NotificationPermission.hasPermission(this@AlarmService)) {
                 val contentIntent = PendingIntent.getActivity(
                     this@AlarmService,
                     alarm.id.toInt(),
@@ -189,8 +218,8 @@ class AlarmService : Service() {
                         .setContentText(
                             resources.getQuantityString(
                                 R.plurals.alarm_rang_for_minutes,
-                                alarmTimeoutMinutes,
-                                alarmTimeoutMinutes
+                                alarm.timeoutMinutes,
+                                alarm.timeoutMinutes
                             )
                         )
                         .setContentIntent(contentIntent)
@@ -204,7 +233,7 @@ class AlarmService : Service() {
                 SocialAlarmEvents.ignore(this@AlarmService, it.id, occurrenceId, "timed_out")
             }
             stopSelf()
-        }, alarmTimeoutMinutes * 60 * 1000L)
+        }, (deadlineAt - System.currentTimeMillis()).coerceAtLeast(0L))
         return START_STICKY
     }
 
@@ -255,7 +284,7 @@ class AlarmService : Service() {
         /* Start the vibrator after everything is ok with the media player */
         if (alarm.vibrate) {
             val vibrationPattern = alarm.vibrationPattern.map(Int::toLong).toLongArray()
-            vibrator!!.vibrate(vibrationPattern, 0)
+            vibrator!!.vibrate(vibrationPattern, 0, NotificationHelper.audioAttributes)
         } else {
             vibrator!!.cancel()
         }
@@ -266,12 +295,27 @@ class AlarmService : Service() {
         player.isLooping = true
         player.setAudioAttributes(NotificationHelper.audioAttributes)
         player.prepare()
-        player.start()
         volumeRamp?.cancel()
+        val focusResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(NotificationHelper.audioAttributes)
+                .build()
+            audioFocusRequest = request
+            audioManager.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                null,
+                AudioManager.STREAM_ALARM,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+            )
+        }
+        if (focusResult != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return
         volumeRamp = VolumeRamp(
             player,
             Preferences.instance.getInt(Preferences.alarmVolumeRampSecondsKey, 0)
         ).apply { start() }
+        player.start()
     }
     /**
      * Stops alarm
@@ -288,6 +332,13 @@ class AlarmService : Service() {
             mediaPlayer?.stop()
             mediaPlayer?.release()
             mediaPlayer = null
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(null)
         }
         NotificationManagerCompat.from(this).cancel(notificationId)
         // Stop vibrator
@@ -341,7 +392,7 @@ class AlarmService : Service() {
             getString(R.string.dismiss),
             getPendingIntent(dismissIntent, 2)
         )
-        val targetAlarmTimeMs = AlarmHelper.getAlarmTime(alarm) ?: System.currentTimeMillis()
+        val targetAlarmTimeMs = currentRingTime ?: System.currentTimeMillis()
 
         return NotificationCompat.Builder(context, NotificationHelper.ALARM_CHANNEL).apply {
             val formattedTime = TimeHelper.formatTime(
@@ -403,7 +454,6 @@ class AlarmService : Service() {
         const val ALERT_HIDDEN_ACTION = "ALERT_HIDDEN"
         const val CANCEL_SHARED_ALARM_INTENT_ACTION = "com.rispng.jay.CANCEL_SHARED_ALARM"
         const val EXTRA_OCCURRENCE_ID = "com.rispng.jay.ALARM_OCCURRENCE_ID"
-        const val ALARM_TIMEOUT_MINUTES = 10
         private const val MISSED_ALARM_ID_OFFSET = 8000
 
     }

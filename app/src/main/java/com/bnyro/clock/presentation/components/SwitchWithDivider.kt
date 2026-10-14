@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 fun SwitchWithDivider(
     title: String,
     description: String? = null,
+    info: String? = null,
     icon: ImageVector? = null,
     isChecked: Boolean = true,
     enabled: Boolean = true,
@@ -69,7 +70,10 @@ fun SwitchWithDivider(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Text(text = title, style = MaterialTheme.typography.titleLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f, fill = false))
+                    info?.let { InfoButton(title = title, explanation = it) }
+                }
                 if (!description.isNullOrEmpty()) {
                     Text(
                         text = description,
@@ -103,6 +107,7 @@ fun SwitchWithDivider(
 fun SwitchItem(
     title: String,
     description: String? = null,
+    info: String? = null,
     icon: ImageVector? = null,
     isChecked: Boolean = true,
     enabled: Boolean = true,
@@ -141,7 +146,10 @@ fun SwitchItem(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Text(text = title, style = MaterialTheme.typography.titleLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f, fill = false))
+                    info?.let { InfoButton(title = title, explanation = it) }
+                }
                 if (!description.isNullOrEmpty()) {
                     Text(
                         text = description,

@@ -67,8 +67,6 @@ import com.bnyro.clock.presentation.screens.settings.components.SwitchPref
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.social.presentation.SocialSettingsSection
-import com.bnyro.clock.util.services.AlarmService
-import com.bnyro.clock.util.services.TimerService
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -82,9 +80,7 @@ fun SettingsScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState()
     )
-    var showAlarmTimeoutDialog by remember { mutableStateOf(false) }
     var showUpcomingAlarmDurationDialog by remember { mutableStateOf(false) }
-    var showTimerTimeoutDialog by remember { mutableStateOf(false) }
     var showTimerIncrementDialog by remember { mutableStateOf(false) }
     var showAlarmVolumeRampDialog by remember { mutableStateOf(false) }
     var showTimerVolumeRampDialog by remember { mutableStateOf(false) }
@@ -93,27 +89,11 @@ fun SettingsScreen(
             Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60)
         )
     }
-    var alarmTimeoutMinutes by remember {
-        mutableIntStateOf(
-            Preferences.instance.getInt(
-                Preferences.alarmTimeoutMinutesKey,
-                AlarmService.ALARM_TIMEOUT_MINUTES
-            )
-        )
-    }
     var upcomingAlarmDurationMinutes by remember {
         mutableIntStateOf(
             Preferences.instance.getInt(
                 Preferences.upcomingAlarmDuration,
                 Preferences.DEFAULT_UPCOMING_ALARM_DURATION
-            )
-        )
-    }
-    var timerTimeoutMinutes by remember {
-        mutableIntStateOf(
-            Preferences.instance.getInt(
-                Preferences.timerTimeoutMinutesKey,
-                TimerService.TIMER_TIMEOUT_MINUTES
             )
         )
     }
@@ -156,9 +136,9 @@ fun SettingsScreen(
         contract = ActivityResultContracts.CreateDocument("application/json"),
         onResult = { fileUri ->
             fileUri?.let { uri ->
-                val timers = (context as MainActivity).timerModel.scheduledObjects.value.filter { it.sharedTimerId == null }.map {
-                    BackupTimer(it.settings, it.currentPosition.value)
-                }
+                val timers = (context as MainActivity).timerModel.scheduledObjects.value
+                    .filter { it.sharedTimerId == null && !it.hasSuccessor }
+                    .map { BackupTimer(it.settings, it.currentPosition.value, it.repeatIndex, it.initialPosition.value) }
                 settingsModel.exportBackup(context, uri, timers)
             }
         }
@@ -326,19 +306,8 @@ fun SettingsScreen(
             AlarmVolumePreference()
 
             IconPreference(
-                title = stringResource(R.string.timeout_after),
-                summary = pluralStringResource(
-                    R.plurals.duration_minutes,
-                    alarmTimeoutMinutes,
-                    alarmTimeoutMinutes
-                ),
-                imageVector = Icons.Rounded.Timer
-            ) {
-                showAlarmTimeoutDialog = true
-            }
-
-            IconPreference(
                 title = stringResource(R.string.upcoming_alarm),
+                info = stringResource(R.string.upcoming_alarm_info),
                 summary = pluralStringResource(
                     R.plurals.duration_minutes,
                     upcomingAlarmDurationMinutes,
@@ -455,18 +424,6 @@ fun SettingsScreen(
             }
 
             IconPreference(
-                title = stringResource(R.string.timeout_after),
-                summary = pluralStringResource(
-                    R.plurals.duration_minutes,
-                    timerTimeoutMinutes,
-                    timerTimeoutMinutes
-                ),
-                imageVector = Icons.Rounded.Timer
-            ) {
-                showTimerTimeoutDialog = true
-            }
-
-            IconPreference(
                 title = stringResource(R.string.volume_ramp),
                 summary = volumeRampSummary(timerVolumeRampSeconds),
                 imageVector = Icons.AutoMirrored.Rounded.VolumeUp
@@ -576,22 +533,6 @@ fun SettingsScreen(
             }
         )
     }
-    if (showAlarmTimeoutDialog) {
-        ScrollPickerDialog(
-            onDismissRequest = { showAlarmTimeoutDialog = false },
-            title = stringResource(R.string.select_alarm_timeout),
-            unit = stringResource(R.string.minutes),
-            value = alarmTimeoutMinutes,
-            maxValue = 120,
-            offset = 1,
-            label = { it.toString() },
-            onValueSet = {
-                alarmTimeoutMinutes = it
-                Preferences.edit { putInt(Preferences.alarmTimeoutMinutesKey, it) }
-                showAlarmTimeoutDialog = false
-            }
-        )
-    }
     if (showUpcomingAlarmDurationDialog) {
         ScrollPickerDialog(
             onDismissRequest = { showUpcomingAlarmDurationDialog = false },
@@ -605,22 +546,6 @@ fun SettingsScreen(
                 upcomingAlarmDurationMinutes = minutes
                 settingsModel.updateUpcomingAlarmDuration(context, minutes)
                 showUpcomingAlarmDurationDialog = false
-            }
-        )
-    }
-    if (showTimerTimeoutDialog) {
-        ScrollPickerDialog(
-            onDismissRequest = { showTimerTimeoutDialog = false },
-            title = stringResource(R.string.select_timer_timeout),
-            unit = stringResource(R.string.minutes),
-            value = timerTimeoutMinutes,
-            maxValue = 120,
-            offset = 1,
-            label = { it.toString() },
-            onValueSet = {
-                timerTimeoutMinutes = it
-                Preferences.edit { putInt(Preferences.timerTimeoutMinutesKey, it) }
-                showTimerTimeoutDialog = false
             }
         )
     }

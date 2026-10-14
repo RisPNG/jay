@@ -20,6 +20,14 @@ data class TimerObject(
     var vibrationPattern: List<Int> = listOf(0, 1000, 1000, 1000, 1000),
     var vibrationPatternName: String = "Default",
     var incrementSeconds: Int? = null,
+    var timeoutMinutes: Int = TimerSettings.DEFAULT_TIMEOUT_MINUTES,
+    var repeatEnabled: Boolean = false,
+    var repeatCount: Int = 0,
+    var repeatIndex: Int = 0,
+    var repeatDurationMillis: Int = initialPosition.value,
+    var hasSuccessor: Boolean = false,
+    var expiresAt: Long = 0L,
+    var elapsedRealtimeDeadline: Long = 0L,
     var sharedTimerId: String? = null,
     var sharedExpiresAt: Long = 0L,
     var sharedGroupName: String? = null,
@@ -37,7 +45,7 @@ data class TimerObject(
 
     val settings: TimerSettings
         get() = TimerSettings(
-            seconds = initialPosition.value / 1000,
+            seconds = (if (repeatEnabled) repeatDurationMillis else initialPosition.value) / 1000,
             label = label.value,
             labelColor = labelColor.value,
             soundName = soundName,
@@ -46,6 +54,9 @@ data class TimerObject(
             vibrate = vibrate,
             vibrationPattern = vibrationPattern,
             vibrationPatternName = vibrationPatternName,
-            incrementSeconds = incrementSeconds
+            incrementSeconds = incrementSeconds,
+            timeoutMinutes = timeoutMinutes,
+            repeatEnabled = repeatEnabled,
+            repeatCount = repeatCount
         )
 }

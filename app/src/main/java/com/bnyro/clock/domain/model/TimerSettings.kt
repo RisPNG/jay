@@ -31,9 +31,14 @@ data class TimerSettings(
     val vibrationPattern: List<Int> = listOf(0, 1000, 1000, 1000, 1000),
     val vibrationPatternName: String = "Default",
     val incrementSeconds: Int? = null,
-    val groupId: String? = null
+    val groupId: String? = null,
+    val timeoutMinutes: Int = DEFAULT_TIMEOUT_MINUTES,
+    val repeatEnabled: Boolean = false,
+    val repeatCount: Int = 0
 ) : Parcelable {
     companion object {
+        const val DEFAULT_TIMEOUT_MINUTES = 10
+
         private val exampleTimers = listOf(
             60 * 5,
             60 * 10,

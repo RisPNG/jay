@@ -5,6 +5,7 @@ import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.util.AlarmHelper
 import java.time.ZoneId
+import java.time.LocalDate
 
 class CreateUpdateDeleteAlarmUseCase(
     private val context: Context,
@@ -31,6 +32,7 @@ class CreateUpdateDeleteAlarmUseCase(
     fun prepareForScheduling(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()) {
         alarm.snoozedUntil = null
         alarm.dismissedAt = null
+        if (!alarm.advanced) alarm.startDate = LocalDate.now(timeZone).toEpochDay()
         alarm.startDate = AlarmHelper.getNextRepetitionStart(alarm, timeZone)?.toEpochDay()
             ?: alarm.startDate
         if (AlarmHelper.hasRecurrenceEnded(alarm, timeZone)) alarm.enabled = false

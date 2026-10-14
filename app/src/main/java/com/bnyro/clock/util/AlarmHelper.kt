@@ -36,6 +36,7 @@ import kotlin.time.Duration.Companion.milliseconds
 //schweiny ass file
 object AlarmHelper {
     const val EXTRA_ID = "alarm_id"
+    const val EXTRA_TRIGGER_TIME = "alarm_trigger_time"
     private const val DAYS_PER_WEEK = 7
     private const val MONTHS_PER_YEAR = 12
     const val PRE_ALARM_ID_OFFSET = 4000
@@ -96,7 +97,7 @@ object AlarmHelper {
         )
 
         Log.d("AlarmHelper", "Scheduling alarm time: ${Date(triggerTime)}")
-        alarmManager.setAlarmClock(alarmInfo, getPendingIntent(context, alarm))
+        alarmManager.setAlarmClock(alarmInfo, getPendingIntent(context, alarm, triggerTime))
 
         reschedulePreAlarm(context, alarm, triggerTime)
     }
@@ -165,9 +166,11 @@ object AlarmHelper {
         alarmManager.cancel(prePi)
     }
 
-    private fun getPendingIntent(context: Context, alarm: Alarm): PendingIntent {
+    private fun getPendingIntent(context: Context, alarm: Alarm, triggerTime: Long? = null): PendingIntent {
         val intent = Intent(context.applicationContext,
-            AlarmReceiver::class.java).putExtra(EXTRA_ID, alarm.id)
+            AlarmReceiver::class.java).putExtra(EXTRA_ID, alarm.id).apply {
+            triggerTime?.let { putExtra(EXTRA_TRIGGER_TIME, it) }
+        }
         return PendingIntent.getBroadcast(context.applicationContext, alarm.id.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 

@@ -23,7 +23,7 @@ class ClockBackupUseCase(private val context: Context) {
     private val container = (context.applicationContext as App).container
 
     suspend fun capture(activeTimers: List<BackupTimer>): ClockBackup {
-        val preferences = Preferences.instance.all.filterKeys { it != Preferences.savedTimersKey && !it.startsWith("jay") }
+        val preferences = Preferences.instance.all.filterKeys { it != Preferences.savedTimersKey && !it.startsWith("jay") && it != "alarmTimeoutMinutes" && it != "timerTimeoutMinutes" }
             .mapValues { (_, value) ->
                 when (value) {
                     is Boolean -> BackupPreference("boolean", JsonPrimitive(value))
@@ -47,7 +47,7 @@ class ClockBackupUseCase(private val context: Context) {
 
     suspend fun restore(backup: ClockBackup) {
         require(backup.version in 1..2)
-        val preferences = backup.preferences?.filterKeys { !it.startsWith("jay") }?.mapValues { (_, preference) ->
+        val preferences = backup.preferences?.filterKeys { !it.startsWith("jay") && it != "alarmTimeoutMinutes" && it != "timerTimeoutMinutes" }?.mapValues { (_, preference) ->
             when (preference.type) {
                 "boolean" -> preference.value.jsonPrimitive.boolean
                 "int" -> preference.value.jsonPrimitive.int
