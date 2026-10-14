@@ -53,7 +53,7 @@ abstract class RingingActivity : ComponentActivity() {
     private val gravitySensor: Sensor? by lazy {
         sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
     }
-    private var facingDownInitially: Boolean? = null
+    private var facingDown: Boolean? = null
 
     private val closeAlertReciever = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -67,14 +67,12 @@ abstract class RingingActivity : ComponentActivity() {
             val gravityThreshold = SensorManager.GRAVITY_EARTH * 0.95f
 
             if (event.sensor.type == Sensor.TYPE_GRAVITY) {
-                val isDown = event.values[2] < -gravityThreshold
-                if (facingDownInitially == null) {
-                    facingDownInitially = isDown
-                    return
-                }
-                if (isDown && facingDownInitially != true) {
-                    dismiss()
-                }
+                val (x, y, z) = event.values
+                if (x * x + y * y + z * z < gravityThreshold * gravityThreshold) return
+                val isDown = z < -gravityThreshold
+                val wasDown = facingDown
+                facingDown = isDown
+                if (isDown && wasDown == false) dismiss()
             }
         }
 
@@ -145,6 +143,7 @@ abstract class RingingActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        facingDown = null
         gravitySensor?.let {
             sensorManager.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
