@@ -9,14 +9,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.bnyro.clock.R
 
 @Composable
-fun InfoButton(title: String, explanation: String) {
+fun InfoButton(title: String, explanation: String, modifier: Modifier = Modifier) {
     var showInformation by rememberSaveable { mutableStateOf(false) }
 
     ClickableIcon(
+        modifier = modifier,
         imageVector = Icons.Outlined.Info,
         contentDescription = stringResource(R.string.option_information, title),
         onClick = { showInformation = true }
