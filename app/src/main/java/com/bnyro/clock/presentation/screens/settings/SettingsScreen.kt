@@ -324,7 +324,6 @@ fun SettingsScreen(
             }
             IconPreference(
                 title = stringResource(R.string.upcoming_alarm),
-                info = stringResource(R.string.upcoming_alarm_info),
                 summary = pluralStringResource(
                     R.plurals.duration_minutes,
                     upcomingAlarmDurationMinutes,
