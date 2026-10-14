@@ -241,7 +241,6 @@ fun AlarmPicker(
                 )
                 SwitchWithDivider(
                     title = stringResource(R.string.snooze),
-                    info = stringResource(R.string.snooze_info),
                     description = with(snoozeMinutes) {
                         pluralStringResource(
                             id = R.plurals.duration_minutes,
