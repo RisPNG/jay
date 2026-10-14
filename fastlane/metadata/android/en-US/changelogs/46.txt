@@ -1,0 +1,8 @@
+• Add repeating timers and per-item ringing timeouts.
+• Restart missed alarms after a chosen delay until dismissed.
+• Synchronise shared timer repeats and alarm restarts.
+• Count snoozes from when ringing began.
+• Improve audio focus, volume ramps, and face-down dismissal.
+• Fix alarm rearming, upcoming reminders, and backup imports.
+• Explain Missed restart in a popup with consistent text spacing.
+• Tap stopwatch digits to start or pause.
