@@ -16,6 +16,7 @@ import com.bnyro.clock.domain.model.TimerObject
 import com.bnyro.clock.domain.model.WatchState
 import com.bnyro.clock.util.services.TimerService
 import com.bnyro.clock.social.domain.MembershipAccessDto
+import com.bnyro.clock.social.domain.DeviceCapabilities
 import com.bnyro.clock.social.domain.SharedTimerDto
 import com.bnyro.clock.social.domain.SocialGroupDto
 import com.bnyro.clock.social.domain.SyncedResource
@@ -38,6 +39,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Robolectric
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -52,8 +54,17 @@ class SharedTimerOperationTest {
     @Before
     fun setUp() = runBlocking {
         context = ApplicationProvider.getApplicationContext<Context>()
+        shadowOf(context.packageManager).setInstallSourceInfo(context.packageName, null, null)
         Preferences.init(context)
         Preferences.instance.edit().clear().commit()
+        val server = SocialRepository.DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, server)
+        Preferences.edit {
+            putString(SocialPreferences.capabilitiesServerKey, server)
+            putString(SocialPreferences.capabilitiesDeviceKey, identity.id)
+            putString(SocialPreferences.capabilitiesInstallationKey, "")
+            putString(SocialPreferences.capabilitiesKey, Json.encodeToString(DeviceCapabilities(advancedGroupTiming = true)))
+        }
         social = Room.inMemoryDatabaseBuilder(context, SocialDatabase::class.java).build()
         alarms = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         repository = SocialRepository(context, social, AlarmRepository(alarms.alarmsDao()))

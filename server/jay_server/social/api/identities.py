@@ -98,7 +98,7 @@ class PushSubscriptionView(APIView):
 
 
 class CapabilitiesView(APIView):
-    @extend_schema(responses={200: {"type": "object", "properties": {"shared_sound_upload": {"type": "boolean"}, "requires_play_entitlement": {"type": "boolean"}, "expires_at": {"type": "string", "format": "date-time", "nullable": True}}, "required": ["shared_sound_upload", "requires_play_entitlement", "expires_at"]}})
+    @extend_schema(responses={200: {"type": "object", "properties": {"shared_sound_upload": {"type": "boolean"}, "requires_play_entitlement": {"type": "boolean"}, "expires_at": {"type": "string", "format": "date-time", "nullable": True}, "advanced_group_timing": {"type": "boolean"}}, "required": ["shared_sound_upload", "requires_play_entitlement", "expires_at", "advanced_group_timing"]}})
     def get(self, request):
         return Response(identity_capabilities(request.user, request.auth))
 

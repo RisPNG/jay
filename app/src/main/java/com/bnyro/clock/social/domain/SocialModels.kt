@@ -162,7 +162,8 @@ data class PlayEntitlementVerification(
 data class DeviceCapabilities(
     @SerialName("shared_sound_upload") val sharedSoundUpload: Boolean = false,
     @SerialName("requires_play_entitlement") val requiresPlayEntitlement: Boolean = true,
-    @SerialName("expires_at") val expiresAt: String? = null
+    @SerialName("expires_at") val expiresAt: String? = null,
+    @SerialName("advanced_group_timing") val advancedGroupTiming: Boolean = false
 ) {
     fun canUploadSharedSounds(now: java.time.Instant = java.time.Instant.now()): Boolean =
         sharedSoundUpload && (!requiresPlayEntitlement ||

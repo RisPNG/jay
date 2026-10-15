@@ -82,6 +82,7 @@ fun AlarmPicker(
     currentGroupId: String?,
     canSave: Boolean = true,
     canUploadSharedSounds: Boolean = false,
+    canUseAdvancedGroupTiming: Boolean = false,
     busy: Boolean = false,
     soundProgress: SharedSoundProgress? = null,
     onSave: (Alarm, String?) -> Unit,
@@ -132,6 +133,7 @@ fun AlarmPicker(
     var soundEnabled by remember { mutableStateOf(currentAlarm.soundEnabled) }
     var selectedGroupId by remember { mutableStateOf(currentGroupId) }
     var groupMenuExpanded by remember { mutableStateOf(false) }
+    val timingEditable = selectedGroupId == null || canUseAdvancedGroupTiming
 
     val initialTime = remember { TimeHelper.millisToTime(currentAlarm.time) }
     var hours by remember { mutableIntStateOf(initialTime.hours) }
@@ -291,32 +293,34 @@ fun AlarmPicker(
                     )
                 }
                 LabelColorPreference(color = labelColor, onColorSelected = { labelColor = it })
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = canSave) { showTimeoutDialog = true }
-                        .padding(8.dp, 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Timer,
-                        contentDescription = null,
-                        modifier = Modifier.padding(start = 8.dp, end = 16.dp).size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.timeout_after),
-                            style = MaterialTheme.typography.titleLarge
+                if (timingEditable) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = canSave) { showTimeoutDialog = true }
+                            .padding(8.dp, 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Timer,
+                            contentDescription = null,
+                            modifier = Modifier.padding(start = 8.dp, end = 16.dp).size(24.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(
-                            text = pluralStringResource(
-                                R.plurals.duration_minutes,
-                                timeoutMinutes,
-                                timeoutMinutes
-                            ),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.timeout_after),
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Text(
+                                text = pluralStringResource(
+                                    R.plurals.duration_minutes,
+                                    timeoutMinutes,
+                                    timeoutMinutes
+                                ),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 }
                 SwitchWithDivider(
@@ -373,20 +377,22 @@ fun AlarmPicker(
                         snoozeEnabled = it
                     }
                 )
-                SwitchWithDivider(
-                    title = stringResource(R.string.missed_restart),
-                    enabled = canSave,
-                    description = pluralStringResource(
-                        R.plurals.duration_minutes,
-                        missedRestartMinutes,
-                        missedRestartMinutes
-                    ),
-                    info = stringResource(R.string.missed_restart_info),
-                    isChecked = missedRestartEnabled,
-                    icon = Icons.Rounded.Replay,
-                    onClick = { showMissedRestartDialog = true },
-                    onChecked = { missedRestartEnabled = it }
-                )
+                if (timingEditable) {
+                    SwitchWithDivider(
+                        title = stringResource(R.string.missed_restart),
+                        enabled = canSave,
+                        description = pluralStringResource(
+                            R.plurals.duration_minutes,
+                            missedRestartMinutes,
+                            missedRestartMinutes
+                        ),
+                        info = stringResource(R.string.missed_restart_info),
+                        isChecked = missedRestartEnabled,
+                        icon = Icons.Rounded.Replay,
+                        onClick = { showMissedRestartDialog = true },
+                        onChecked = { missedRestartEnabled = it }
+                    )
+                }
             }
         }
 
@@ -425,8 +431,8 @@ fun AlarmPicker(
                         soundUri = soundUri,
                         snoozeEnabled = snoozeEnabled,
                         snoozeMinutes = snoozeMinutes,
-                        timeoutMinutes = timeoutMinutes,
-                        missedRestartEnabled = missedRestartEnabled,
+                        timeoutMinutes = if (timingEditable) timeoutMinutes else 10,
+                        missedRestartEnabled = timingEditable && missedRestartEnabled,
                         missedRestartMinutes = missedRestartMinutes,
                         soundEnabled = soundEnabled,
                         vibrationPattern = vibrationPattern,
@@ -496,7 +502,7 @@ fun AlarmPicker(
             }
         )
     }
-    if (showMissedRestartDialog) {
+    if (showMissedRestartDialog && timingEditable) {
         ScrollPickerDialog(
             onDismissRequest = { showMissedRestartDialog = false },
             title = stringResource(R.string.select_missed_restart_time),
@@ -511,7 +517,7 @@ fun AlarmPicker(
             }
         )
     }
-    if (showTimeoutDialog) {
+    if (showTimeoutDialog && timingEditable) {
         ScrollPickerDialog(
             onDismissRequest = { showTimeoutDialog = false },
             title = stringResource(R.string.select_alarm_timeout),

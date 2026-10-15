@@ -14,6 +14,11 @@ from jay_server.social.worker import process_deadlines
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
+@pytest.fixture(autouse=True)
+def modern_alarm_timing(settings):
+    settings.LEGACY_CLIENT_SUPPORT = False
+
+
 def test_restart_keeps_the_final_occurrence_pending_at_1815_and_1830_without_manual_snooze(client, group, alarm_payload, monkeypatch):
     trigger = timezone.now().replace(hour=18, minute=0, second=0, microsecond=0)
     alarm_payload.update(local_time_ms=18 * 3600000, start_date=trigger.date().isoformat(), end_occurrences=1, snooze_enabled=False, timeout_minutes=5, missed_restart_enabled=True, missed_restart_minutes=10)
@@ -226,7 +231,7 @@ def test_legacy_occurrence_registration_uses_the_alarm_timeout(client, group, al
     assert parse_datetime(response.data["deadline_at"]) == trigger + timedelta(minutes=5)
 
 
-def test_alarm_restart_migration_resets_defaults_and_only_pending_phase_deadlines(client, group):
+def test_alarm_restart_migration_preserves_legacy_defaults_and_occurrence_deadlines(client, group):
     before = [("social", "0008_occurrence_snoozed_until")]
     executor = MigrationExecutor(connection)
     after = executor.loader.graph.leaf_nodes()
@@ -238,6 +243,7 @@ def test_alarm_restart_migration_resets_defaults_and_only_pending_phase_deadline
         occurrences = apps.get_model("social", "AlarmOccurrence")
         for key, state, snoozed_until, deadline in [
             ("initial", "pending", None, trigger + timedelta(minutes=10)),
+            ("custom", "pending", None, trigger + timedelta(minutes=18)),
             ("snoozed", "pending", trigger + timedelta(minutes=15), trigger + timedelta(minutes=25)),
             ("resolved", "ignored", None, trigger + timedelta(minutes=10)),
         ]:
@@ -253,14 +259,16 @@ def test_alarm_restart_migration_resets_defaults_and_only_pending_phase_deadline
     finally:
         MigrationExecutor(connection).migrate(after)
     upgraded = SharedAlarm.objects.get(pk=alarm.pk)
-    assert upgraded.timeout_minutes == 5
+    assert upgraded.timeout_minutes == 10
     assert upgraded.missed_restart_enabled is False
     assert upgraded.missed_restart_minutes == 10
     initial = AlarmOccurrence.objects.get(alarm=upgraded, occurrence_key="initial")
+    custom = AlarmOccurrence.objects.get(alarm=upgraded, occurrence_key="custom")
     snoozed = AlarmOccurrence.objects.get(alarm=upgraded, occurrence_key="snoozed")
     resolved = AlarmOccurrence.objects.get(alarm=upgraded, occurrence_key="resolved")
-    assert initial.deadline_at == trigger + timedelta(minutes=5)
-    assert snoozed.deadline_at == trigger + timedelta(minutes=20)
+    assert initial.deadline_at == trigger + timedelta(minutes=10)
+    assert custom.deadline_at == trigger + timedelta(minutes=18)
+    assert snoozed.deadline_at == trigger + timedelta(minutes=25)
     assert snoozed.snoozed_until == trigger + timedelta(minutes=15)
     assert initial.trigger_at == snoozed.trigger_at == trigger
     assert initial.cycle_date == snoozed.cycle_date == trigger.date()
@@ -270,14 +278,14 @@ def test_alarm_restart_migration_resets_defaults_and_only_pending_phase_deadline
     assert snapshot.status_code == 200, snapshot.data
     snapshot_alarm = next(item["data"] for item in snapshot.data["items"] if item["kind"] == "alarm" and item["key"] == str(alarm.pk))
     snapshot_occurrence = next(item["data"] for item in snapshot.data["items"] if item["kind"] == "occurrence" and item["key"] == str(initial.pk))
-    assert snapshot_alarm["timeout_minutes"] == 5
+    assert snapshot_alarm["timeout_minutes"] == 10
     assert snapshot_alarm["missed_restart_enabled"] is False
-    assert parse_datetime(snapshot_occurrence["deadline_at"]) == trigger + timedelta(minutes=5)
+    assert parse_datetime(snapshot_occurrence["deadline_at"]) == trigger + timedelta(minutes=10)
     assert snapshot_occurrence["snoozed_at"] is None
     delta = client.get(f"/v1/groups/{group.pk}/sync", {"cursor": checkpoint})
     assert delta.status_code == 200, delta.data
     assert delta.data["mode"] == "delta"
-    assert any(item["kind"] == "alarm" and item["data"]["timeout_minutes"] == 5 for item in delta.data["items"])
-    assert any(item["kind"] == "occurrence" and parse_datetime(item["data"]["deadline_at"]) == trigger + timedelta(minutes=5) for item in delta.data["items"])
+    assert any(item["kind"] == "alarm" and item["data"]["timeout_minutes"] == 10 for item in delta.data["items"])
+    assert any(item["kind"] == "occurrence" and parse_datetime(item["data"]["deadline_at"]) == trigger + timedelta(minutes=10) for item in delta.data["items"])
     assert "timeout_minutes" not in SyncVersion.objects.get(pk=old_alarm_version.pk).representation
     assert parse_datetime(SyncVersion.objects.get(pk=old_occurrence_version.pk).representation["deadline_at"]) == trigger + timedelta(minutes=10)

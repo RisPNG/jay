@@ -1,17 +1,14 @@
-from datetime import timedelta
-
 from django.db import migrations, models, transaction
-from django.db.models.functions import Coalesce
 
 
-def reset_pending_alarm_deadlines(apps, schema_editor):
+def initialize_alarm_timing(apps, schema_editor):
     from jay_server.social.synchronization import publish_changes
 
     alarms = apps.get_model("social", "SharedAlarm")
     occurrences = apps.get_model("social", "AlarmOccurrence")
     scopes = apps.get_model("social", "SyncScope")
     versions = apps.get_model("social", "SyncVersion")
-    occurrences.objects.filter(state="pending").update(deadline_at=Coalesce("snoozed_until", "trigger_at") + timedelta(minutes=5))
+    alarms.objects.update(timeout_minutes=10)
     for alarm in alarms.objects.filter(deleted_at=None, group__deleted_at=None).select_related("group").iterator():
         with transaction.atomic():
             scopes.objects.select_for_update().get(pk=alarm.group.scope_id)
@@ -72,5 +69,5 @@ class Migration(migrations.Migration):
             model_name="alarmoccurrence",
             constraint=models.CheckConstraint(condition=~models.Q(state="pending") | models.Q(snoozed_until=None, deadline_at__gt=models.F("trigger_at")) | models.Q(snoozed_until__isnull=False, deadline_at__gt=models.F("snoozed_until")), name="occurrence_deadline_after_ring"),
         ),
-        migrations.RunPython(reset_pending_alarm_deadlines, migrations.RunPython.noop),
+        migrations.RunPython(initialize_alarm_timing, migrations.RunPython.noop),
     ]

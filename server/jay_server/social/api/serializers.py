@@ -1,10 +1,12 @@
 from datetime import timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from django.conf import settings
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers
 
+from ..errors import DomainError
 from ..models import ActivityKind, AlarmPermission, AlarmTimeBasis, MemberRole, RepeatAnchor, RepeatUnit, SoundMode
 
 
@@ -164,6 +166,8 @@ class AlarmPayload(MemberCommand):
     sound = SoundSelection()
 
     def validate(self, data):
+        if settings.LEGACY_CLIENT_SUPPORT and (data.get("missed_restart_enabled") or data.get("timeout_minutes", 10) != 10):
+            raise DomainError("client_upgrade_required", "Shared alarm timing controls are available after support for Jay 1.2.4 is turned off", 400)
         if len(set(data["days"])) != len(data["days"]):
             raise serializers.ValidationError({"days": "Weekdays must be unique"})
         if data["end_date"] is not None and data["end_date"] < data["start_date"]:
@@ -197,6 +201,11 @@ class TimerPayload(MemberCommand):
         repeat_enabled = data.get("repeat_enabled", self.instance.repeat_enabled if self.instance is not None else False)
         repeat_count = data.get("repeat_count", self.instance.repeat_count if self.instance is not None else 0)
         repeat_index = data.get("repeat_index", self.instance.repeat_index if self.instance is not None else 0)
+        if settings.LEGACY_CLIENT_SUPPORT and (
+            data.get("repeat_enabled") or data.get("repeat_count", 0) or data.get("repeat_index", 0)
+            or data.get("timeout_minutes", 10) != 10
+        ):
+            raise DomainError("client_upgrade_required", "Shared timer timing controls are available after support for Jay 1.2.4 is turned off", 400)
         if not repeat_enabled and repeat_index != 0:
             raise serializers.ValidationError({"repeat_index": "A nonrepeating timer starts at index 0"})
         if repeat_enabled and repeat_count and repeat_index > repeat_count:

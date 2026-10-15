@@ -1,6 +1,7 @@
 from datetime import timedelta
 from uuid import uuid4
 
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -30,6 +31,7 @@ class TimerListView(APIView):
                 return Response(receipt.response, status=receipt.status)
             data.pop("membership_id")
             selection = data.pop("sound")
+            data.setdefault("timeout_minutes", 10 if settings.LEGACY_CLIENT_SUPPORT else 5)
             sound = select_shared_sound(group, request.user, selection, installation=request.auth)
             timer = SharedTimer.objects.create(**data, group=group, sound=sound, sound_mode=selection["mode"], started_by=request.user, save_id=receipt.operation_id)
             changes = [("timer", str(timer.pk), "upsert", TimerRepresentation(timer).data, None)]
@@ -100,12 +102,18 @@ class TimerOccurrenceView(APIView):
         serializer = TimerOccurrenceCommand(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        timer = get_object_or_404(SharedTimer.objects.select_related("group"), pk=timer_id, deleted_at=None)
+        timer = get_object_or_404(SharedTimer.objects.select_related("group"), pk=timer_id)
         with mutation(request, data, [timer.group.scope_id]) as receipt:
-            timer = get_object_or_404(SharedTimer.objects.select_for_update().select_related("group"), pk=timer_id, deleted_at=None)
+            timer = get_object_or_404(SharedTimer.objects.select_for_update().select_related("group"), pk=timer_id)
             member = require_membership(timer.group, request.user, data["membership_id"])
             if receipt.completed_at:
                 return Response(receipt.response, status=receipt.status)
+            if timer.deleted_at is not None and not (
+                settings.LEGACY_CLIENT_SUPPORT and TimerOccurrence.objects.filter(
+                    timer=timer, membership=member, run_id=data["run_id"], repeat_index=data["repeat_index"]
+                ).exists()
+            ):
+                raise DomainError("not_found", "Timer not found", 404)
             if data["run_id"] != timer.run_id:
                 raise DomainError("run_changed", "This response belongs to an old timer run")
             index = data["repeat_index"]
@@ -124,8 +132,11 @@ class TimerOccurrenceView(APIView):
             if existing is not None:
                 receipt.status, receipt.response = 200, TimerOccurrenceRepresentation(existing).data
                 return Response(receipt.response)
+            shared_answers = timer.group.shared_answers and (
+                not settings.LEGACY_CLIENT_SUPPORT or timer.group.alarm_permission == "everyone" or member.role == "leader"
+            )
             members = GroupMembership.objects.filter(group=timer.group, removed_at=None, identity__retired_at=None).order_by("identity_id")
-            if not timer.group.shared_answers:
+            if not shared_answers:
                 members = members.filter(pk=member.pk)
             changes = []
             for recipient in members:
@@ -137,6 +148,10 @@ class TimerOccurrenceView(APIView):
                     changes.append(("timer_occurrence", str(occurrence.pk), "upsert", TimerOccurrenceRepresentation(occurrence).data, recipient.identity_id))
                 if recipient.pk == member.pk:
                     answered = occurrence
+            if settings.LEGACY_CLIENT_SUPPORT and shared_answers:
+                timer.deleted_at = now
+                timer.save(update_fields=["deleted_at"])
+                changes.append(("timer", str(timer.pk), "delete", {"id": str(timer.pk)}, None))
             if changes:
                 publish_changes(timer.group.scope_id, changes, group=timer.group, actor=request.user)
             receipt.status, receipt.response = 200, TimerOccurrenceRepresentation(answered).data

@@ -13,6 +13,7 @@ import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.presentation.screens.alarm.AlarmActivity
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
+import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.receivers.AlarmReceiver
 import com.bnyro.clock.util.services.AlarmService
 import java.time.Instant
@@ -95,6 +96,31 @@ class AlarmSnoozeAnchorTest {
         assertEquals(ringTime + 6 * 60_000L, target)
         assertEquals(target, context.container.alarmRepository.getAlarmById(alarm.id)?.snoozedUntil)
         assertEquals(target, context.getSystemService(AlarmManager::class.java).nextAlarmClock.triggerTime)
+    }
+
+    @Test
+    fun sharedCompatibilitySnoozeStartsFromTheButtonPress() = runBlocking {
+        assertTrue(SystemClock.setCurrentTimeMillis(ringTime + 100_000L))
+        Preferences.edit { putString("${SocialPreferences.alarmOccurrencePrefix}${alarm.id}", ringTime.toString()) }
+
+        val target = AlarmHelper.snooze(context, alarm, ringTime, 5)
+
+        assertEquals(ringTime + 6 * 60_000L, target)
+        assertEquals(target, context.container.alarmRepository.getAlarmById(alarm.id)?.snoozedUntil)
+    }
+
+    @Test
+    fun sharedAdvancedSnoozeKeepsTheRingAnchor() = runBlocking {
+        assertTrue(SystemClock.setCurrentTimeMillis(ringTime + 100_000L))
+        Preferences.edit {
+            putString("${SocialPreferences.alarmOccurrencePrefix}${alarm.id}", ringTime.toString())
+            putBoolean("${SocialPreferences.alarmAdvancedTimingPrefix}${alarm.id}", true)
+        }
+
+        val target = AlarmHelper.snooze(context, alarm, ringTime, 5)
+
+        assertEquals(ringTime + 5 * 60_000L, target)
+        assertEquals(target, context.container.alarmRepository.getAlarmById(alarm.id)?.snoozedUntil)
     }
 
     @Test

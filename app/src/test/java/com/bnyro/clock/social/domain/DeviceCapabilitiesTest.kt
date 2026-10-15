@@ -26,4 +26,11 @@ class DeviceCapabilitiesTest {
         assertFalse(DeviceCapabilities(false, true, now.plusSeconds(1).toString()).canUploadSharedSounds(now))
     }
 
+    @Test
+    fun advancedGroupTimingRequiresExplicitServerSupport() {
+        assertFalse(DeviceCapabilities().advancedGroupTiming)
+        assertFalse(Json.decodeFromString<DeviceCapabilities>("""{"shared_sound_upload":true}""").advancedGroupTiming)
+        assertTrue(Json.decodeFromString<DeviceCapabilities>("""{"advanced_group_timing":true}""").advancedGroupTiming)
+    }
+
 }

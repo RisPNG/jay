@@ -93,6 +93,7 @@ ANDROID_APP_LINKS = env.json("ANDROID_APP_LINKS", default={})
 INVITE_LIFETIME_HOURS = env.int("INVITE_LIFETIME_HOURS", default=24)
 PLAY_ENTITLEMENT_LIFETIME_HOURS = env.int("PLAY_ENTITLEMENT_LIFETIME_HOURS", default=48)
 SHARED_SOUND_ACCESS = env("SHARED_SOUND_ACCESS", default="play")
+LEGACY_CLIENT_SUPPORT = env.bool("LEGACY_CLIENT_SUPPORT", default=True)
 if SHARED_SOUND_ACCESS not in {"play", "everyone"}:
     from django.core.exceptions import ImproperlyConfigured
     raise ImproperlyConfigured("SHARED_SOUND_ACCESS must be play or everyone")

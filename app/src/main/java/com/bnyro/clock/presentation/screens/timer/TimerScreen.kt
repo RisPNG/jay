@@ -417,6 +417,7 @@ fun TimerScreen(
         TimerEditSheet(
             currentTimer = timer.settings,
             pickerStyle = settingsModel.timerPickerStyle,
+            canUseAdvancedGroupTiming = socialModel.canUseAdvancedGroupTiming,
             onSave = { settings ->
                 timerModel.updateTimer(timer.id, settings)
                 editedTimer = null
@@ -451,6 +452,7 @@ fun TimerScreen(
             pickerStyle = settingsModel.timerPickerStyle,
             groups = editableGroups,
             canUploadSharedSounds = socialModel.canUploadSharedSounds,
+            canUseAdvancedGroupTiming = socialModel.canUseAdvancedGroupTiming,
             onSave = { settings ->
                 timerModel.updateSavedTimer(settings)
                 editedSavedTimerId = null

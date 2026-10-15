@@ -127,10 +127,10 @@ def process_deadlines():
                 continue
             record_alarm_response(alarm, occurrence.identity, {
                 "id": uuid4(), "alarm_revision": alarm.revision,
-                "kind": "snoozed" if alarm.missed_restart_enabled else "ignored",
+                "kind": "snoozed" if alarm.missed_restart_enabled and not settings.LEGACY_CLIENT_SUPPORT else "ignored",
                 "occurred_at": occurrence.deadline_at, "occurrence_key": occurrence.occurrence_key,
-                "reason": "timed_out" if alarm.missed_restart_enabled else "deadline",
-                "snoozed_until": occurrence.deadline_at + timedelta(minutes=alarm.missed_restart_minutes) if alarm.missed_restart_enabled else None,
+                "reason": "timed_out" if alarm.missed_restart_enabled and not settings.LEGACY_CLIENT_SUPPORT else "deadline",
+                "snoozed_until": occurrence.deadline_at + timedelta(minutes=alarm.missed_restart_minutes) if alarm.missed_restart_enabled and not settings.LEGACY_CLIENT_SUPPORT else None,
             })
             progressed = True
     return progressed

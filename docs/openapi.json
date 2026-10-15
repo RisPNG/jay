@@ -1493,12 +1493,16 @@
                                             "type": "string",
                                             "format": "date-time",
                                             "nullable": true
+                                        },
+                                        "advanced_group_timing": {
+                                            "type": "boolean"
                                         }
                                     },
                                     "required": [
                                         "shared_sound_upload",
                                         "requires_play_entitlement",
-                                        "expires_at"
+                                        "expires_at",
+                                        "advanced_group_timing"
                                     ]
                                 }
                             }
@@ -2755,6 +2759,9 @@
             "CapabilitiesRepresentation": {
                 "type": "object",
                 "properties": {
+                    "advanced_group_timing": {
+                        "type": "boolean"
+                    },
                     "shared_sound_upload": {
                         "type": "boolean"
                     },
@@ -2768,6 +2775,7 @@
                     }
                 },
                 "required": [
+                    "advanced_group_timing",
                     "expires_at",
                     "requires_play_entitlement",
                     "shared_sound_upload"

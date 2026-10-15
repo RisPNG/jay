@@ -417,7 +417,9 @@ object AlarmHelper {
     fun snooze(context: Context, oldAlarm: Alarm, ringTime: Long, snoozeMinutes: Int): Long {
         val now = System.currentTimeMillis()
         val calendar = Calendar.getInstance()
-        calendar.timeInMillis = ringTime
+        calendar.timeInMillis = if (Preferences.instance.contains("${SocialPreferences.alarmOccurrencePrefix}${oldAlarm.id}") &&
+            !Preferences.instance.getBoolean("${SocialPreferences.alarmAdvancedTimingPrefix}${oldAlarm.id}", false)
+        ) now else ringTime
         calendar.add(Calendar.MINUTE, snoozeMinutes)
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)

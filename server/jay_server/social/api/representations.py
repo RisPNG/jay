@@ -86,6 +86,7 @@ class OutcomeRepresentation(serializers.ModelSerializer):
 
 
 class CapabilitiesRepresentation(serializers.Serializer):
+    advanced_group_timing = serializers.BooleanField()
     shared_sound_upload = serializers.BooleanField()
     requires_play_entitlement = serializers.BooleanField()
     expires_at = serializers.DateTimeField(allow_null=True)

@@ -50,6 +50,7 @@ The Android emulator can reach this API at `http://10.0.2.2:8000`. Use a debug b
 | `DATABASE_POOL_SIZE` | Maximum pooled connections per process; size against the database connection budget |
 | `IDENTITY_INACTIVITY_TIMEOUT_DAYS` | Removes identities unseen for this many days together with the groups they solely lead, defaulting to 120; profiles with operator-granted sound access are retained; 0 disables the sweep |
 | `SHARED_SOUND_ACCESS` | Shared-sound upload policy: `play` (default) requires a verified paid installation or an operator grant for the current profile; `everyone` grants access to every authenticated device, subject to group edit permissions |
+| `LEGACY_CLIENT_SUPPORT` | Defaults to `true` while Jay 1.2.4 clients remain in use. Shared alarms and timers keep their existing timing and shared-answer behaviour, and new group timing controls stay unavailable. Set to `false` on both web and worker only after every user has upgraded to Jay 1.2.5. Personal alarms and timers are unaffected. |
 | `B2_S3_ENDPOINT` | Backblaze B2 S3-compatible endpoint |
 | `B2_BUCKET_NAME` | Private B2 bucket that stores normalised shared sounds |
 | `B2_APPLICATION_KEY_ID` | B2 application key ID scoped to the sound bucket |
@@ -163,7 +164,7 @@ mise exec -- .venv/bin/uvicorn jay_server.asgi:application --host 0.0.0.0 --port
 mise exec -- .venv/bin/python manage.py run_worker
 ```
 
-Use `/health/live` for web liveness, `/health/ready` for database and schema readiness, and `manage.py check_worker` for worker progress and failures. Stop processes gracefully, keep database backups, and test restoration. Rolling deployments require schema compatibility between overlapping versions.
+Use `/health/live` for web liveness, `/health/ready` for database and schema readiness, and `manage.py check_worker` for worker progress and failures. Stop processes gracefully, keep database backups, and test restoration. Rolling deployments require schema compatibility between overlapping versions. Keep `LEGACY_CLIENT_SUPPORT=true` on both web and worker while any user remains on Jay 1.2.4. The API reports `advanced_group_timing=false`, and Jay 1.2.5 retains the existing shared request formats, global ringing limits, snooze timing, and stop-for-everyone timer answers. Shared repeats, missed-alarm restarts, and per-item group timing controls remain unavailable during this transition. Existing alarm deadlines and stored policies are preserved. After every user has updated, set `LEGACY_CLIENT_SUPPORT=false` on both processes and redeploy; clients receive the capability on their next synchronization. Personal scheduling does not depend on this setting.
 
 After updating a worker affected by the shared-sound verification `NotSupportedError`, run `mise exec -- .venv/bin/python manage.py retry_sound_verifications` once. Run it after every worker is updated and older workers have stopped: the command requeues failed verification jobs for sounds still awaiting verification with a fresh retry window.
 

@@ -18,6 +18,7 @@ import com.bnyro.clock.data.database.AppDatabase
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.social.domain.MembershipAccessDto
+import com.bnyro.clock.social.domain.DeviceCapabilities
 import com.bnyro.clock.social.domain.SharedAlarmDto
 import com.bnyro.clock.social.domain.SharedAlarmLink
 import com.bnyro.clock.social.domain.SharedSoundMode
@@ -60,8 +61,17 @@ class SharedAlarmRestartPhaseTest {
     @Before
     fun setUp() = runBlocking {
         context = ApplicationProvider.getApplicationContext()
+        shadowOf(context.packageManager).setInstallSourceInfo(context.packageName, null, null)
         Preferences.init(context)
         Preferences.instance.edit().clear().commit()
+        val server = SocialRepository.DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, server)
+        Preferences.edit {
+            putString(SocialPreferences.capabilitiesServerKey, server)
+            putString(SocialPreferences.capabilitiesDeviceKey, identity.id)
+            putString(SocialPreferences.capabilitiesInstallationKey, "")
+            putString(SocialPreferences.capabilitiesKey, Json.encodeToString(DeviceCapabilities(advancedGroupTiming = true)))
+        }
         social = Room.inMemoryDatabaseBuilder(context, SocialDatabase::class.java).build()
         alarms = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         context.container = AppContainer(context, alarms)
@@ -69,7 +79,10 @@ class SharedAlarmRestartPhaseTest {
         localId = alarmRepository.addAlarm(Alarm(time = 0L, enabled = false, endOccurrences = 1, missedRestartEnabled = true, soundEnabled = false, vibrate = false))
         occurrenceId = (System.currentTimeMillis() - 60_000L).toString()
         WorkManager.getInstance(context).cancelUniqueWork("jay_ignored_alarm_$localId").result.get()
-        Preferences.edit { putString("${SocialPreferences.alarmOccurrencePrefix}$localId", occurrenceId) }
+        Preferences.edit {
+            putString("${SocialPreferences.alarmOccurrencePrefix}$localId", occurrenceId)
+            putBoolean("${SocialPreferences.alarmAdvancedTimingPrefix}$localId", true)
+        }
         social.socialDao().putAlarmLink(SharedAlarmLink("alarm", localId, "group", 1, SharedSoundMode.OFF, null, null, null, "save"))
         social.socialDao().putResources(listOf(
             SyncedResource("identity", "membership", "membership", Json.encodeToString(MembershipAccessDto("membership", "group", "group", "member", true, true))),

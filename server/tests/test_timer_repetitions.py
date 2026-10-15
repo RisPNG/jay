@@ -15,6 +15,11 @@ from jay_server.social.worker import maintain_state
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
+@pytest.fixture(autouse=True)
+def advanced_group_timing(settings):
+    settings.LEGACY_CLIENT_SUPPORT = False
+
+
 def create_timer(client, group, timer_payload, **settings):
     payload = {**timer_payload, "id": str(uuid4()), **settings}
     response = client.post(f"/v1/groups/{group.pk}/timers", payload, format="json", headers={"Idempotency-Key": str(uuid4())})

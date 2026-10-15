@@ -1,7 +1,7 @@
-• Add repeating timers and per-item ringing timeouts.
-• Restart missed alarms after a chosen delay until dismissed.
-• Synchronise shared timer repeats and alarm restarts.
-• Count snoozes from when ringing began.
+• Add repeating personal timers and per-item ringing timeouts.
+• Restart missed personal alarms after a chosen delay until dismissed.
+• Keep group alarms and timers compatible with Jay 1.2.4 during upgrades.
+• Count personal alarm snoozes from when ringing began.
 • Improve audio focus, volume ramps, and face-down dismissal.
 • Fix alarm rearming, upcoming reminders, and backup imports.
 • Explain Missed restart in a popup with consistent text spacing.

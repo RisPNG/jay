@@ -131,6 +131,9 @@ class SocialRepository(
     val canUploadSharedSounds: Boolean
         get() = deviceCapabilities.canUploadSharedSounds()
 
+    val canUseAdvancedGroupTiming: Boolean
+        get() = deviceCapabilities.advancedGroupTiming
+
     private fun applyDeviceCapabilities(
         capabilities: DeviceCapabilities,
         serverUrl: String,
@@ -237,12 +240,28 @@ class SocialRepository(
         }
         val remoteGroups = synchronizedGroups.associateBy { it.id }
         val remoteGroupIds = remoteGroups.keys
+        val advancedGroupTiming = canUseAdvancedGroupTiming
         val remoteAlarms = resources.filter { it.kind == "alarm" }.map {
             json.decodeFromString<SharedAlarmDto>(it.representation)
-        }.filter { it.groupId in remoteGroupIds }.map { it.copy(soundTitle = sounds[it.soundId]?.title ?: it.soundTitle) }
+        }.filter { it.groupId in remoteGroupIds }.map {
+            it.copy(
+                soundTitle = sounds[it.soundId]?.title ?: it.soundTitle,
+                timeoutMinutes = if (advancedGroupTiming) it.timeoutMinutes else Preferences.instance.getInt(SocialPreferences.legacyAlarmTimeoutMinutesKey, 10),
+                missedRestartEnabled = advancedGroupTiming && it.missedRestartEnabled
+            )
+        }
         val remoteTimers = resources.filter { it.kind == "timer" }.map {
             json.decodeFromString<SharedTimerDto>(it.representation)
-        }.filter { it.groupId in remoteGroupIds }.map { it.copy(soundTitle = sounds[it.soundId]?.title ?: it.soundTitle) }
+        }.filter { it.groupId in remoteGroupIds }.map {
+            it.copy(
+                soundTitle = sounds[it.soundId]?.title ?: it.soundTitle,
+                runId = if (advancedGroupTiming) it.runId else it.runId ?: it.id,
+                timeoutMinutes = if (advancedGroupTiming) it.timeoutMinutes else Preferences.instance.getInt(SocialPreferences.legacyTimerTimeoutMinutesKey, 10),
+                repeatEnabled = advancedGroupTiming && it.repeatEnabled,
+                repeatCount = if (advancedGroupTiming) it.repeatCount else 0,
+                repeatIndex = if (advancedGroupTiming) it.repeatIndex else 0
+            )
+        }
         val timerOccurrences = resources.filter { it.kind == "timer_occurrence" }.map {
             json.decodeFromString<TimerOccurrenceDto>(it.representation)
         }
@@ -384,12 +403,37 @@ class SocialRepository(
                     scheduleIgnoredOutcome(it, remote.id, remote.revision)
                 }
             } else {
-                alarmRepository.getAlarmById(link.localAlarmId)?.takeIf {
-                    it.soundUri != soundUri || it.labelColor != remote.labelColor
-                }?.let {
-                    alarmRepository.updateAlarm(it.copy(soundUri = soundUri, labelColor = remote.labelColor))
+                alarmRepository.getAlarmById(link.localAlarmId)?.let { local ->
+                    val timingChanged = local.timeoutMinutes != remote.timeoutMinutes ||
+                        local.missedRestartEnabled != remote.missedRestartEnabled ||
+                        local.missedRestartMinutes != remote.missedRestartMinutes
+                    if (local.soundUri != soundUri || local.labelColor != remote.labelColor || timingChanged) {
+                        val alarm = local.copy(
+                            soundUri = soundUri, labelColor = remote.labelColor,
+                            timeoutMinutes = remote.timeoutMinutes, missedRestartEnabled = remote.missedRestartEnabled,
+                            missedRestartMinutes = remote.missedRestartMinutes
+                        )
+                        alarmRepository.updateAlarm(alarm)
+                        if (timingChanged) {
+                            AlarmHelper.enqueue(context, alarm, timeZone = timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault())
+                            val occurrenceId = Preferences.instance.getString("${SocialPreferences.alarmOccurrencePrefix}${alarm.id}", null)
+                            if (occurrenceId == null) {
+                                scheduleIgnoredOutcome(alarm, remote.id, remote.revision)
+                            } else {
+                                val deadline = Preferences.instance.getLong("${SocialPreferences.alarmDeadlinePrefix}${alarm.id}", -1L)
+                                val phaseRing = local.snoozedUntil ?: deadline.takeIf { it > 0L }?.minus(local.timeoutMinutes * 60_000L)
+                                    ?: occurrenceId.toLongOrNull()
+                                if (deadline != 0L && phaseRing != null) {
+                                    SocialIgnoredAlarmWorker.schedule(context, alarm, phaseRing, occurrenceId,
+                                        snoozedAtMillis = Preferences.instance.getLong("${SocialPreferences.alarmSnoozedAtPrefix}${alarm.id}", 0L))
+                                }
+                            }
+                        }
+                    }
                 }
             }
+            val localId = requireNotNull(socialDao.getAlarmLinkByRemoteId(remote.id)).localAlarmId
+            Preferences.edit { putBoolean("${SocialPreferences.alarmAdvancedTimingPrefix}$localId", advancedGroupTiming) }
         }
 
         val sharedAlarmIds = socialDao.getAlarmLinks().map { it.localAlarmId.toString() }.toSet()
@@ -763,6 +807,7 @@ class SocialRepository(
         onProgress: (SharedSoundProgress) -> Unit = {}
     ): Long = withContext(Dispatchers.IO) {
         val group = groups.first().first { it.id == groupId }
+        val advancedGroupTiming = canUseAdvancedGroupTiming
         val timeZone = if (group.alarmTimeBasis == AlarmTimeBasis.GROUP_TIME_ZONE) ZoneId.of(group.alarmTimeZone) else ZoneId.systemDefault()
         alarmUseCase.prepareForScheduling(alarm, timeZone)
         val soundMode = when {
@@ -772,7 +817,7 @@ class SocialRepository(
         }
         val soundId = if (soundMode == SharedSoundMode.SHARED) UUID.randomUUID().toString() else null
         val alarmId = UUID.randomUUID().toString()
-        val payload = json.encodeToJsonElement(SharedAlarmRequest(
+        val payload = JsonObject(json.encodeToJsonElement(SharedAlarmRequest(
             groupId = groupId, time = alarm.time, label = alarm.label, labelColor = alarm.labelColor, enabled = alarm.enabled,
             days = alarm.days, vibrate = alarm.vibrate, startDate = LocalDate.ofEpochDay(alarm.startDate).toString(),
             repeatInterval = alarm.repeatInterval, repeatUnit = alarm.repeatUnit.name, repeatAnchor = alarm.repeatAnchor.name,
@@ -783,7 +828,9 @@ class SocialRepository(
             vibrationPattern = alarm.vibrationPattern, vibrationPatternName = alarm.vibrationPatternName,
             sound = SharedSoundSelection(soundMode.name.lowercase(), soundId, alarm.soundName ?: "Shared sound"),
             membershipId = group.membershipId, id = alarmId
-        )).jsonObject
+        )).jsonObject.filterKeys {
+            advancedGroupTiming || it !in setOf("timeout_minutes", "missed_restart_enabled", "missed_restart_minutes")
+        })
         val optimistic = JsonObject(payload + mapOf(
             "sound_title" to JsonPrimitive(alarm.soundName ?: "Shared sound"),
             "revision" to JsonPrimitive(1), "sound_mode" to JsonPrimitive(soundMode.name.lowercase()),
@@ -800,6 +847,7 @@ class SocialRepository(
             alarmUseCase.updateAlarm(alarm)
         } else {
             val group = groups.first().first { it.id == link.groupId }
+            val advancedGroupTiming = canUseAdvancedGroupTiming
             alarmUseCase.prepareForScheduling(alarm, link.timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault())
             val local = alarmRepository.getAlarmById(alarm.id)
             val keepSound = alarm.soundEnabled && link.soundMode == SharedSoundMode.SHARED &&
@@ -821,7 +869,10 @@ class SocialRepository(
                 vibrationPattern = alarm.vibrationPattern, vibrationPatternName = alarm.vibrationPatternName,
                 sound = SharedSoundSelection(soundMode.name.lowercase(), soundId, alarm.soundName ?: "Shared sound"),
                 membershipId = group.membershipId
-            )).jsonObject.filterKeys { it !in setOf("id", "group_id") })
+            )).jsonObject.filterKeys {
+                it !in setOf("id", "group_id") && (advancedGroupTiming ||
+                    it !in setOf("timeout_minutes", "missed_restart_enabled", "missed_restart_minutes"))
+            })
             val optimistic = JsonObject(payload + mapOf(
                 "id" to JsonPrimitive(link.remoteAlarmId), "group_id" to JsonPrimitive(link.groupId),
                 "sound_title" to JsonPrimitive(alarm.soundName ?: "Shared sound"),
@@ -932,6 +983,7 @@ class SocialRepository(
         onProgress: (SharedSoundProgress) -> Unit = {}
     ) = withContext(Dispatchers.IO) {
         val group = groups.first().first { it.id == groupId }
+        val advancedGroupTiming = canUseAdvancedGroupTiming
         val soundMode = when {
             !settings.soundEnabled -> SharedSoundMode.OFF
             settings.soundUri != null && canUploadSharedSounds -> SharedSoundMode.SHARED
@@ -939,7 +991,7 @@ class SocialRepository(
         }
         val soundId = if (soundMode == SharedSoundMode.SHARED) UUID.randomUUID().toString() else null
         val timerId = UUID.randomUUID().toString()
-        val payload = json.encodeToJsonElement(SharedTimerRequest(
+        val payload = JsonObject(json.encodeToJsonElement(SharedTimerRequest(
             label = label, labelColor = settings.labelColor, durationSeconds = settings.seconds,
             incrementSeconds = settings.incrementSeconds ?: Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60),
             vibrate = settings.vibrate, vibrationPattern = settings.vibrationPattern,
@@ -949,7 +1001,9 @@ class SocialRepository(
             runId = UUID.randomUUID().toString(), timeoutMinutes = settings.timeoutMinutes,
             repeatEnabled = settings.repeatEnabled, repeatCount = settings.repeatCount,
             membershipId = group.membershipId, id = timerId
-        )).jsonObject
+        )).jsonObject.filterKeys {
+            advancedGroupTiming || it !in setOf("run_id", "timeout_minutes", "repeat_enabled", "repeat_count", "repeat_index")
+        })
         val optimistic = JsonObject(payload + mapOf(
             "sound_title" to JsonPrimitive(settings.soundName ?: "Shared sound"),
             "group_id" to JsonPrimitive(groupId), "sound_mode" to JsonPrimitive(soundMode.name.lowercase()),
@@ -982,13 +1036,19 @@ class SocialRepository(
                 if (resource == null || group == null || !group.canEditAlarms) {
                     null
                 } else {
-                    val timer = json.decodeFromString<SharedTimerDto>(resource.representation)
+                    val advancedGroupTiming = canUseAdvancedGroupTiming
+                    val timer = json.decodeFromString<SharedTimerDto>(resource.representation).let {
+                        if (advancedGroupTiming) it else it.copy(
+                            runId = it.runId ?: it.id,
+                            repeatEnabled = false, repeatCount = 0, repeatIndex = 0
+                        )
+                    }
                     val source = sourceRunId?.let { SharedTimerCommandSource(membershipId, it, sourceRepeatIndex, sourceFinished) }
                     val previous = socialDao.getLatestOperation(groupId, "timer", timerId)
                     val previousTimer = previous?.optimisticState?.let { json.decodeFromString<SharedTimerDto>(it) }
                     val followsLocalCommand = source != null && previous?.state in setOf("pending", "accepted", "confirmed") &&
                         previousTimer?.commandSource == source && previousTimer?.runId == timer.runId
-                    val currentIndex = if (adjustmentSeconds != 0 && followsLocalCommand) timer.repeatIndex else repeatIndex
+                    val currentIndex = if (!advancedGroupTiming) 0 else if (adjustmentSeconds != 0 && followsLocalCommand) timer.repeatIndex else repeatIndex
                     val adjustedExpiry = if (adjustmentSeconds == 0 || sourceFinished && !followsLocalCommand ||
                         timer.runId != sourceRunId && !followsLocalCommand
                     ) expiresAt else java.time.OffsetDateTime.parse(timer.expiresAt).toInstant().toEpochMilli() +
@@ -999,7 +1059,10 @@ class SocialRepository(
                         sound = SharedSoundSelection(timer.soundMode, timer.soundId), expiresAt = Instant.ofEpochMilli(adjustedExpiry).toString(),
                         runId = runId, timeoutMinutes = timer.timeoutMinutes, repeatEnabled = timer.repeatEnabled,
                         repeatCount = timer.repeatCount, repeatIndex = currentIndex, membershipId = membershipId
-                    )).jsonObject.filterKeys { it != "id" })
+                    )).jsonObject.filterKeys {
+                        it != "id" && (advancedGroupTiming ||
+                            it !in setOf("run_id", "timeout_minutes", "repeat_enabled", "repeat_count", "repeat_index"))
+                    })
                     payload to JsonObject(Json.parseToJsonElement(resource.representation).jsonObject + payload +
                         ("command_source" to (source?.let { json.encodeToJsonElement(it) } ?: kotlinx.serialization.json.JsonNull)))
                 }
@@ -1027,7 +1090,7 @@ class SocialRepository(
         operationId: String,
         occurredAt: Long
     ) = withContext(Dispatchers.IO) {
-        if (groups.first().none { it.id == groupId && it.membershipId == membershipId }) return@withContext
+        val group = groups.first().firstOrNull { it.id == groupId && it.membershipId == membershipId } ?: return@withContext
         socialDao.putDismissedTimer(DismissedSharedTimer(
             timerId, membershipId, runId, repeatIndex,
             maxOf(System.currentTimeMillis(), expiresAt) + maxOf(SUPPRESSED_TIMER_LIFETIME_MILLIS, timeoutMinutes * 60_000L)
@@ -1040,6 +1103,10 @@ class SocialRepository(
             return@withContext
         }
         if (socialDao.getOperation(operationId) != null) return@withContext
+        if (!canUseAdvancedGroupTiming) {
+            if (group.sharedAnswers && group.canEditAlarms) cancelSharedTimer(timerId, groupId, membershipId, operationId)
+            return@withContext
+        }
         val server = Preferences.instance.getString(SocialPreferences.serverUrlKey, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, server)
         val resolvedAt = Instant.ofEpochMilli(occurredAt).toString()
@@ -1208,7 +1275,8 @@ class SocialRepository(
             it.startsWith(SocialPreferences.alarmOccurrencePrefix) ||
                 it.startsWith(SocialPreferences.alarmDeadlinePrefix) ||
                 it.startsWith(SocialPreferences.alarmSnoozedAtPrefix) ||
-                it.startsWith(SocialPreferences.alarmTimeZonePrefix)
+                it.startsWith(SocialPreferences.alarmTimeZonePrefix) ||
+                it.startsWith(SocialPreferences.alarmAdvancedTimingPrefix)
         }.forEach { key ->
             Preferences.edit { remove(key) }
         }
@@ -1234,6 +1302,7 @@ class SocialRepository(
             remove("${SocialPreferences.alarmOccurrencePrefix}${link.localAlarmId}")
             remove("${SocialPreferences.alarmDeadlinePrefix}${link.localAlarmId}")
             remove("${SocialPreferences.alarmSnoozedAtPrefix}${link.localAlarmId}")
+            remove("${SocialPreferences.alarmAdvancedTimingPrefix}${link.localAlarmId}")
         }
         WorkManager.getInstance(context).cancelUniqueWork(
             "jay_ignored_alarm_${link.localAlarmId}"

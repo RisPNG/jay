@@ -28,6 +28,9 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
     val canUploadSharedSounds: Boolean
         get() = repository.canUploadSharedSounds
 
+    val canUseAdvancedGroupTiming: Boolean
+        get() = repository.canUseAdvancedGroupTiming
+
     val groups: StateFlow<List<SocialGroup>> = repository.groups.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),

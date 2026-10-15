@@ -48,7 +48,7 @@ class SharedTimerSyncTest {
             val body = if (items != null) {
                 val scope = if (exchange.requestURI.path == "/v1/sync") "identity" else "group"
                 """{"scope_id":"$scope","mode":"snapshot","from_revision":0,"through_revision":$cursor,"next_cursor":"$cursor","has_more":false,"server_time":"${Instant.now()}","items":$items}"""
-            } else "{}"
+            } else if (exchange.requestURI.path == "/v1/identity/capabilities") """{"advanced_group_timing":true}""" else "{}"
             exchange.requestBody.close()
             val bytes = body.toByteArray()
             exchange.sendResponseHeaders(200, bytes.size.toLong())

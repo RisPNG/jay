@@ -38,21 +38,27 @@ class DeviceCapabilitiesCacheTest {
                 putString(SocialPreferences.capabilitiesInstallationKey, "")
                 putString(SocialPreferences.capabilitiesServerKey, server)
                 putString(SocialPreferences.capabilitiesDeviceKey, identity.id)
-                putString(SocialPreferences.capabilitiesKey, Json.encodeToString(DeviceCapabilities(true, false)))
+                putString(SocialPreferences.capabilitiesKey, Json.encodeToString(DeviceCapabilities(true, false, advancedGroupTiming = true)))
             }
             assertTrue(repository.canUploadSharedSounds)
+            assertTrue(repository.canUseAdvancedGroupTiming)
             Preferences.edit { putString(SocialPreferences.capabilitiesInstallationKey, "another-installation") }
             assertFalse(repository.canUploadSharedSounds)
+            assertFalse(repository.canUseAdvancedGroupTiming)
             Preferences.edit { putString(SocialPreferences.capabilitiesInstallationKey, "") }
             context.getSharedPreferences("jay_identity", Context.MODE_PRIVATE).edit { clear() }
             assertFalse(repository.canUploadSharedSounds)
+            assertFalse(repository.canUseAdvancedGroupTiming)
             val replacement = DeviceIdentityStore.loadOrCreate(context, server)
             Preferences.edit { putString(SocialPreferences.capabilitiesDeviceKey, replacement.id) }
             assertTrue(repository.canUploadSharedSounds)
+            assertTrue(repository.canUseAdvancedGroupTiming)
             repository.changeServer("https://restricted.example")
             assertFalse(repository.canUploadSharedSounds)
+            assertFalse(repository.canUseAdvancedGroupTiming)
             repository.changeServer(server)
             assertFalse(repository.canUploadSharedSounds)
+            assertFalse(repository.canUseAdvancedGroupTiming)
         } finally {
             social.close()
             alarms.close()

@@ -69,7 +69,8 @@ fun TimerEditSheet(
     onDelete: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     groups: List<SocialGroup>? = null,
-    canUploadSharedSounds: Boolean = false
+    canUploadSharedSounds: Boolean = false,
+    canUseAdvancedGroupTiming: Boolean = false
 ) {
     var showRingtoneDialog by remember { mutableStateOf(false) }
     var showVibrationDialog by remember { mutableStateOf(false) }
@@ -92,6 +93,7 @@ fun TimerEditSheet(
     var timeoutMinutes by remember { mutableIntStateOf(currentTimer.timeoutMinutes) }
     var repeatEnabled by remember { mutableStateOf(currentTimer.repeatEnabled) }
     var repeatCount by remember { mutableIntStateOf(currentTimer.repeatCount) }
+    val timingEditable = selectedGroupId == null || canUseAdvancedGroupTiming
 
     val scrollState = rememberScrollState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -167,18 +169,20 @@ fun TimerEditSheet(
                 }
 
                 Column {
-                    SwitchWithDivider(
-                        title = stringResource(R.string.repeat),
-                        description = if (repeatCount == 0) {
-                            stringResource(R.string.timer_repeat_indefinitely)
-                        } else {
-                            pluralStringResource(R.plurals.timer_repeat_count, repeatCount, repeatCount)
-                        },
-                        isChecked = repeatEnabled,
-                        icon = Icons.Rounded.Repeat,
-                        onClick = { showRepeatDialog = true },
-                        onChecked = { repeatEnabled = it }
-                    )
+                    if (timingEditable) {
+                        SwitchWithDivider(
+                            title = stringResource(R.string.repeat),
+                            description = if (repeatCount == 0) {
+                                stringResource(R.string.timer_repeat_indefinitely)
+                            } else {
+                                pluralStringResource(R.plurals.timer_repeat_count, repeatCount, repeatCount)
+                            },
+                            isChecked = repeatEnabled,
+                            icon = Icons.Rounded.Repeat,
+                            onClick = { showRepeatDialog = true },
+                            onChecked = { repeatEnabled = it }
+                        )
+                    }
                     Row(
                         modifier = Modifier.padding(8.dp, 16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -208,30 +212,32 @@ fun TimerEditSheet(
                         )
                     }
                     LabelColorPreference(color = labelColor, onColorSelected = { labelColor = it })
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showTimeoutDialog = true }
-                            .padding(8.dp, 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Timer,
-                            contentDescription = null,
+                    if (timingEditable) {
+                        Row(
                             modifier = Modifier
-                                .padding(start = 8.dp, end = 16.dp)
-                                .size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.timeout_after),
-                                style = MaterialTheme.typography.titleLarge
+                                .fillMaxWidth()
+                                .clickable { showTimeoutDialog = true }
+                                .padding(8.dp, 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Timer,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .padding(start = 8.dp, end = 16.dp)
+                                    .size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Text(
-                                text = pluralStringResource(R.plurals.duration_minutes, timeoutMinutes, timeoutMinutes),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.timeout_after),
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                                Text(
+                                    text = pluralStringResource(R.plurals.duration_minutes, timeoutMinutes, timeoutMinutes),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
                         }
                     }
                     SwitchWithDivider(
@@ -334,9 +340,9 @@ fun TimerEditSheet(
                                 vibrationPatternName = vibrationPatternName,
                                 incrementSeconds = incrementSeconds,
                                 groupId = selectedGroupId,
-                                timeoutMinutes = timeoutMinutes,
-                                repeatEnabled = repeatEnabled,
-                                repeatCount = repeatCount
+                                timeoutMinutes = if (timingEditable) timeoutMinutes else 10,
+                                repeatEnabled = timingEditable && repeatEnabled,
+                                repeatCount = if (timingEditable) repeatCount else 0
                             )
                         )
                     }
@@ -365,7 +371,7 @@ fun TimerEditSheet(
             selectedPattern = vibrationPatternName
         )
     }
-    if (showRepeatDialog) {
+    if (showRepeatDialog && timingEditable) {
         ScrollPickerDialog(
             onDismissRequest = { showRepeatDialog = false },
             title = stringResource(R.string.select_timer_repeats),
@@ -379,7 +385,7 @@ fun TimerEditSheet(
             }
         )
     }
-    if (showTimeoutDialog) {
+    if (showTimeoutDialog && timingEditable) {
         ScrollPickerDialog(
             onDismissRequest = { showTimeoutDialog = false },
             title = stringResource(R.string.select_timer_timeout),
