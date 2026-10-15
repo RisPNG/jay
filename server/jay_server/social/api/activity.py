@@ -1,7 +1,6 @@
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from django.core import signing
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -36,8 +35,7 @@ class OccurrenceView(APIView):
             zone = alarm.group.alarm_time_zone if alarm.group.alarm_time_basis == "group_time_zone" else request.user.time_zone
             if data["trigger_at"].astimezone(ZoneInfo(zone)).date() != data["cycle_date"]:
                 raise DomainError("cycle_invalid", "The cycle date does not match the trigger", 400)
-            if not settings.LEGACY_CLIENT_SUPPORT:
-                data["deadline_at"] = data["trigger_at"] + timedelta(minutes=alarm.timeout_minutes)
+            data["deadline_at"] = data["trigger_at"] + timedelta(minutes=alarm.timeout_minutes)
             data.pop("membership_id")
             occurrence, created = AlarmOccurrence.objects.get_or_create(alarm=alarm, identity=request.user, occurrence_key=data["occurrence_key"], defaults={"group": alarm.group, **{key: value for key, value in data.items() if key != "occurrence_key"}})
             if not created and occurrence.state in {"pending", "canceled"} and (occurrence.snoozed_until is None or occurrence.alarm_revision != data["alarm_revision"]):

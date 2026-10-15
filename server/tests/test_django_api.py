@@ -215,6 +215,20 @@ def test_openapi_references_resolve(client):
     schema = SchemaGenerator().get_schema(public=True)
     validate_schema(schema)
     assert json.loads(OpenApiJsonRenderer().render(schema)) == json.loads((Path(__file__).parents[2] / "docs/openapi.json").read_text())
+    for path, command in [
+        ("/v1/alarms/{alarm_id}", "MembershipCommandRequest"),
+        ("/v1/groups/{group_id}", "MembershipCommandRequest"),
+        ("/v1/groups/{group_id}/membership", "MembershipCommandRequest"),
+        ("/v1/groups/{group_id}/members/{member_id}", "MembershipCommandRequest"),
+        ("/v1/timers/{timer_id}", "TimerCancelCommandRequest"),
+    ]:
+        body = schema["paths"][path]["delete"]["requestBody"]
+        assert body["required"] is True
+        assert body["content"]["application/json"]["schema"] == {"$ref": f"#/components/schemas/{command}"}
+    cancellation = schema["components"]["schemas"]["TimerCancelCommandRequest"]
+    assert cancellation["required"] == ["membership_id"]
+    assert cancellation["properties"]["run_id"] == {"type": "string", "format": "uuid"}
+    assert "requestBody" not in schema["paths"]["/v1/identity"]["delete"]
     unresolved = [schema]
     while unresolved:
         entry = unresolved.pop()

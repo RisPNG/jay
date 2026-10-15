@@ -147,6 +147,27 @@ class SharedTimerOperationTest {
         assertTrue(social.socialDao().getPendingOperations().isEmpty())
         assertTrue(social.socialDao().getDismissedTimers().isEmpty())
     }
+
+    @Test
+    fun cancellationKeepsTheCapturedRunInsteadOfBindingToANewerProjection() = runBlocking {
+        repository.cancelSharedTimer("timer", "group", "member", "cancel", runId = "captured-native-run")
+        val operation = requireNotNull(social.socialDao().getOperation("cancel"))
+        val payload = Json.parseToJsonElement(requireNotNull(operation.payload)).jsonObject
+        assertEquals(setOf("membership_id", "run_id"), payload.keys)
+        assertEquals("captured-native-run", payload.getValue("run_id").jsonPrimitive.content)
+
+        repository.cancelSharedTimer("timer", "group", "member", "cancel", runId = "newer-run")
+
+        assertEquals(operation, social.socialDao().getOperation("cancel"))
+    }
+
+    @Test
+    fun cancellationWithoutACapturedRunRetainsLegacyIntent() = runBlocking {
+        repository.cancelSharedTimer("timer", "group", "member", "legacy-cancel")
+
+        val payload = Json.parseToJsonElement(requireNotNull(social.socialDao().getOperation("legacy-cancel")?.payload)).jsonObject
+        assertEquals(setOf("membership_id"), payload.keys)
+    }
     @Test
     fun consecutiveCountingCommandsAccumulateBeforeTheirNativeProjectionChanges() = runBlocking {
         val savedAt = System.currentTimeMillis()

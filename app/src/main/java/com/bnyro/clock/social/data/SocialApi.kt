@@ -170,6 +170,7 @@ class SocialApi(
         connection.connectTimeout = 15_000
         connection.readTimeout = 25_000
         connection.setRequestProperty("Accept", "text/event-stream")
+        connection.setRequestProperty("X-Jay-Protocol", "2")
         connection.setRequestProperty("Authorization", "Bearer ${identity.token}")
         connection.setRequestProperty("X-Jay-Identity-ID", identity.id)
         installationCredential?.let { connection.setRequestProperty("X-Jay-Installation", it) }
@@ -209,6 +210,7 @@ class SocialApi(
             connection.connectTimeout = 15_000
             connection.readTimeout = 30_000
             connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("X-Jay-Protocol", "2")
             operationId?.let { connection.setRequestProperty("Idempotency-Key", it) }
             if (authenticated) {
                 connection.setRequestProperty("Authorization", "Bearer ${identity.token}")

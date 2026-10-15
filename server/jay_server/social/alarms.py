@@ -4,7 +4,6 @@ import json
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
@@ -18,7 +17,6 @@ from .synchronization import publish_changes
 
 def schedule_occurrences(alarm, identity_ids, after=None):
     now = timezone.now()
-    timeout_minutes = 10 if settings.LEGACY_CLIENT_SUPPORT else alarm.timeout_minutes
     changes = []
     outdated = AlarmOccurrence.objects.filter(alarm=alarm, identity_id__in=identity_ids, state="pending")
     if alarm.enabled and alarm.deleted_at is None:
@@ -41,7 +39,7 @@ def schedule_occurrences(alarm, identity_ids, after=None):
         key = str(int(trigger.timestamp() * 1000))
         occurrence, created = AlarmOccurrence.objects.get_or_create(
             alarm=alarm, identity=member.identity, occurrence_key=key,
-            defaults={"group": alarm.group, "alarm_revision": alarm.revision, "cycle_date": trigger.astimezone(ZoneInfo(zone)).date(), "trigger_at": trigger, "deadline_at": trigger + timedelta(minutes=timeout_minutes)},
+            defaults={"group": alarm.group, "alarm_revision": alarm.revision, "cycle_date": trigger.astimezone(ZoneInfo(zone)).date(), "trigger_at": trigger, "deadline_at": trigger + timedelta(minutes=alarm.timeout_minutes)},
         )
         if not created:
             if occurrence.state not in {"pending", "canceled"}:
@@ -50,7 +48,7 @@ def schedule_occurrences(alarm, identity_ids, after=None):
                 continue
             occurrence.alarm_revision = alarm.revision
             occurrence.trigger_at = trigger
-            occurrence.deadline_at = trigger + timedelta(minutes=timeout_minutes)
+            occurrence.deadline_at = trigger + timedelta(minutes=alarm.timeout_minutes)
             occurrence.cycle_date = trigger.astimezone(ZoneInfo(zone)).date()
             occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "pending", None, None, None
             occurrence.save()
@@ -95,17 +93,17 @@ def record_alarm_response(alarm, identity, data):
     occurrence = occurrences.filter(occurrence_key=occurrence_key).first() if occurrence_key else occurrences.filter(trigger_at__lte=data["occurred_at"], state__in=["pending", "ignored"]).order_by("-trigger_at").first()
     if occurrence:
         occurrence_key = occurrence.occurrence_key
-        if occurrence.snoozed_until and data["kind"] == "ignored" and data["occurred_at"] < occurrence.deadline_at:
-            raise DomainError("response_outdated", "The alarm was snoozed before this response deadline")
+        if data["kind"] == "ignored" and data["occurred_at"] < occurrence.deadline_at:
+            raise DomainError("response_outdated", "This response precedes the current alarm deadline")
     if occurrence and data["kind"] == "snoozed" and occurrence.snoozed_at and data["occurred_at"] < occurrence.snoozed_at:
         raise DomainError("response_outdated", "A newer snooze already advanced this alarm phase")
     automatic_restart = data["kind"] == "snoozed" and data.get("reason") == "timed_out"
     if automatic_restart:
-        if settings.LEGACY_CLIENT_SUPPORT or not alarm.missed_restart_enabled or occurrence is None or occurrence.state != "pending" or data["occurred_at"] != occurrence.deadline_at:
+        if not alarm.missed_restart_enabled or occurrence is None or occurrence.state != "pending" or data["occurred_at"] != occurrence.deadline_at:
             raise DomainError("response_outdated", "This timeout no longer belongs to the pending alarm phase")
         if data.get("snoozed_until") not in (None, occurrence.deadline_at + timedelta(minutes=alarm.missed_restart_minutes)):
             raise DomainError("restart_time_invalid", "Restart time must follow the current timeout by the alarm restart delay", 400)
-    if data["kind"] == "ignored" and alarm.missed_restart_enabled and not settings.LEGACY_CLIENT_SUPPORT:
+    if data["kind"] == "ignored" and alarm.missed_restart_enabled:
         raise DomainError("response_outdated", "This alarm restarts instead of becoming missed")
     previous = AlarmActivity.objects.filter(alarm=alarm, identity=identity, occurrence_key=occurrence_key, kind__in=["dismissed", "ignored"]).exclude(reason="corrected").order_by("-created_at").first() if occurrence_key else None
     changes = []
@@ -127,12 +125,12 @@ def record_alarm_response(alarm, identity, data):
             else:
                 snoozed_until = data.get("snoozed_until")
                 if snoozed_until is None:
-                    ring_time = activity.occurred_at if settings.LEGACY_CLIENT_SUPPORT else occurrence.snoozed_until or occurrence.trigger_at
+                    ring_time = occurrence.snoozed_until or occurrence.trigger_at
                     snoozed_until = (ring_time + timedelta(minutes=alarm.snooze_minutes)).replace(second=0, microsecond=0)
                     if snoozed_until <= activity.occurred_at:
                         snoozed_until = activity.occurred_at.replace(second=0, microsecond=0) + timedelta(minutes=1)
             occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "pending", None, snoozed_until, activity.occurred_at
-            occurrence.deadline_at = snoozed_until + timedelta(minutes=10 if settings.LEGACY_CLIENT_SUPPORT else alarm.timeout_minutes)
+            occurrence.deadline_at = snoozed_until + timedelta(minutes=alarm.timeout_minutes)
         else:
             occurrence.state, occurrence.resolved_at = activity.kind, timezone.now()
             occurrence.snoozed_until, occurrence.snoozed_at = None, None
@@ -144,7 +142,7 @@ def record_alarm_response(alarm, identity, data):
             for other in shared:
                 if activity.kind == "snoozed":
                     other.state, other.resolved_at, other.snoozed_until, other.snoozed_at = "pending", None, snoozed_until, activity.occurred_at
-                    other.deadline_at = snoozed_until + timedelta(minutes=10 if settings.LEGACY_CLIENT_SUPPORT else alarm.timeout_minutes)
+                    other.deadline_at = snoozed_until + timedelta(minutes=alarm.timeout_minutes)
                 else:
                     other.state, other.resolved_at, other.snoozed_until, other.snoozed_at = activity.kind, timezone.now(), None, None
                 other.save()

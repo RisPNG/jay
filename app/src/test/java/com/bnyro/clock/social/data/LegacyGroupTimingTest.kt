@@ -12,15 +12,21 @@ import com.bnyro.clock.social.domain.DeviceCapabilities
 import com.bnyro.clock.social.domain.MembershipAccessDto
 import com.bnyro.clock.social.domain.SharedAlarmDto
 import com.bnyro.clock.social.domain.SharedTimerDto
+import com.bnyro.clock.social.domain.ScopeSyncItem
+import com.bnyro.clock.social.domain.ScopeSyncPage
 import com.bnyro.clock.social.domain.SocialGroupDto
 import com.bnyro.clock.social.domain.SyncedResource
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.TimerService
+import com.sun.net.httpserver.HttpServer
+import java.net.InetSocketAddress
 import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
@@ -165,6 +171,64 @@ class LegacyGroupTimingTest {
         val alarmUpdate = Json.parseToJsonElement(requireNotNull(updates.single { it.kind == "alarm" }.payload)).jsonObject
         assertTrue(setOf("run_id", "timeout_minutes", "repeat_enabled", "repeat_count", "repeat_index").none { it in timerUpdate })
         assertTrue(setOf("timeout_minutes", "missed_restart_enabled", "missed_restart_minutes").none { it in alarmUpdate })
+    }
+
+    @Test
+    fun anUpdatedApiEnablesSharedRepeatsRestartsAndPerItemTimeoutsImmediately() = runBlocking {
+        val resources = social.socialDao().getResources().map {
+            if (it.kind == "timer") it.copy(representation = JsonObject(Json.parseToJsonElement(it.representation).jsonObject +
+                ("run_id" to JsonPrimitive("canonical-run"))).toString()) else it
+        }
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            val scope = when (exchange.requestURI.path) {
+                "/v1/sync" -> "identity"
+                "/v1/groups/group/sync" -> "group"
+                else -> null
+            }
+            val body = if (scope != null) {
+                Json.encodeToString(ScopeSyncPage(scope, "snapshot", 0L, 1L, "complete", false,
+                    resources.filter { it.scopeId == scope }.mapIndexed { index, resource ->
+                        ScopeSyncItem(resource.kind, resource.key, "upsert", Json.parseToJsonElement(resource.representation).jsonObject, 1L, index)
+                    }, Instant.now().toString()))
+            } else if (exchange.requestURI.path == "/v1/identity/capabilities") """{"advanced_group_timing":true}""" else "{}"
+            exchange.requestBody.close()
+            val bytes = body.toByteArray()
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        try {
+            Preferences.edit { putString(SocialPreferences.serverUrlKey, "http://127.0.0.1:${server.address.port}") }
+
+            repository.synchronize()
+
+            assertTrue(repository.canUseAdvancedGroupTiming)
+            val timer = requireNotNull(shadowOf(context).nextStartedService)
+            assertEquals(3, timer.getIntExtra(TimerService.SHARED_TIMER_TIMEOUT_EXTRA_KEY, -1))
+            assertTrue(timer.getBooleanExtra(TimerService.SHARED_TIMER_REPEAT_ENABLED_EXTRA_KEY, false))
+            assertEquals(4, timer.getIntExtra(TimerService.SHARED_TIMER_REPEAT_COUNT_EXTRA_KEY, -1))
+            assertEquals(1, timer.getIntExtra(TimerService.SHARED_TIMER_REPEAT_INDEX_EXTRA_KEY, -1))
+            val localId = requireNotNull(social.socialDao().getAlarmLinkByRemoteId("alarm")).localAlarmId
+            assertEquals(3, alarmRepository.getAlarmById(localId)?.timeoutMinutes)
+            assertTrue(requireNotNull(alarmRepository.getAlarmById(localId)).missedRestartEnabled)
+
+            repository.startSharedTimer("group", "New timer", TimerSettings(seconds = 60, timeoutMinutes = 9, repeatEnabled = true, repeatCount = 6))
+            repository.createSharedAlarm("group", Alarm(time = 0L, enabled = false, timeoutMinutes = 11, missedRestartEnabled = true, missedRestartMinutes = 13))
+
+            val operations = social.socialDao().getPendingOperations()
+            val timerPayload = Json.parseToJsonElement(requireNotNull(operations.single { it.kind == "timer" && it.method == "POST" }.payload)).jsonObject
+            assertEquals("9", timerPayload.getValue("timeout_minutes").jsonPrimitive.content)
+            assertEquals("true", timerPayload.getValue("repeat_enabled").jsonPrimitive.content)
+            assertEquals("6", timerPayload.getValue("repeat_count").jsonPrimitive.content)
+            assertTrue("run_id" in timerPayload)
+            val alarmPayload = Json.parseToJsonElement(requireNotNull(operations.single { it.kind == "alarm" && it.method == "POST" }.payload)).jsonObject
+            assertEquals("11", alarmPayload.getValue("timeout_minutes").jsonPrimitive.content)
+            assertEquals("true", alarmPayload.getValue("missed_restart_enabled").jsonPrimitive.content)
+            assertEquals("13", alarmPayload.getValue("missed_restart_minutes").jsonPrimitive.content)
+        } finally {
+            server.stop(0)
+        }
     }
 
     @Test

@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -27,7 +26,7 @@ class AlarmListView(APIView):
                 return Response(receipt.response, status=receipt.status)
             data.pop("membership_id")
             selection = data.pop("sound")
-            data.setdefault("timeout_minutes", 10 if settings.LEGACY_CLIENT_SUPPORT else 5)
+            data.setdefault("timeout_minutes", 10)
             sound = select_shared_sound(group, request.user, selection, installation=request.auth)
             alarm = SharedAlarm.objects.create(**data, sound_mode=selection["mode"], sound=sound, save_id=receipt.operation_id, created_by=request.user, updated_by=request.user)
             changes = [("alarm", str(alarm.pk), "upsert", AlarmRepresentation(alarm).data, None)]

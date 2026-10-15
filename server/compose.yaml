@@ -24,7 +24,6 @@ services:
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY for the local deployment}
       PUBLIC_URL: http://127.0.0.1:8000
       SHARED_SOUND_ACCESS: ${SHARED_SOUND_ACCESS:-play}
-      LEGACY_CLIENT_SUPPORT: ${LEGACY_CLIENT_SUPPORT:-true}
       ALLOWED_HOSTS: localhost,127.0.0.1
 
   web:

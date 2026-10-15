@@ -15,13 +15,8 @@ from jay_server.social.worker import maintain_state
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
-@pytest.fixture(autouse=True)
-def advanced_group_timing(settings):
-    settings.LEGACY_CLIENT_SUPPORT = False
-
-
 def create_timer(client, group, timer_payload, **settings):
-    payload = {**timer_payload, "id": str(uuid4()), **settings}
+    payload = {**timer_payload, "id": str(uuid4()), "timeout_minutes": 5, **settings}
     response = client.post(f"/v1/groups/{group.pk}/timers", payload, format="json", headers={"Idempotency-Key": str(uuid4())})
     assert response.status_code == 201, response.data
     return SharedTimer.objects.get(pk=response.data["id"]), payload
@@ -37,15 +32,17 @@ def answer(client, timer, index=0, identity_id="1" * 64, key=None, run_id=None, 
 
 
 def test_old_client_timer_payload_receives_independent_defaults(client, group, timer_payload):
-    timer, _ = create_timer(client, group, timer_payload)
-    assert timer.timeout_minutes == 5
+    created = client.post(f"/v1/groups/{group.pk}/timers", timer_payload, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert created.status_code == 201, created.data
+    timer = SharedTimer.objects.get(pk=created.data["id"])
+    assert timer.timeout_minutes == 10
     assert not timer.repeat_enabled
     assert timer.repeat_count == timer.repeat_index == 0
     assert isinstance(timer.run_id, UUID)
     snapshot = client.get(f"/v1/groups/{group.pk}/sync")
     metadata = next(item["data"] for item in snapshot.data["items"] if item["kind"] == "timer")
     assert metadata["run_id"] == str(timer.run_id)
-    assert metadata["timeout_minutes"] == 5
+    assert metadata["timeout_minutes"] == 10
 
 
 @pytest.mark.parametrize("field,value", [
@@ -245,7 +242,7 @@ def test_cancel_deletes_the_series_and_prevents_later_answers(client, group, tim
     timer, _ = create_timer(client, group, timer_payload, expires_at=(timezone.now() - timedelta(seconds=1)).isoformat(), repeat_enabled=True)
     assert answer(client, timer).status_code == 200
     membership = GroupMembership.objects.get(group=group, identity_id="1" * 64, removed_at=None)
-    canceled = client.delete(f"/v1/timers/{timer.pk}", {"membership_id": str(membership.pk)}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    canceled = client.delete(f"/v1/timers/{timer.pk}", {"membership_id": str(membership.pk), "run_id": str(timer.run_id)}, format="json", headers={"Idempotency-Key": str(uuid4())})
     assert canceled.status_code == 204
     assert answer(client, timer).status_code == 404
     snapshot = client.get(f"/v1/groups/{group.pk}/sync")

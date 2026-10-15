@@ -5,12 +5,15 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.bnyro.clock.social.domain.SyncedResource
 import com.bnyro.clock.social.domain.SyncScopeState
+import com.bnyro.clock.util.Preferences
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.time.Instant
+import java.util.Collections
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,6 +25,47 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
 class SocialSynchronizationTest {
+    @Test
+    fun aQueuedLegacyDeleteRetainsItsOriginalIntentWhenRetriedByTheNewClient() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        Preferences.init(context)
+        Preferences.edit { clear() }
+        val database = Room.inMemoryDatabaseBuilder(context, SocialDatabase::class.java).build()
+        val attempts = Collections.synchronizedList(mutableListOf<Triple<String?, String?, String>>())
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            attempts += Triple(exchange.requestHeaders.getFirst("X-Jay-Protocol"), exchange.requestHeaders.getFirst("Idempotency-Key"),
+                exchange.requestBody.bufferedReader().use { it.readText() })
+            val bytes = "{}".toByteArray()
+            exchange.sendResponseHeaders(if (attempts.size == 1) 503 else 200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        try {
+            val synchronization = SocialSynchronization(context, database)
+            val operation = synchronization.saveOperation("group", "timer", "timer", "DELETE", "/v1/timers/timer",
+                JsonObject(mapOf("membership_id" to JsonPrimitive("member"))), null, ordered = false)
+            val api = SocialApi("http://127.0.0.1:${server.address.port}", DeviceIdentity("identity", "Test device", "test-token", "test-secret"))
+
+            val failure = runCatching { synchronization.flushOperations(api) }.exceptionOrNull()
+
+            assertTrue(failure is SocialApiException && failure.status == 503)
+            assertEquals(operation, database.socialDao().getOperation(operation.operationId))
+            synchronization.flushOperations(api)
+            assertEquals(2, attempts.size)
+            assertTrue(attempts.all { it.first == "2" && it.second == operation.operationId && it.third == operation.payload })
+            val accepted = requireNotNull(database.socialDao().getOperation(operation.operationId))
+            assertEquals("accepted", accepted.state)
+            assertEquals(operation.payload, accepted.payload)
+            assertEquals(operation.effectiveSavedAt, accepted.effectiveSavedAt)
+            assertEquals(setOf("membership_id"), kotlinx.serialization.json.Json.parseToJsonElement(requireNotNull(accepted.payload)).jsonObject.keys)
+        } finally {
+            server.stop(0)
+            database.close()
+            Preferences.edit { clear() }
+        }
+    }
+
     @Test
     fun rejectedFutureClockDoesNotPoisonSubsequentSaves() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Application>()

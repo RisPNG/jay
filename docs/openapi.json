@@ -303,6 +303,16 @@
                 "tags": [
                     "v1"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipCommandRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "bearerIdentity": [],
@@ -716,6 +726,16 @@
                 "tags": [
                     "v1"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipCommandRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "bearerIdentity": [],
@@ -967,6 +987,16 @@
                 "tags": [
                     "v1"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipCommandRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "bearerIdentity": [],
@@ -1015,6 +1045,16 @@
                 "tags": [
                     "v1"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MembershipCommandRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "bearerIdentity": [],
@@ -1961,6 +2001,16 @@
                 "tags": [
                     "v1"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TimerCancelCommandRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "bearerIdentity": [],
@@ -3171,6 +3221,18 @@
                     "scope_id"
                 ]
             },
+            "MembershipCommandRequest": {
+                "type": "object",
+                "properties": {
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "membership_id"
+                ]
+            },
             "MembershipPreferencesRequest": {
                 "type": "object",
                 "properties": {
@@ -3814,6 +3876,22 @@
                     {
                         "$ref": "#/components/schemas/DeletedResourceRepresentation"
                     }
+                ]
+            },
+            "TimerCancelCommandRequest": {
+                "type": "object",
+                "properties": {
+                    "membership_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "run_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "membership_id"
                 ]
             },
             "TimerCreateRequest": {

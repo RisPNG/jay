@@ -14,9 +14,9 @@ from jay_server.social.worker import process_deadlines
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
-@pytest.fixture(autouse=True)
-def modern_alarm_timing(settings):
-    settings.LEGACY_CLIENT_SUPPORT = False
+@pytest.fixture
+def alarm_payload(alarm_payload):
+    return {**alarm_payload, "timeout_minutes": 5}
 
 
 def test_restart_keeps_the_final_occurrence_pending_at_1815_and_1830_without_manual_snooze(client, group, alarm_payload, monkeypatch):
@@ -198,9 +198,10 @@ def test_snooze_ordering_rejects_old_manual_and_automatic_outcomes_but_accepts_a
 
 
 def test_legacy_alarm_writes_use_defaults_then_preserve_new_policy_and_history(client, group, alarm_payload):
+    alarm_payload.pop("timeout_minutes")
     created = client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())})
     assert created.status_code == 201, created.data
-    assert created.data["timeout_minutes"] == 5
+    assert created.data["timeout_minutes"] == 10
     assert created.data["missed_restart_enabled"] is False
     assert created.data["missed_restart_minutes"] == 10
     alarm_id = alarm_payload.pop("id")
@@ -209,7 +210,7 @@ def test_legacy_alarm_writes_use_defaults_then_preserve_new_policy_and_history(c
     updated = client.put(path, {**alarm_payload, "saved_at": timezone.now().isoformat(), "timeout_minutes": 12, "missed_restart_enabled": True, "missed_restart_minutes": 7}, format="json", headers={"Idempotency-Key": str(uuid4())})
     assert updated.status_code == 200, updated.data
     history = client.get(f"{path}/activity").data["items"][0]["details"]
-    assert history["previous_timeout_minutes"] == 5
+    assert history["previous_timeout_minutes"] == 10
     assert history["timeout_minutes"] == 12
     assert history["previous_missed_restart_enabled"] is False
     assert history["missed_restart_enabled"] is True
@@ -223,12 +224,14 @@ def test_legacy_alarm_writes_use_defaults_then_preserve_new_policy_and_history(c
     assert old_client.data["missed_restart_minutes"] == 7
 
 
-def test_legacy_occurrence_registration_uses_the_alarm_timeout(client, group, alarm_payload):
+@pytest.mark.parametrize("timeout", [5, 25])
+def test_legacy_occurrence_registration_uses_the_alarm_timeout(client, group, alarm_payload, timeout):
+    alarm_payload["timeout_minutes"] = timeout
     assert client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 201
     trigger = timezone.now().replace(second=0, microsecond=0)
     response = client.put(f"/v1/alarms/{alarm_payload['id']}/occurrence", {"membership_id": alarm_payload["membership_id"], "alarm_revision": 1, "occurrence_key": str(int(trigger.timestamp() * 1000)), "trigger_at": trigger.isoformat(), "deadline_at": (trigger + timedelta(minutes=10)).isoformat(), "cycle_date": trigger.date().isoformat()}, format="json", headers={"Idempotency-Key": str(uuid4())})
     assert response.status_code == 200, response.data
-    assert parse_datetime(response.data["deadline_at"]) == trigger + timedelta(minutes=5)
+    assert parse_datetime(response.data["deadline_at"]) == trigger + timedelta(minutes=timeout)
 
 
 def test_alarm_restart_migration_preserves_legacy_defaults_and_occurrence_deadlines(client, group):

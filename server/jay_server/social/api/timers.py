@@ -1,7 +1,5 @@
-from datetime import timedelta
 from uuid import uuid4
 
-from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -10,11 +8,12 @@ from rest_framework.views import APIView
 
 from ..access import require_membership, select_shared_sound
 from ..errors import DomainError
-from ..models import Group, GroupMembership, SharedTimer, TimerOccurrence
+from ..models import Group, SharedTimer
 from ..synchronization import publish_changes
+from ..timers import record_timer_response
 from ..transactions import accept_saved_state, mutation
 from .representations import SoundRepresentation, TimerOccurrenceRepresentation, TimerRepresentation
-from .serializers import MembershipCommand, TimerCreate, TimerOccurrenceCommand, TimerPayload
+from .serializers import TimerCancelCommand, TimerCreate, TimerOccurrenceCommand, TimerPayload
 
 
 class TimerListView(APIView):
@@ -31,7 +30,7 @@ class TimerListView(APIView):
                 return Response(receipt.response, status=receipt.status)
             data.pop("membership_id")
             selection = data.pop("sound")
-            data.setdefault("timeout_minutes", 10 if settings.LEGACY_CLIENT_SUPPORT else 5)
+            data.setdefault("timeout_minutes", 10)
             sound = select_shared_sound(group, request.user, selection, installation=request.auth)
             timer = SharedTimer.objects.create(**data, group=group, sound=sound, sound_mode=selection["mode"], started_by=request.user, save_id=receipt.operation_id)
             changes = [("timer", str(timer.pk), "upsert", TimerRepresentation(timer).data, None)]
@@ -78,20 +77,30 @@ class TimerView(APIView):
             receipt.status, receipt.response = 200, TimerRepresentation(timer).data
         return Response(receipt.response)
 
-    @extend_schema(request=MembershipCommand, responses={204: None})
+    @extend_schema(request=TimerCancelCommand, responses={204: None})
     def delete(self, request, timer_id):
-        serializer = MembershipCommand(data=request.data)
+        serializer = TimerCancelCommand(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         timer = get_object_or_404(SharedTimer.objects.select_related("group"), pk=timer_id)
         with mutation(request, data, [timer.group.scope_id]) as receipt:
+            timer = get_object_or_404(SharedTimer.objects.select_for_update().select_related("group"), pk=timer_id)
+            member = require_membership(timer.group, request.user, data["membership_id"], editor=True)
             if receipt.completed_at:
                 return Response(status=receipt.status)
-            timer = get_object_or_404(SharedTimer.objects.select_for_update().select_related("group"), pk=timer_id, deleted_at=None)
-            require_membership(timer.group, request.user, data["membership_id"], editor=True)
-            timer.deleted_at = timezone.now()
-            timer.save(update_fields=["deleted_at"])
-            publish_changes(timer.group.scope_id, [("timer", str(timer.pk), "delete", {"id": str(timer.pk)}, None)], group=timer.group, actor=request.user)
+            if timer.deleted_at is None:
+                run_id = data.get("run_id")
+                if run_id is not None and run_id != timer.run_id:
+                    raise DomainError("run_changed", "This cancellation belongs to an old timer run")
+                now = timezone.now()
+                if run_id is None and timer.repeat_enabled:
+                    if now < timer.expires_at:
+                        raise DomainError("client_upgrade_required", "Update to Jay 1.2.5 to cancel a repeating timer", 400)
+                    record_timer_response(timer, member, timer.repeat_index, now)
+                else:
+                    timer.deleted_at = now
+                    timer.save(update_fields=["deleted_at"])
+                    publish_changes(timer.group.scope_id, [("timer", str(timer.pk), "delete", {"id": str(timer.pk)}, None)], group=timer.group, actor=request.user)
             receipt.status, receipt.response = 204, None
         return Response(status=204)
 
@@ -108,51 +117,8 @@ class TimerOccurrenceView(APIView):
             member = require_membership(timer.group, request.user, data["membership_id"])
             if receipt.completed_at:
                 return Response(receipt.response, status=receipt.status)
-            if timer.deleted_at is not None and not (
-                settings.LEGACY_CLIENT_SUPPORT and TimerOccurrence.objects.filter(
-                    timer=timer, membership=member, run_id=data["run_id"], repeat_index=data["repeat_index"]
-                ).exists()
-            ):
-                raise DomainError("not_found", "Timer not found", 404)
             if data["run_id"] != timer.run_id:
                 raise DomainError("run_changed", "This response belongs to an old timer run")
-            index = data["repeat_index"]
-            if index < timer.repeat_index or (not timer.repeat_enabled and index != 0) or (timer.repeat_enabled and timer.repeat_count and index > timer.repeat_count):
-                raise DomainError("occurrence_invalid", "This repeat does not belong to the timer run", 400)
-            now = timezone.now()
-            elapsed_index = timer.repeat_index + (now - timer.expires_at) // timedelta(seconds=timer.duration_seconds)
-            if index > elapsed_index:
-                raise DomainError("occurrence_invalid", "This timer occurrence has not expired", 400)
-            trigger = timer.expires_at + timedelta(seconds=(index - timer.repeat_index) * timer.duration_seconds)
-            if data["occurred_at"] < trigger:
-                raise DomainError("occurrence_invalid", "The response precedes this timer occurrence", 400)
-            if data["occurred_at"] > now + timedelta(minutes=2):
-                raise DomainError("clock_invalid", "The response time is ahead of the server clock")
-            existing = TimerOccurrence.objects.filter(timer=timer, membership=member, run_id=timer.run_id, repeat_index=index).first()
-            if existing is not None:
-                receipt.status, receipt.response = 200, TimerOccurrenceRepresentation(existing).data
-                return Response(receipt.response)
-            shared_answers = timer.group.shared_answers and (
-                not settings.LEGACY_CLIENT_SUPPORT or timer.group.alarm_permission == "everyone" or member.role == "leader"
-            )
-            members = GroupMembership.objects.filter(group=timer.group, removed_at=None, identity__retired_at=None).order_by("identity_id")
-            if not shared_answers:
-                members = members.filter(pk=member.pk)
-            changes = []
-            for recipient in members:
-                occurrence, created = TimerOccurrence.objects.get_or_create(
-                    timer=timer, membership=recipient, run_id=timer.run_id, repeat_index=index,
-                    defaults={"group": timer.group, "identity_id": recipient.identity_id, "trigger_at": trigger, "deadline_at": trigger + timedelta(minutes=timer.timeout_minutes), "resolved_at": now},
-                )
-                if created:
-                    changes.append(("timer_occurrence", str(occurrence.pk), "upsert", TimerOccurrenceRepresentation(occurrence).data, recipient.identity_id))
-                if recipient.pk == member.pk:
-                    answered = occurrence
-            if settings.LEGACY_CLIENT_SUPPORT and shared_answers:
-                timer.deleted_at = now
-                timer.save(update_fields=["deleted_at"])
-                changes.append(("timer", str(timer.pk), "delete", {"id": str(timer.pk)}, None))
-            if changes:
-                publish_changes(timer.group.scope_id, changes, group=timer.group, actor=request.user)
+            answered = record_timer_response(timer, member, data["repeat_index"], data["occurred_at"])
             receipt.status, receipt.response = 200, TimerOccurrenceRepresentation(answered).data
         return Response(receipt.response)

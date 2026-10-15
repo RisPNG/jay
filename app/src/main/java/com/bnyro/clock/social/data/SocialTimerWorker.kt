@@ -34,7 +34,7 @@ class SocialTimerWorker(context: Context, parameters: WorkerParameters) :
                 inputData.getInt("source_repeat_index", 0), inputData.getBoolean("source_finished", false)
             )
 
-            ACTION_CANCEL -> repository.cancelSharedTimer(timerId, groupId, membershipId, operationId)
+            ACTION_CANCEL -> repository.cancelSharedTimer(timerId, groupId, membershipId, operationId, inputData.getString("cancel_run_id"))
 
             ACTION_DISMISSED -> repository.dismissSharedTimer(
                 timerId, groupId, membershipId,
@@ -78,6 +78,11 @@ class SocialTimerWorker(context: Context, parameters: WorkerParameters) :
                         .putString(ACTION, action)
                         .putString("group_id", requireNotNull(timer.sharedGroupId))
                         .putString("membership_id", requireNotNull(timer.sharedMembershipId))
+                        .apply {
+                            if (action == ACTION_CANCEL && (context.applicationContext as App).container.socialRepository.canUseAdvancedGroupTiming) {
+                                putString("cancel_run_id", requireNotNull(timer.sharedRunId))
+                            }
+                        }
                         .putString("run_id", if (action == ACTION_ADJUST) java.util.UUID.randomUUID().toString() else requireNotNull(timer.sharedRunId))
                         .putInt("repeat_index", repeatIndex)
                         .putString("source_run_id", timer.sharedRunId)

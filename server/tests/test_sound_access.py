@@ -44,14 +44,14 @@ def test_migration_retains_operator_grants_and_discards_profile_purchase_access(
 
 def test_operator_access_is_scoped_revocable_and_synchronized(client, group, member):
     call_command("grant_sound_access", "1" * 64, stdout=StringIO())
-    expected = {"shared_sound_upload": True, "requires_play_entitlement": False, "expires_at": None, "advanced_group_timing": False}
+    expected = {"shared_sound_upload": True, "requires_play_entitlement": False, "expires_at": None, "advanced_group_timing": True}
     assert client.get("/v1/identity/capabilities").data == expected
     assert not member.get("/v1/identity/capabilities").data["shared_sound_upload"]
     assert SyncVersion.objects.get(kind="capabilities", key="1" * 64, superseded_at=None).representation == expected
     payload = {"id": str(uuid4()), "membership_id": str(GroupMembership.objects.get(group=group, identity_id="1" * 64).pk), "title": "Review sound", "sha256": "a" * 64, "byte_length": 100, "duration_ms": 1000}
     assert client.post(f"/v1/groups/{group.pk}/sounds/uploads", payload, format="json", headers={"Idempotency-Key": str(uuid4()), "X-Jay-Installation": "paid-installation"}).status_code == 201
     call_command("grant_sound_access", "1" * 64, revoke=True, stdout=StringIO())
-    assert client.get("/v1/identity/capabilities").data == {"shared_sound_upload": False, "requires_play_entitlement": True, "expires_at": None, "advanced_group_timing": False}
+    assert client.get("/v1/identity/capabilities").data == {"shared_sound_upload": False, "requires_play_entitlement": True, "expires_at": None, "advanced_group_timing": True}
     assert client.post(f"/v1/groups/{group.pk}/sounds/uploads", {**payload, "id": str(uuid4())}, format="json", headers={"Idempotency-Key": str(uuid4()), "X-Jay-Installation": "paid-installation"}).status_code == 403
 
 
@@ -87,7 +87,7 @@ def test_inflight_play_verification_cannot_overwrite_operator_grant(client, monk
     monkeypatch.setattr(providers, "verify_play_entitlement", verify)
     result = client.post("/v1/identity/play-entitlement", {"integrity_token": "inflight"}, format="json", headers={"Idempotency-Key": str(uuid4()), "X-Jay-Installation": "paid-installation"})
     assert result.status_code == 200
-    assert result.data == {"shared_sound_upload": True, "requires_play_entitlement": False, "expires_at": None, "advanced_group_timing": False}
+    assert result.data == {"shared_sound_upload": True, "requires_play_entitlement": False, "expires_at": None, "advanced_group_timing": True}
     assert ProfileSoundGrant.objects.filter(identity_id="1" * 64).exists()
 
 

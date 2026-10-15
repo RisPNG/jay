@@ -1,5 +1,6 @@
 from drf_spectacular.extensions import OpenApiAuthenticationExtension, OpenApiSerializerExtension
 from drf_spectacular.openapi import AutoSchema
+from drf_spectacular.plumbing import build_media_type_object
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter
 
@@ -23,6 +24,21 @@ class DeletedResourceSchema(OpenApiSerializerExtension):
 
 
 class JaySchema(AutoSchema):
+    def _get_request_body(self, direction="request"):
+        if self.method != "DELETE":
+            return super()._get_request_body(direction)
+        serializer = self.get_request_serializer()
+        if serializer is None:
+            return None
+        schema, required = self._get_request_for_media_type(serializer, direction)
+        if schema is None:
+            return None
+        examples = self._get_examples(serializer, direction, "application/json")
+        body = {"content": {"application/json": build_media_type_object(schema, examples)}}
+        if required:
+            body["required"] = True
+        return body
+
     def get_override_parameters(self):
         parameters = super().get_override_parameters()
         if not self.path.endswith("/identities/register"):

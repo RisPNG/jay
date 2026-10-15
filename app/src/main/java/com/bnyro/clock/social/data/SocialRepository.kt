@@ -1070,11 +1070,14 @@ class SocialRepository(
         Unit
     }
 
-    suspend fun cancelSharedTimer(timerId: String, groupId: String, membershipId: String, operationId: String) = withContext(Dispatchers.IO) {
+    suspend fun cancelSharedTimer(timerId: String, groupId: String, membershipId: String, operationId: String, runId: String? = null) = withContext(Dispatchers.IO) {
         if (socialDao.getOperation(operationId) != null) return@withContext
         if (groups.first().none { it.id == groupId && it.membershipId == membershipId && it.canEditAlarms }) return@withContext
         saveSharedChange(groupId, "timer", timerId, "DELETE", "/v1/timers/$timerId",
-            JsonObject(mapOf("membership_id" to JsonPrimitive(membershipId))), optimisticState = null,
+            JsonObject(buildMap {
+                put("membership_id", JsonPrimitive(membershipId))
+                if (runId != null) put("run_id", JsonPrimitive(runId))
+            }), optimisticState = null,
             ordered = false, operationId = operationId)
         Unit
     }
