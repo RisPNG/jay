@@ -50,7 +50,6 @@ object Preferences {
         val migratedBigStartButton = instance.all[timerBigStartButtonKey]
         val oldBigStartButton = instance.all["timer_BIG_start_button"]
         instance.edit {
-            remove("alarmTimeoutMinutes")
             if (timerPickerStyle is Boolean) {
                 putString(
                     timerPickerStyleKey,
