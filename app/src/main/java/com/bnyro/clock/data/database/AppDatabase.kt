@@ -16,6 +16,7 @@ import com.bnyro.clock.data.database.dao.Converters
 import com.bnyro.clock.data.database.dao.TimeZonesDao
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.TimeZone
+import com.bnyro.clock.util.Preferences
 
 @Database(
     entities = [TimeZone::class, Alarm::class],
@@ -119,6 +120,7 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_17_18 = object : Migration(17, 18) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE alarms ADD COLUMN timeoutMinutes INTEGER NOT NULL DEFAULT 5")
+                db.execSQL("UPDATE alarms SET timeoutMinutes = ?", arrayOf(Preferences.instance.getInt("alarmTimeoutMinutes", 10)))
                 db.execSQL("ALTER TABLE alarms ADD COLUMN missedRestartEnabled INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE alarms ADD COLUMN missedRestartMinutes INTEGER NOT NULL DEFAULT 10")
             }
