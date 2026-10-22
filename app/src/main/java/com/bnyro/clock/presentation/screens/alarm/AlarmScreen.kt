@@ -122,6 +122,7 @@ fun AlarmScreen(
 
     var showToggleConfirmation by remember { mutableStateOf(false) }
     var wannadeletequestion by remember { mutableStateOf(false) }
+    var showAlarmKinds by remember { mutableStateOf(false) }
 
     BackHandler(enabled = alarmModel.showFilter) {
         alarmModel.showFilter = false
