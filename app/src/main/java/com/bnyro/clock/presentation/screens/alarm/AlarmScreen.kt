@@ -46,6 +46,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.AlarmSortOrder
@@ -188,6 +190,7 @@ fun AlarmScreen(
                                 val isSelected = sortOrder == currentSortOrder
                                 DropdownMenuItem(
                                     text = { Text(stringResource(sortOrder.value)) },
+                                    modifier = Modifier.semantics { selected = isSelected },
                                     leadingIcon = if (isSelected) {
                                         { Icon(Icons.Default.Check, contentDescription = null) }
                                     } else {
