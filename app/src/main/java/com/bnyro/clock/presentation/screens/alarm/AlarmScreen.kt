@@ -1,8 +1,5 @@
 package com.bnyro.clock.presentation.screens.alarm
 
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.selected
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalConfiguration
@@ -23,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -89,6 +87,7 @@ fun AlarmScreen(
     val alarms by alarmModel.alarms.collectAsStateWithLifecycle()
     val filters by alarmModel.filters.collectAsStateWithLifecycle()
     val labelColors by alarmModel.labelColors.collectAsStateWithLifecycle()
+    val currentSortOrder by alarmModel.sortOrder.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentTime by produceState(System.currentTimeMillis(), lifecycleOwner, alarms.isNotEmpty()) {
         if (alarms.isNotEmpty()) {
@@ -101,7 +100,6 @@ fun AlarmScreen(
         }
     }
 
-    val selectedSortOrder by alarmModel.sortOrder.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     var displayedAlarmIds by remember { mutableStateOf(emptyList<Long>()) }
     val alarmIds = alarms.map { it.id }
@@ -122,7 +120,6 @@ fun AlarmScreen(
 
     var showToggleConfirmation by remember { mutableStateOf(false) }
     var wannadeletequestion by remember { mutableStateOf(false) }
-    var showAlarmKinds by remember { mutableStateOf(false) }
 
     BackHandler(enabled = alarmModel.showFilter) {
         alarmModel.showFilter = false
@@ -238,16 +235,19 @@ fun AlarmScreen(
                             expanded = alarmModel.showSortOrder,
                             onDismissRequest = { alarmModel.showSortOrder = false }) {
                             AlarmSortOrder.entries.forEach { sortOrder ->
+                                val isSelected = sortOrder == currentSortOrder
                                 DropdownMenuItem(
                                     text = { Text(stringResource(sortOrder.value)) },
-                                    modifier = Modifier.semantics { selected = sortOrder == selectedSortOrder },
-                                    trailingIcon = {
-                                        if (sortOrder == selectedSortOrder) Icon(Icons.Default.Check, null)
+                                    leadingIcon = if (isSelected) {
+                                        { Icon(Icons.Default.Check, contentDescription = null) }
+                                    } else {
+                                        null
                                     },
                                     onClick = {
                                         alarmModel.setSortOrder(sortOrder)
                                         alarmModel.showSortOrder = false
-                                    })
+                                    }
+                                )
                             }
                         }
                     }
