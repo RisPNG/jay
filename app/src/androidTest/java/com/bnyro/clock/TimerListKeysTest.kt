@@ -33,8 +33,7 @@ class TimerListKeysTest {
     private var previousSavedTimers: String? = null
 
     @Before
-    fun initializePreferences() {
-        Preferences.init(ApplicationProvider.getApplicationContext())
+    fun rememberSavedTimers() {
         previousSavedTimers = Preferences.instance.getString(Preferences.savedTimersKey, null)
     }
 
