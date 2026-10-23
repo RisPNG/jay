@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.rounded.AddAlarm
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -96,6 +98,7 @@ fun TimerScreen(
 
     var editedTimer by remember { mutableStateOf<TimerObject?>(null) }
     var editedSavedTimerId by remember { mutableStateOf<Int?>(null) }
+    var showSortDropdown by remember { mutableStateOf(false) }
     var showGroupTimerDialog by remember { mutableStateOf(false) }
     var selectedGroupTimerId by remember { mutableStateOf<String?>(null) }
     val editableGroups = groups.filter { it.canEditAlarms }
@@ -105,7 +108,7 @@ fun TimerScreen(
     var showPicker by remember(settingsModel.timerPickerBehaviour) {
         mutableStateOf(
             activeTimers.isEmpty() ||
-                settingsModel.timerPickerBehaviour == TimerPickerBehaviour.KEEP_OPEN
+                    settingsModel.timerPickerBehaviour == TimerPickerBehaviour.KEEP_OPEN
         )
     }
     LaunchedEffect(activeTimers.isEmpty(), settingsModel.timerPickerBehaviour) {
@@ -288,11 +291,44 @@ fun TimerScreen(
                             pluralStringResource(R.plurals.saved_timers, timerModel.savedTimers.size)
                         ) {
                             if (!isSelectionMode) {
-                                ClickableIcon(
-                                    imageVector = Icons.Rounded.AddAlarm,
-                                    contentDescription = stringResource(R.string.add_saved_timer)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    timerModel.addSavedTimer(timerModel.timePickerSeconds)
+                                    Box {
+                                        ClickableIcon(
+                                            imageVector = Icons.AutoMirrored.Filled.Sort,
+                                            contentDescription = stringResource(R.string.sort_saved_timers)
+                                        ) {
+                                            showSortDropdown = true
+                                        }
+
+                                        DropdownMenu(
+                                            expanded = showSortDropdown,
+                                            onDismissRequest = { showSortDropdown = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(R.string.label)) },
+                                                onClick = {
+                                                    timerModel.savedTimers = timerModel.savedTimers.sortedBy { it.label.lowercase() }
+                                                    showSortDropdown = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(R.string.duration)) },
+                                                onClick = {
+                                                    timerModel.savedTimers = timerModel.savedTimers.sortedBy { it.seconds }
+                                                    showSortDropdown = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                    ClickableIcon(
+                                        imageVector = Icons.Rounded.AddAlarm,
+                                        contentDescription = stringResource(R.string.add_saved_timer)
+                                    ) {
+                                        timerModel.addSavedTimer(timerModel.timePickerSeconds)
+                                    }
                                 }
                             }
                         }

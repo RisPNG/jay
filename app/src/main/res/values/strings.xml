@@ -51,6 +51,7 @@
     <string name="timer_reset">Reset</string>
     <string name="paused_timer_title">%1$s paused</string>
     <!-- Sorting -->
+    <string name="sort_saved_timers">Sort saved timers</string>
     <string name="alphabetic">Alphabetic</string>
     <string name="offset">Offset</string>
     <!-- Settings -->
@@ -137,7 +138,7 @@
         <item quantity="one">%d hour</item>
         <item quantity="other">%d hours</item>
     </plurals>
-    <string name="minutes">minutes</string>
+    <string name="minutes">Minutes</string>
     <string name="seconds">Seconds</string>
     <string name="snooze">Snooze</string>
     <string name="dismiss">Dismiss</string>
@@ -394,4 +395,5 @@
     <string name="toggle_selected_alarms_confirmation">Turn each selected alarm on if it is off, or off if it is on?</string>
     <string name="toggle">Toggle</string>
     <string name="option_information">About %1$s</string>
+    <string name="duration">Duration</string>
 </resources>
