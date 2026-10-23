@@ -266,7 +266,8 @@ fun TimerScreen(
                                 ) {
                                     Box {
                                         ClickableIcon(
-                                            imageVector = Icons.AutoMirrored.Filled.Sort
+                                            imageVector = Icons.AutoMirrored.Filled.Sort,
+                                            contentDescription = stringResource(R.string.sort_saved_timers)
                                         ) {
                                             showSortDropdown = true
                                         }
@@ -278,14 +279,14 @@ fun TimerScreen(
                                             DropdownMenuItem(
                                                 text = { Text(stringResource(R.string.label)) },
                                                 onClick = {
-                                                    timerModel.sortSavedTimersByName()
+                                                    timerModel.savedTimers = timerModel.savedTimers.sortedBy { it.label.lowercase() }
                                                     showSortDropdown = false
                                                 }
                                             )
                                             DropdownMenuItem(
                                                 text = { Text(stringResource(R.string.duration)) },
                                                 onClick = {
-                                                    timerModel.sortSavedTimersByDuration()
+                                                    timerModel.savedTimers = timerModel.savedTimers.sortedBy { it.seconds }
                                                     showSortDropdown = false
                                                 }
                                             )
