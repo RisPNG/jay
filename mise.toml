@@ -1,0 +1,4 @@
+[tools]
+java = "21.0.2"
+python = "3.11.14"
+postgres = "18.6"
