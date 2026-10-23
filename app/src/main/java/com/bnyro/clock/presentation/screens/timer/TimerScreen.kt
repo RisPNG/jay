@@ -267,7 +267,7 @@ fun TimerScreen(
                             }
                         }
                     }
-                    items(activeTimers, key = { it.id }) { timer ->
+                    items(activeTimers, key = { "activeTimer:${it.id}" }) { timer ->
                         TimerItem(
                             obj = timer,
                             timerModel = timerModel,
@@ -334,7 +334,7 @@ fun TimerScreen(
                         }
                     }
                 }
-                items(timerModel.savedTimers, key = { it.id }) { timer ->
+                items(timerModel.savedTimers, key = { "savedTimer:${it.id}" }) { timer ->
                     val isSelected = selectedSavedTimerIds.contains(timer.id)
 
                     SavedTimerItem(
