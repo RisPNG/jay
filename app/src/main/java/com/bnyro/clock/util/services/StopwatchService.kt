@@ -28,7 +28,7 @@ import java.util.Timer
 import java.util.TimerTask
 
 class StopwatchService : Service() {
-    private val notificationId = 1
+    private val notificationId = -1
     var currentPosition = 0L
         private set
     var state = WatchState.IDLE
