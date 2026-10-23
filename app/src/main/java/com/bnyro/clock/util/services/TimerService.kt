@@ -685,6 +685,7 @@ class TimerService : Service() {
         timerObject.state.value = WatchState.RUNNING
         scheduleAlarm(timerObject)
         acquireWakeLock()
+        promoteForeground()
         updateNotification(timerObject)
     }
 
