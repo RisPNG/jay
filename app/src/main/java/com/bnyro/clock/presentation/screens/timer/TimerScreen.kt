@@ -266,7 +266,8 @@ fun TimerScreen(
                                 ) {
                                     Box {
                                         ClickableIcon(
-                                            imageVector = Icons.AutoMirrored.Filled.Sort
+                                            imageVector = Icons.AutoMirrored.Filled.Sort,
+                                            contentDescription = stringResource(R.string.sort_saved_timers)
                                         ) {
                                             showSortDropdown = true
                                         }
