@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.MoreTime
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -66,6 +68,8 @@ fun TimerEditSheet(
     var showRingtoneDialog by remember { mutableStateOf(false) }
     var showVibrationDialog by remember { mutableStateOf(false) }
     var showIncrementDialog by remember { mutableStateOf(false) }
+    var showRepeatDialog by remember { mutableStateOf(false) }
+    var showTimeoutDialog by remember { mutableStateOf(false) }
 
     var seconds by remember { mutableIntStateOf(currentTimer.seconds) }
     var labelColor by remember { mutableIntStateOf(currentTimer.labelColor) }
@@ -77,6 +81,9 @@ fun TimerEditSheet(
     var vibrationPattern by remember { mutableStateOf(currentTimer.vibrationPattern) }
     var vibrationPatternName by remember { mutableStateOf(currentTimer.vibrationPatternName) }
     var incrementSeconds by remember { mutableStateOf(currentTimer.incrementSeconds) }
+    var timeoutMinutes by remember { mutableIntStateOf(currentTimer.timeoutMinutes) }
+    var repeatEnabled by remember { mutableStateOf(currentTimer.repeatEnabled) }
+    var repeatCount by remember { mutableIntStateOf(currentTimer.repeatCount) }
 
     val scrollState = rememberScrollState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -104,6 +111,18 @@ fun TimerEditSheet(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Column {
+                    SwitchWithDivider(
+                        title = stringResource(R.string.repeat),
+                        description = if (repeatCount == 0) {
+                            stringResource(R.string.timer_repeat_indefinitely)
+                        } else {
+                            pluralStringResource(R.plurals.timer_repeat_count, repeatCount, repeatCount)
+                        },
+                        isChecked = repeatEnabled,
+                        icon = Icons.Rounded.Repeat,
+                        onClick = { showRepeatDialog = true },
+                        onChecked = { repeatEnabled = it }
+                    )
                     Row(
                         modifier = Modifier.padding(8.dp, 16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -133,6 +152,32 @@ fun TimerEditSheet(
                         )
                     }
                     LabelColorPreference(color = labelColor, onColorSelected = { labelColor = it })
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showTimeoutDialog = true }
+                            .padding(8.dp, 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Timer,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .padding(start = 8.dp, end = 16.dp)
+                                .size(24.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.timeout_after),
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Text(
+                                text = pluralStringResource(R.plurals.duration_minutes, timeoutMinutes, timeoutMinutes),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                     SwitchWithDivider(
                         title = stringResource(R.string.sound),
                         description = soundName ?: stringResource(R.string.default_sound),
@@ -226,7 +271,10 @@ fun TimerEditSheet(
                                 vibrate = vibrationEnabled,
                                 vibrationPattern = vibrationPattern,
                                 vibrationPatternName = vibrationPatternName,
-                                incrementSeconds = incrementSeconds
+                                incrementSeconds = incrementSeconds,
+                                timeoutMinutes = timeoutMinutes,
+                                repeatEnabled = repeatEnabled,
+                                repeatCount = repeatCount
                             )
                         )
                     }
@@ -253,6 +301,35 @@ fun TimerEditSheet(
                 showVibrationDialog = false
             },
             selectedPattern = vibrationPatternName
+        )
+    }
+    if (showRepeatDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showRepeatDialog = false },
+            title = stringResource(R.string.select_timer_repeats),
+            unit = stringResource(R.string.timer_repeats_unit),
+            value = repeatCount,
+            maxValue = 101,
+            label = { it.toString() },
+            onValueSet = {
+                repeatCount = it
+                showRepeatDialog = false
+            }
+        )
+    }
+    if (showTimeoutDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showTimeoutDialog = false },
+            title = stringResource(R.string.select_timer_timeout),
+            unit = stringResource(R.string.minutes),
+            value = timeoutMinutes,
+            maxValue = 120,
+            offset = 1,
+            label = { it.toString() },
+            onValueSet = {
+                timeoutMinutes = it
+                showTimeoutDialog = false
+            }
         )
     }
     if (showIncrementDialog) {

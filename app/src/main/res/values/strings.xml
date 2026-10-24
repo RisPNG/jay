@@ -107,6 +107,13 @@
     <string name="timeout_after">Timeout after</string>
     <string name="select_alarm_timeout">Select alarm timeout</string>
     <string name="select_timer_timeout">Select timer timeout</string>
+    <string name="timer_repeat_indefinitely">Indefinitely</string>
+    <string name="select_timer_repeats">Select additional repeats</string>
+    <string name="timer_repeats_unit">repeats</string>
+    <plurals name="timer_repeat_count">
+        <item quantity="one">%d additional repeat</item>
+        <item quantity="other">%d additional repeats</item>
+    </plurals>
     <string name="volume_ramp">Gradually increase volume</string>
     <string name="select_volume_ramp">Select volume ramp</string>
     <string name="volume_ramp_never">Never</string>
