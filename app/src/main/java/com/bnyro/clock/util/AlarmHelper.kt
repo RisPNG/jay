@@ -153,8 +153,8 @@ object AlarmHelper {
     private fun getPendingIntent(context: Context, alarm: Alarm, triggerTime: Long? = null): PendingIntent {
         val intent = Intent(context.applicationContext,
             AlarmReceiver::class.java).putExtra(EXTRA_ID, alarm.id).apply {
-                triggerTime?.let { putExtra(EXTRA_TRIGGER_TIME, it) }
-            }
+            triggerTime?.let { putExtra(EXTRA_TRIGGER_TIME, it) }
+        }
         return PendingIntent.getBroadcast(context.applicationContext, alarm.id.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
@@ -388,12 +388,17 @@ object AlarmHelper {
             calendar.set(Calendar.SECOND, 0)
             calendar.set(Calendar.MILLISECOND, 0)
         }
-        val alarm = oldAlarm.copy(snoozedUntil = calendar.timeInMillis)
+        return snooze(context, oldAlarm, calendar.timeInMillis)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.M)
+    fun snooze(context: Context, oldAlarm: Alarm, snoozedUntil: Long): Long {
+        val alarm = oldAlarm.copy(snoozedUntil = snoozedUntil)
         runBlocking {
             (context.applicationContext as App).container.alarmRepository.updateAlarm(alarm)
         }
         enqueue(context, alarm)
-        return calendar.timeInMillis
+        return snoozedUntil
     }
     /**
      * @return the days of the week mapped to an index 0-Sunday, 1-Monday, ..., 6-Saturday.
