@@ -55,8 +55,7 @@ object AlarmHelper {
             Toast.LENGTH_SHORT
         ).show()
     }
-    fun getPreAlarmDelayMillis(context: Context): Long {
-        Preferences.init(context)
+    fun getPreAlarmDelayMillis(): Long {
         val minutes = Preferences.instance.getInt(
             Preferences.upcomingAlarmDuration,
             Preferences.DEFAULT_UPCOMING_ALARM_DURATION
@@ -93,7 +92,18 @@ object AlarmHelper {
         Log.d("AlarmHelper", "Scheduling alarm time: ${Date(triggerTime)}")
         alarmManager.setAlarmClock(alarmInfo, getPendingIntent(context, alarm))
 
-        val preAlarmDelay = getPreAlarmDelayMillis(context)
+        reschedulePreAlarm(context, alarm, triggerTime)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.M)
+    @SuppressLint("ScheduleExactAlarm")
+    fun reschedulePreAlarm(context: Context, alarm: Alarm, triggerTime: Long) {
+        if (!Permission.AlarmPermission.hasPermission(context)) return
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.cancel(getPreAlarmPendingIntent(context, alarm))
+        NotificationManagerCompat.from(context).cancel(alarm.id.toInt() + PRE_ALARM_ID_OFFSET)
+
+        val preAlarmDelay = getPreAlarmDelayMillis()
         val preAlarmTime = triggerTime - preAlarmDelay
         val now = System.currentTimeMillis()
 

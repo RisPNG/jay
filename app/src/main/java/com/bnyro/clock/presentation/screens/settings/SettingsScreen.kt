@@ -81,6 +81,7 @@ fun SettingsScreen(
         rememberTopAppBarState()
     )
     var showAlarmTimeoutDialog by remember { mutableStateOf(false) }
+    var showUpcomingAlarmDurationDialog by remember { mutableStateOf(false) }
     var showTimerTimeoutDialog by remember { mutableStateOf(false) }
     var showTimerIncrementDialog by remember { mutableStateOf(false) }
     var showAlarmVolumeRampDialog by remember { mutableStateOf(false) }
@@ -95,6 +96,14 @@ fun SettingsScreen(
             Preferences.instance.getInt(
                 Preferences.alarmTimeoutMinutesKey,
                 AlarmService.ALARM_TIMEOUT_MINUTES
+            )
+        )
+    }
+    var upcomingAlarmDurationMinutes by remember {
+        mutableIntStateOf(
+            Preferences.instance.getInt(
+                Preferences.upcomingAlarmDuration,
+                Preferences.DEFAULT_UPCOMING_ALARM_DURATION
             )
         )
     }
@@ -323,15 +332,6 @@ fun SettingsScreen(
                 showAlarmTimeoutDialog = true
             }
 
-            var showUpcomingAlarmDurationDialog by remember { mutableStateOf(false) }
-            var upcomingAlarmDurationMinutes by remember {
-                mutableIntStateOf(
-                    Preferences.instance.getInt(
-                        Preferences.upcomingAlarmDuration,
-                        Preferences.DEFAULT_UPCOMING_ALARM_DURATION
-                    )
-                )
-            }
             IconPreference(
                 title = stringResource(R.string.upcoming_alarm),
                 summary = pluralStringResource(
@@ -343,23 +343,6 @@ fun SettingsScreen(
             ) {
                 showUpcomingAlarmDurationDialog = true
             }
-            if (showUpcomingAlarmDurationDialog) {
-                ScrollPickerDialog(
-                    onDismissRequest = { showUpcomingAlarmDurationDialog = false },
-                    title = stringResource(R.string.upcoming_alarm),
-                    unit = stringResource(R.string.minutes),
-                    value = upcomingAlarmDurationMinutes,
-                    maxValue = 720, // max 12 hours (720 min)
-                    offset = 5,    // min 5 min
-                    label = { it.toString() },
-                    onValueSet = { minutes ->
-                        upcomingAlarmDurationMinutes = minutes
-                        Preferences.edit { putInt(Preferences.upcomingAlarmDuration, minutes) }
-                        showUpcomingAlarmDurationDialog = false
-                    }
-                )
-            }
-
             IconPreference(
                 title = stringResource(R.string.volume_ramp),
                 summary = volumeRampSummary(alarmVolumeRampSeconds),
@@ -581,6 +564,22 @@ fun SettingsScreen(
                 alarmTimeoutMinutes = it
                 Preferences.edit { putInt(Preferences.alarmTimeoutMinutesKey, it) }
                 showAlarmTimeoutDialog = false
+            }
+        )
+    }
+    if (showUpcomingAlarmDurationDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showUpcomingAlarmDurationDialog = false },
+            title = stringResource(R.string.upcoming_alarm),
+            unit = stringResource(R.string.minutes),
+            value = upcomingAlarmDurationMinutes,
+            maxValue = 720 - 5 + 1,
+            offset = 5,
+            label = { it.toString() },
+            onValueSet = { minutes ->
+                upcomingAlarmDurationMinutes = minutes
+                settingsModel.updateUpcomingAlarmDuration(context, minutes)
+                showUpcomingAlarmDurationDialog = false
             }
         )
     }

@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.bnyro.clock.App
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.BackupTimer
 import com.bnyro.clock.domain.usecase.ClockBackupUseCase
@@ -22,6 +23,7 @@ import com.bnyro.clock.domain.model.TimerPickerBehaviour
 import com.bnyro.clock.domain.model.WeekStart
 import com.bnyro.clock.navigation.HomeRoutes
 import com.bnyro.clock.navigation.homeRoutes
+import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.catpucchinLatte
 import kotlinx.coroutines.Dispatchers
@@ -73,6 +75,21 @@ class SettingsModel : ViewModel() {
     fun updateFabAlignment(alignment: FabAlignment) {
         Preferences.edit { putString("fab_alignment", alignment.name) }
         fabAlignment = alignment
+    }
+
+    fun updateUpcomingAlarmDuration(context: Context, minutes: Int) {
+        Preferences.edit { putInt(Preferences.upcomingAlarmDuration, minutes) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val appContext = context.applicationContext
+            val alarmRepository = (appContext as App).container.alarmRepository
+            alarmRepository.getAlarms().forEach { alarm ->
+                if (alarm.enabled && !AlarmHelper.hasRecurrenceEnded(alarm)) {
+                    AlarmHelper.getAlarmTime(alarm)?.let {
+                        AlarmHelper.reschedulePreAlarm(appContext, alarm, it)
+                    }
+                }
+            }
+        }
     }
 
     enum class AppName(@StringRes val resId: Int) {

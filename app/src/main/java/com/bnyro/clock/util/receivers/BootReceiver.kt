@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.core.os.UserManagerCompat
 import com.bnyro.clock.App
 import com.bnyro.clock.util.AlarmHelper
+import com.bnyro.clock.util.Preferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 
@@ -32,7 +33,12 @@ class BootReceiver : BroadcastReceiver() {
         } else {
             context
         }
-        val alarmRepository = (safeContext.applicationContext as App).container.alarmRepository
+        val app = safeContext.applicationContext as App
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && UserManagerCompat.isUserUnlocked(context)) {
+            app.migrateToDeviceProtectedStorage()
+            Preferences.init(context.createDeviceProtectedStorageContext())
+        }
+        val alarmRepository = app.container.alarmRepository
 
         runBlocking(Dispatchers.IO) {
             try {
