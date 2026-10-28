@@ -1,5 +1,6 @@
 package com.bnyro.clock.presentation.screens.alarmpicker.components
 
+import com.bnyro.clock.ui.theme.resolveLabelColor
 import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -216,7 +216,7 @@ fun AlarmPicker(
                             imeAction = ImeAction.Default
                         ),
                         leadingIcon = {
-                            Icon(imageVector = Icons.AutoMirrored.Outlined.Label, contentDescription = null, tint = Color(labelColor))
+                            Icon(imageVector = Icons.AutoMirrored.Outlined.Label, contentDescription = null, tint = resolveLabelColor(labelColor))
                         }
                     )
                 }
