@@ -154,7 +154,9 @@ fun RingingAlert(
                             }
                             RingingIcon(icon, iconSize, Modifier.weight(1f, fill = false))
                             Spacer(Modifier.height(12.dp))
-                            title()
+                            Box(Modifier.weight(3f, fill = false)) {
+                                title()
+                            }
                         }
                         Column(
                             modifier = Modifier.fillMaxHeight().weight(1f),
@@ -255,7 +257,7 @@ fun RingingTitle(
                 maxLines = 1,
                 softWrap = false,
                 autoSize = TextAutoSize.StepBased(
-                    minFontSize = 24.sp,
+                    minFontSize = 12.sp,
                     maxFontSize = if (showSeconds) 76.sp else 108.sp,
                     stepSize = 1.sp
                 )
