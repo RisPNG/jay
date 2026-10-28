@@ -14,8 +14,10 @@ import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.TimerService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class TimerAlertTakeoverTest {
@@ -27,11 +29,13 @@ class TimerAlertTakeoverTest {
         val previousVolumeAction = Preferences.instance
             .getString(Preferences.timerVolumeButtonActionKey, null)
         val dismissedTimers = ArrayBlockingQueue<Int>(1)
+        val takeoverShown = CountDownLatch(1)
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 val timerId = intent?.getIntExtra(TimerService.ID_EXTRA_KEY, 0) ?: return
-                if (intent.getStringExtra(TimerService.ACTION_EXTRA_KEY) == TimerService.ACTION_STOP) {
-                    dismissedTimers.offer(timerId)
+                when (intent.getStringExtra(TimerService.ACTION_EXTRA_KEY)) {
+                    TimerService.ACTION_STOP -> dismissedTimers.offer(timerId)
+                    TimerService.ACTION_ALERT_SHOWN -> if (timerId == 202) takeoverShown.countDown()
                 }
             }
         }
@@ -65,7 +69,7 @@ class TimerAlertTakeoverTest {
                             .putExtra(TimerService.INCREMENT_EXTRA_KEY, 120)
                     )
                 }
-                instrumentation.waitForIdleSync()
+                assertTrue("The replacement timer must be shown", takeoverShown.await(5, TimeUnit.SECONDS))
                 scenario.onActivity { activity ->
                     assertSame(originalActivity, activity)
                     assertEquals(202, activity.intent.getIntExtra(TimerService.ID_EXTRA_KEY, 0))
