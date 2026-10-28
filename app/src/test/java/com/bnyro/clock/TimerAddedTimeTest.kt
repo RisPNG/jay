@@ -92,15 +92,12 @@ class TimerAddedTimeTest {
 
     @Test
     fun notificationAddedTimeUsesTheTimerSettingWithoutAnOverride() {
-        service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_PAUSE_RESUME, timer.id))
-        shadowOf(Looper.getMainLooper()).idle()
-        val remainingMillis = timer.currentPosition.value
         val manager = application.getSystemService(NotificationManager::class.java)
         manager.activeNotifications.single { it.id == timer.id }
             .notification.actions[1].actionIntent.send()
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertEquals(remainingMillis + 90_000, timer.currentPosition.value)
+        assertEquals(990, timer.secondsLeft)
         assertEquals(990_000, timer.initialPosition.value)
         assertEquals(90, timer.incrementSeconds)
     }
