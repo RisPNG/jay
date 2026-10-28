@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.bnyro.clock.App
@@ -20,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 class AlarmActivity : RingingActivity() {
     private var alarm by mutableStateOf(Alarm(0, 0))
     private var groupName by mutableStateOf<String?>(null)
+    private var ringingSince by mutableLongStateOf(System.currentTimeMillis())
 
     override val closeAction = ALARM_ALERT_CLOSE_ACTION
 
@@ -37,7 +39,7 @@ class AlarmActivity : RingingActivity() {
                 groupName = groupName,
                 snoozeEnabled = alarm.snoozeEnabled,
                 snoozeTime = alarm.snoozeMinutes,
-                alarmTimeMillis = alarm.time
+                ringingSince = ringingSince
             )
         }
 
@@ -92,6 +94,7 @@ class AlarmActivity : RingingActivity() {
     }
 
     private fun handleIntent(intent: Intent) {
+        ringingSince = intent.getLongExtra(AlarmHelper.EXTRA_TRIGGER_TIME, System.currentTimeMillis())
         val id = intent.getLongExtra(AlarmHelper.EXTRA_ID, -1).takeIf { it != -1L } ?: return
         val alarmRepository = (application as App).container.alarmRepository
         this.alarm = runBlocking {

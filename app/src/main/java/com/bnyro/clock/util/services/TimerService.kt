@@ -171,14 +171,15 @@ class TimerService : Service() {
                     // a timer that has finished ringing has run out of time to add to, so the
                     // time added starts it running again rather than sitting on a finished timer
                     val finished = obj.currentPosition.value == 0
-                    val addedmskek = obj.effectiveIncrementSeconds * 1000
-                    val expiresAt = if (finished) System.currentTimeMillis() + addedmskek
-                    else obj.expiresAt + addedmskek
+                    val addedSeconds = intent.getIntExtra(INCREMENT_EXTRA_KEY, obj.effectiveIncrementSeconds)
+                    val addedMillis = addedSeconds * 1000
+                    val expiresAt = if (finished) System.currentTimeMillis() + addedMillis
+                    else obj.expiresAt + addedMillis
 
                     if (obj.sharedTimerId != null) {
                         if (!obj.sharedCanEdit) return
                         SocialTimerWorker.enqueue(applicationContext, obj, SocialTimerWorker.ACTION_ADJUST, expiresAt, if (finished) 0 else obj.repeatIndex,
-                            adjustmentSeconds = obj.effectiveIncrementSeconds)
+                            adjustmentSeconds = addedSeconds)
                         if (finished) endRinging(obj)
                         return
                     }
@@ -188,11 +189,11 @@ class TimerService : Service() {
                         obj.repeatIndex = 0
                         obj.hasSuccessor = false
                         obj.state.value = WatchState.RUNNING
-                        obj.initialPosition.value = addedmskek
+                        obj.initialPosition.value = addedMillis
                     } else {
-                        obj.initialPosition.value += addedmskek
+                        obj.initialPosition.value += addedMillis
                     }
-                    obj.currentPosition.value += addedmskek
+                    obj.currentPosition.value += addedMillis
 
                     if (obj.state.value == WatchState.RUNNING) {
                         cancelAlarm(obj)

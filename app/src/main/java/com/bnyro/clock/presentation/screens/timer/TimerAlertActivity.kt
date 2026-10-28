@@ -27,6 +27,8 @@ class TimerAlertActivity : RingingActivity() {
 
     override val volumeButtonActionDefault = VolumeButtonAction.DISMISS
 
+    override val snoozeAvailable get() = canEdit && incrementSeconds > 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
@@ -34,7 +36,7 @@ class TimerAlertActivity : RingingActivity() {
         setContent {
             TimerAlertScreen(
                 onDismiss = this@TimerAlertActivity::dismiss,
-                onSnooze = this@TimerAlertActivity::snooze,
+                onSnooze = { seconds -> answerWith(TimerService.ACTION_ADD_TIME, seconds) },
                 onReset = this@TimerAlertActivity::reset,
                 label = label,
                 groupName = groupName,
@@ -51,8 +53,10 @@ class TimerAlertActivity : RingingActivity() {
 
     private fun reset() = answerWith(TimerService.TIMER_RESTART)
 
-    private fun answerWith(action: String) {
-        sendBroadcast(TimerService.updateStateIntent(action, timerId))
+    private fun answerWith(action: String, seconds: Int? = null) {
+        sendBroadcast(TimerService.updateStateIntent(action, timerId).apply {
+            seconds?.let { putExtra(TimerService.INCREMENT_EXTRA_KEY, it) }
+        })
         finish()
     }
 
@@ -74,8 +78,9 @@ class TimerAlertActivity : RingingActivity() {
     }
 
     override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
+        super.onNewIntent(intent)
         // a takeover hands the showing screen to another timer, which counts as showing it anew
         reportAlert(TimerService.ACTION_ALERT_SHOWN)
     }
