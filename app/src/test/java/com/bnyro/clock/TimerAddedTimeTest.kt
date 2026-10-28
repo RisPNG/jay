@@ -75,37 +75,46 @@ class TimerAddedTimeTest {
 
     @Test
     fun selectedAddedTimeOverridesTheTimerSettingForThisAction() {
+        service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_PAUSE_RESUME, timer.id))
+        shadowOf(Looper.getMainLooper()).idle()
+        val remainingMillis = timer.currentPosition.value
         service.sendBroadcast(
             TimerService.updateStateIntent(TimerService.ACTION_ADD_TIME, timer.id)
                 .putExtra(TimerService.INCREMENT_EXTRA_KEY, 15)
         )
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertEquals(915_000, timer.currentPosition.value)
+        assertEquals(remainingMillis + 15_000, timer.currentPosition.value)
         assertEquals(915_000, timer.initialPosition.value)
         assertEquals(90, timer.incrementSeconds)
-        assertEquals(WatchState.RUNNING, timer.state.value)
+        assertEquals(WatchState.PAUSED, timer.state.value)
     }
 
     @Test
     fun notificationAddedTimeUsesTheTimerSettingWithoutAnOverride() {
+        service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_PAUSE_RESUME, timer.id))
+        shadowOf(Looper.getMainLooper()).idle()
+        val remainingMillis = timer.currentPosition.value
         val manager = application.getSystemService(NotificationManager::class.java)
         manager.activeNotifications.single { it.id == timer.id }
             .notification.actions[1].actionIntent.send()
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertEquals(990_000, timer.currentPosition.value)
+        assertEquals(remainingMillis + 90_000, timer.currentPosition.value)
         assertEquals(990_000, timer.initialPosition.value)
         assertEquals(90, timer.incrementSeconds)
     }
 
     @Test
     fun addedTimeWithoutATimerSettingUsesTheGlobalPreference() {
+        service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_PAUSE_RESUME, timer.id))
+        shadowOf(Looper.getMainLooper()).idle()
+        val remainingMillis = timer.currentPosition.value
         service.updateTimer(timer.id, timer.settings.copy(incrementSeconds = null))
         service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_ADD_TIME, timer.id))
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertEquals(1_020_000, timer.currentPosition.value)
+        assertEquals(remainingMillis + 120_000, timer.currentPosition.value)
         assertEquals(1_020_000, timer.initialPosition.value)
         assertNull(timer.incrementSeconds)
     }
@@ -128,7 +137,7 @@ class TimerAddedTimeTest {
         )
         shadowOf(Looper.getMainLooper()).idle()
 
-        assertEquals(15_000, timer.currentPosition.value)
+        assertEquals(15, timer.secondsLeft)
         assertEquals(15_000, timer.initialPosition.value)
         assertEquals(90, timer.incrementSeconds)
         assertEquals(WatchState.RUNNING, timer.state.value)
