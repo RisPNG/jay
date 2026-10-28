@@ -279,10 +279,7 @@ fun RingingTitle(
                         enabled = hasLabel,
                         modifier = Modifier
                             .then(if (ringingSeconds != null) Modifier.weight(1f, fill = false) else Modifier)
-                            .widthIn(
-                                min = if (hasLabel) minOf(176.dp, timePillWidth) else 0.dp,
-                                max = timePillWidth
-                            )
+                            .widthIn(max = timePillWidth)
                             .height(pillHeight),
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -290,7 +287,10 @@ fun RingingTitle(
                     ) {
                         Crossfade(targetState = showingLabel && hasLabel, label = "Ringing label") { showLabel ->
                             Row(
-                                modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp, vertical = 8.dp),
+                                modifier = Modifier
+                                    .widthIn(min = if (hasLabel) minOf(176.dp, timePillWidth) else 0.dp)
+                                    .fillMaxHeight()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
