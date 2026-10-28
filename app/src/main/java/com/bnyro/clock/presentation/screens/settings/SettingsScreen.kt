@@ -135,9 +135,9 @@ fun SettingsScreen(
         contract = ActivityResultContracts.CreateDocument("application/json"),
         onResult = { fileUri ->
             fileUri?.let { uri ->
-                val timers = (context as MainActivity).timerModel.scheduledObjects.value.map {
-                    BackupTimer(it.settings, it.currentPosition.value)
-                }
+                val timers = (context as MainActivity).timerModel.scheduledObjects.value
+                    .filter { !it.hasSuccessor }
+                    .map { BackupTimer(it.settings, it.currentPosition.value, it.repeatIndex, it.initialPosition.value) }
                 settingsModel.exportBackup(context, uri, timers)
             }
         }
