@@ -9,11 +9,12 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ApplicationProvider
 import com.bnyro.clock.presentation.screens.alarm.AlarmAlertScreen
 import com.bnyro.clock.presentation.screens.ringing.RingingAlert
@@ -114,7 +115,7 @@ class SharedRingingScreenTest {
                 context.resources.getQuantityString(R.plurals.add_seconds, 1, 1)
             ).assertDoesNotExist()
             composeRule.onNodeWithContentDescription(context.getString(R.string.dismiss))
-                .assertIsDisplayed().performClick()
+                .assertIsDisplayed().performSemanticsAction(SemanticsActions.OnClick) { it() }
             composeRule.runOnIdle {
                 assertEquals(index + 1, dismissals)
                 assertEquals(0, mutations)
