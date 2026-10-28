@@ -61,6 +61,7 @@ class LabelColorMigrationTest {
         }
         val upgraded = Room.databaseBuilder(context, AppDatabase::class.java, name)
             .addMigrations(
+                AppDatabase.MIGRATION_15_16,
                 ReflectionHelpers.getStaticField<Migration>(AppDatabase::class.java, "MIGRATION_16_17"),
                 AppDatabase.MIGRATION_17_18
             )
