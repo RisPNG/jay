@@ -34,8 +34,7 @@ import com.bnyro.clock.util.Preferences
         AutoMigration(from = 9, to = 10, spec = AppDatabase.RemoveTimeZoneOffsetColumn::class),
         AutoMigration(from = 10, to = 11),
         AutoMigration(from = 13, to = 14),
-        AutoMigration(from = 14, to = 15),
-        AutoMigration(from = 15, to = 16)
+        AutoMigration(from = 14, to = 15)
     ]
 )
 @TypeConverters(Converters::class)
@@ -111,6 +110,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val snoozedUntil = db.query("PRAGMA table_info(alarms)").use { columns ->
+                    var column = "NULL"
+                    while (columns.moveToNext()) {
+                        if (columns.getString(columns.getColumnIndexOrThrow("name")) == "snoozedUntil") {
+                            column = "snoozedUntil"
+                            break
+                        }
+                    }
+                    column
+                }
+                db.execSQL("ALTER TABLE alarms RENAME TO alarms_before_snooze")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `alarms` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `time` INTEGER NOT NULL, `label` TEXT, `labelColor` INTEGER NOT NULL DEFAULT 0, `enabled` INTEGER NOT NULL, `days` TEXT NOT NULL, `vibrate` INTEGER NOT NULL, `soundName` TEXT, `soundUri` TEXT, `snoozeEnabled` INTEGER NOT NULL DEFAULT 1, `snoozeMinutes` INTEGER NOT NULL DEFAULT 10, `snoozedUntil` INTEGER DEFAULT NULL, `soundEnabled` INTEGER NOT NULL DEFAULT 1, `vibrationPattern` TEXT NOT NULL DEFAULT '0,1000,1000,1000,1000', `vibrationPatternName` TEXT NOT NULL DEFAULT 'Default', `dismissedAt` INTEGER DEFAULT NULL, `startDate` INTEGER NOT NULL DEFAULT 0, `repeatInterval` INTEGER NOT NULL DEFAULT 1, `repeatUnit` TEXT NOT NULL DEFAULT 'WEEK', `repeatAnchor` TEXT NOT NULL DEFAULT 'DAY_OF_MONTH', `repeatDuration` INTEGER DEFAULT NULL, `repeatDurationUnit` TEXT NOT NULL DEFAULT 'DAY', `endDate` INTEGER DEFAULT NULL, `endOccurrences` INTEGER DEFAULT NULL, `advanced` INTEGER NOT NULL DEFAULT 0)")
+                db.execSQL(
+                    "INSERT INTO alarms (id, time, label, labelColor, enabled, days, vibrate, soundName, soundUri, snoozeEnabled, snoozeMinutes, snoozedUntil, soundEnabled, vibrationPattern, vibrationPatternName, dismissedAt, startDate, repeatInterval, repeatUnit, repeatAnchor, repeatDuration, repeatDurationUnit, endDate, endOccurrences, advanced) " +
+                        "SELECT id, time, label, labelColor, enabled, days, vibrate, soundName, soundUri, snoozeEnabled, snoozeMinutes, $snoozedUntil, soundEnabled, vibrationPattern, vibrationPatternName, dismissedAt, startDate, repeatInterval, repeatUnit, repeatAnchor, repeatDuration, repeatDurationUnit, endDate, endOccurrences, advanced FROM alarms_before_snooze"
+                )
+                db.execSQL("DROP TABLE alarms_before_snooze")
+            }
+        }
+
         private val MIGRATION_16_17 = object : Migration(16, 17) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("UPDATE alarms SET labelColor = 0 WHERE labelColor = -1")
@@ -153,6 +174,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_7_8,
                         MIGRATION_11_12,
                         MIGRATION_12_13,
+                        MIGRATION_15_16,
                         MIGRATION_16_17,
                         MIGRATION_17_18
                     )
