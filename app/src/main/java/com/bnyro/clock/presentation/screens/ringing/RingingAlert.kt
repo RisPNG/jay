@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -234,6 +235,9 @@ fun RingingTitle(
             }
         }
     }
+    val pillTextStyle = MaterialTheme.typography.titleMedium.copy(lineHeight = TextUnit.Unspecified)
+    val pillIconSize = with(LocalDensity.current) { (pillTextStyle.fontSize * 1.25f).toDp() }
+    val pillAutoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = pillTextStyle.fontSize, stepSize = 1.sp)
     val pillHeight = maxOf(40.dp, with(LocalDensity.current) {
         MaterialTheme.typography.titleMedium.lineHeight.toDp()
     } + 16.dp)
@@ -293,14 +297,16 @@ fun RingingTitle(
                                 Icon(
                                     imageVector = if (showLabel) Icons.AutoMirrored.Outlined.Label else Icons.Outlined.Notifications,
                                     contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(pillIconSize)
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text(
+                                BasicText(
                                     text = if (showLabel) label.orEmpty() else ringingTime,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = pillTextStyle.copy(color = LocalContentColor.current),
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                    autoSize = if (showLabel) null else pillAutoSize
                                 )
                             }
                         }
@@ -320,19 +326,18 @@ fun RingingTitle(
                                 Icon(
                                     imageVector = Icons.Outlined.HourglassEmpty,
                                     contentDescription = null,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(pillIconSize)
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 BasicText(
                                     text = "+" + DateUtils.formatElapsedTime(seconds),
-                                    style = MaterialTheme.typography.titleMedium.copy(
+                                    style = pillTextStyle.copy(
                                         color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        lineHeight = TextUnit.Unspecified,
                                         fontFeatureSettings = "tnum"
                                     ),
                                     maxLines = 1,
                                     softWrap = false,
-                                    autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 16.sp, stepSize = 1.sp)
+                                    autoSize = pillAutoSize
                                 )
                             }
                         }
