@@ -20,7 +20,7 @@ import com.bnyro.clock.util.Preferences
 
 @Database(
     entities = [TimeZone::class, Alarm::class],
-    version = 16,
+    version = 17,
     autoMigrations = [
         AutoMigration(
             from = 2,
@@ -34,7 +34,8 @@ import com.bnyro.clock.util.Preferences
         AutoMigration(from = 9, to = 10, spec = AppDatabase.RemoveTimeZoneOffsetColumn::class),
         AutoMigration(from = 10, to = 11),
         AutoMigration(from = 13, to = 14),
-        AutoMigration(from = 14, to = 15, spec = AppDatabase.MigrateDefaultLabelColor::class)
+        AutoMigration(from = 14, to = 15, spec = AppDatabase.MigrateDefaultLabelColor::class),
+        AutoMigration(from = 15, to = 16)
     ]
 )
 @TypeConverters(Converters::class)
@@ -116,7 +117,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATION_15_16 = object : Migration(15, 16) {
+        val MIGRATION_16_17 = object : Migration(16, 17) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE alarms ADD COLUMN timeoutMinutes INTEGER NOT NULL DEFAULT 5")
                 db.execSQL("UPDATE alarms SET timeoutMinutes = ?", arrayOf(Preferences.instance.getInt("alarmTimeoutMinutes", 10)))
@@ -152,7 +153,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_7_8,
                         MIGRATION_11_12,
                         MIGRATION_12_13,
-                        MIGRATION_15_16
+                        MIGRATION_16_17
                     )
                     .build()
                 INSTANCE = instance
