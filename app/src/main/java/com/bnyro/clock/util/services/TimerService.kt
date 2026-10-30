@@ -393,6 +393,7 @@ class TimerService : Service() {
         ).setContentTitle(timeLeft)
             .setShortCriticalText(timeLeft)
             .setRequestPromotedOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentText(
                 if (timerObject.state.value == WatchState.RUNNING) {
                     timerObject.label.value
@@ -713,6 +714,7 @@ class TimerService : Service() {
             .setContentIntent(contentIntent)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setDeleteIntent(deletePendingIntent)
             .setOngoing(false)
             .setSilent(!announces)
