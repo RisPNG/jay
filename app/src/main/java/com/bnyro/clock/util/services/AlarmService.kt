@@ -153,6 +153,7 @@ class AlarmService : Service() {
                     )
                         .setSmallIcon(R.drawable.ic_notification)
                         .setSilent(true)
+                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                         .setContentTitle(
                             alarm.label?.takeIf { it.isNotBlank() }?.let {
                                 getString(
@@ -335,6 +336,7 @@ class AlarmService : Service() {
             )
             setAutoCancel(true)
             setColorized(true)
+            setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             setColor(TextColor.PrimaryDark.getColorValue(context))
             priority = NotificationCompat.PRIORITY_MAX
             foregroundServiceBehavior = FOREGROUND_SERVICE_IMMEDIATE
