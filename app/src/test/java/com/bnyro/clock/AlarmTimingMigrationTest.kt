@@ -7,8 +7,13 @@ import androidx.test.core.app.ApplicationProvider
 import com.bnyro.clock.data.database.AppDatabase
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.util.Preferences
+import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -25,6 +30,11 @@ class AlarmTimingMigrationTest {
         val application = ApplicationProvider.getApplicationContext<Application>()
         val context = application.createDeviceProtectedStorageContext()
         val migration = AppDatabase.MIGRATION_17_18
+        val legacySchema = Json.parseToJsonElement(
+            File("schemas/${AppDatabase::class.java.name}/17.json").readText()
+        ).jsonObject.getValue("database").jsonObject.getValue("entities").jsonArray
+            .first { it.jsonObject.getValue("tableName").jsonPrimitive.content == "alarms" }
+            .jsonObject.getValue("createSql").jsonPrimitive.content.replace("\${TABLE_NAME}", "alarms")
         for (globalTimeout in listOf(null, 23)) {
             Preferences.init(context)
             Preferences.edit {
@@ -42,10 +52,6 @@ class AlarmTimingMigrationTest {
                 )
                 alarm.id = original.alarmsDao().insert(alarm)
                 val sqlite = original.openHelper.writableDatabase
-                val legacySchema = sqlite.query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'alarms'").use {
-                    it.moveToFirst()
-                    it.getString(0).replace(Regex(", `(timeoutMinutes|missedRestartEnabled|missedRestartMinutes)` INTEGER NOT NULL DEFAULT [0-9]+"), "")
-                }
                 assertFalse(legacySchema.contains("timeoutMinutes"))
                 sqlite.execSQL("ALTER TABLE alarms RENAME TO alarms_before_timing")
                 sqlite.execSQL(legacySchema)

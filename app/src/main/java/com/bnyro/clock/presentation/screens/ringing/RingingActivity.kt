@@ -41,7 +41,7 @@ abstract class RingingActivity : ComponentActivity() {
 
     protected abstract fun snooze()
 
-    /** Whether snoozing is offered at all, which the volume keys fall back from when it is not. */
+    /** Whether snoozing is available to the screen and volume keys. */
     protected open val snoozeAvailable: Boolean get() = true
 
     /** Whether a close broadcast is about what this screen is currently showing. */
@@ -58,6 +58,9 @@ abstract class RingingActivity : ComponentActivity() {
     private val closeAlertReciever = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.getStringExtra(ACTION_EXTRA_KEY) != CLOSE_ACTION) return
+            if (intent.getLongExtra(ALERT_GENERATION_EXTRA_KEY, 0L) !=
+                this@RingingActivity.intent.getLongExtra(ALERT_GENERATION_EXTRA_KEY, 0L)
+            ) return
             if (closesThisAlert(intent)) finish()
         }
     }
@@ -129,7 +132,7 @@ abstract class RingingActivity : ComponentActivity() {
             )
         ) {
             VolumeButtonAction.SNOOZE -> {
-                if (snoozeAvailable) snooze() else dismiss()
+                if (snoozeAvailable) snooze()
                 true
             }
             VolumeButtonAction.DISMISS -> {
@@ -160,6 +163,7 @@ abstract class RingingActivity : ComponentActivity() {
     }
 
     companion object {
+        const val ALERT_GENERATION_EXTRA_KEY = "alert_generation"
         const val ACTION_EXTRA_KEY = "action"
         const val CLOSE_ACTION = "CLOSE"
     }

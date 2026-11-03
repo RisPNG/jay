@@ -13,6 +13,7 @@ class CreateUpdateDeleteAlarmUseCase(
 ) {
     suspend fun createAlarm(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()): Long {
         alarm.snoozedUntil = null
+        alarm.snoozeCount = 0
         alarm.dismissedAt = null
         if (AlarmHelper.hasRecurrenceEnded(alarm, timeZone)) alarm.enabled = false
         val newId = alarmRepository.addAlarm(alarm)

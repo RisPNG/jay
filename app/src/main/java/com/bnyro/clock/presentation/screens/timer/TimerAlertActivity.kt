@@ -55,13 +55,14 @@ class TimerAlertActivity : RingingActivity() {
 
     private fun answerWith(action: String, seconds: Int? = null) {
         sendBroadcast(TimerService.updateStateIntent(action, timerId).apply {
+            putExtra(TimerService.RINGING_SINCE_EXTRA_KEY, ringingSince)
             seconds?.let { putExtra(TimerService.INCREMENT_EXTRA_KEY, it) }
         })
-        finish()
     }
 
     override fun closesThisAlert(intent: Intent) =
-        intent.getIntExtra(TimerService.ID_EXTRA_KEY, 0) == timerId
+        intent.getIntExtra(TimerService.ID_EXTRA_KEY, 0) == timerId &&
+            intent.getLongExtra(TimerService.RINGING_SINCE_EXTRA_KEY, -1L) == ringingSince
 
     override fun onStart() {
         super.onStart()
@@ -74,7 +75,9 @@ class TimerAlertActivity : RingingActivity() {
     }
 
     private fun reportAlert(action: String) {
-        sendBroadcast(TimerService.updateStateIntent(action, timerId))
+        sendBroadcast(TimerService.updateStateIntent(action, timerId)
+            .putExtra(TimerService.RINGING_SINCE_EXTRA_KEY, ringingSince)
+            .putExtra(ALERT_GENERATION_EXTRA_KEY, intent.getLongExtra(ALERT_GENERATION_EXTRA_KEY, 0L)))
     }
 
     override fun onNewIntent(intent: Intent) {

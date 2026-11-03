@@ -38,78 +38,98 @@ import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.TimeHelper
+import com.bnyro.clock.util.RingingCoordinator
+import com.bnyro.clock.util.RingingSession
 import com.bnyro.clock.util.VolumeRamp
 import com.bnyro.clock.util.widgets.TextColor
 import com.bnyro.clock.util.widgets.getColorValue
 import kotlinx.coroutines.runBlocking
+
 import com.bnyro.clock.social.data.SocialAlarmEvents
+
 import com.bnyro.clock.social.data.SocialActivityWorker
+
 import com.bnyro.clock.social.data.SocialIgnoredAlarmWorker
+
 import com.bnyro.clock.social.domain.AlarmActivityKind
+
 import java.time.Instant
+
 import com.bnyro.clock.social.data.SocialPreferences
 
 class AlarmService : Service() {
-    private val notificationId = 5
     private var isPlaying = false
     private var vibrator: Vibrator? = null
     private var mediaPlayer: MediaPlayer? = null
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
-    private var currentAlarm: Alarm? = null
-    private var currentRingTime: Long? = null
-    private var occurrenceId: String? = null
-    private var outcomeRecorded = false
-    private var alertScreenVisible = false
-
+    private val ringingAlarms = linkedMapOf<Long, AlarmRing>()
     private val timeoutHandler = Handler(Looper.getMainLooper())
     private var volumeRamp: VolumeRamp? = null
 
+    private inner class AlarmRing(val alarm: Alarm, val ringTime: Long, val occurrenceId: String) : RingingSession {
+        var alertScreenVisible = false
+        var alertGeneration = 0L
+        val notificationId = ALARM_NOTIFICATION_ID_OFFSET + alarm.id.toInt()
+        val timeout = Runnable { handleTimeout(this) }
+        override val soundEnabled get() = alarm.soundEnabled
+        override val vibrate get() = alarm.vibrate
+        override val timeoutMillis get() = alarm.timeoutMinutes * 60_000L
+        override val isAlarm = true
+
+        override fun onSelected() {
+            alertGeneration++
+            play(alarm)
+            startForeground(notificationId, createNotification(this@AlarmService, this))
+            startActivity(alertIntent(this))
+        }
+
+        override fun onSuppressed() {
+            alertScreenVisible = false
+            stopAudio()
+            closeAlert(this)
+            if (ringingAlarms[alarm.id] === this) {
+                NotificationManagerCompat.from(this@AlarmService)
+                    .notify(notificationId, createNotification(this@AlarmService, this))
+            }
+        }
+    }
+
     private val alarmActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d("AlarmService", "magga")
-            if (
-                intent?.action == CANCEL_SHARED_ALARM_INTENT_ACTION &&
-                intent.getLongExtra(AlarmHelper.EXTRA_ID, -1L) == currentAlarm?.id
-            ) {
-                stopSelf()
+            intent ?: return
+            val ring = ringingAlarms[intent.getLongExtra(AlarmHelper.EXTRA_ID, -1L)] ?: return
+            if (intent.action == CANCEL_SHARED_ALARM_INTENT_ACTION) {
+                endRinging(ring)
                 return
             }
-            when (val action = intent?.getStringExtra(ACTION_EXTRA_KEY)) {
+            if (intent.getLongExtra(AlarmHelper.EXTRA_TRIGGER_TIME, -1L) != ring.ringTime) return
+            val deliveredOccurrenceId = intent.getStringExtra(EXTRA_OCCURRENCE_ID)
+            if (deliveredOccurrenceId != null && deliveredOccurrenceId != ring.occurrenceId) return
+            when (val action = intent.getStringExtra(ACTION_EXTRA_KEY)) {
                 DISMISS_ACTION -> {
-                    currentAlarm?.let {
-                        outcomeRecorded = true
-                        SocialAlarmEvents.dismiss(this@AlarmService, it.id, occurrenceId)
-                    }
-                    //maybe fixes a super shitty bug that was shitty kinda D:
-                    currentAlarm?.let { alarm ->
-                        AlarmHelper.enqueue(this@AlarmService, alarm, skipToday = true)
-                    }
-                    stopSelf()
+                    SocialAlarmEvents.dismiss(this@AlarmService, ring.alarm.id, ring.occurrenceId)
+                    AlarmHelper.enqueue(this@AlarmService, ring.alarm, skipToday = true)
+                    endRinging(ring)
                 }
                 SNOOZE_ACTION -> {
-                    currentAlarm?.let { alarm ->
-                        val occurredAt = System.currentTimeMillis()
-                        outcomeRecorded = true
-                        val snoozedUntil = AlarmHelper.snooze(this@AlarmService, alarm, currentRingTime!!, alarm.snoozeMinutes)
-                        SocialAlarmEvents.snooze(
-                            this@AlarmService,
-                            alarm,
-                            snoozedUntil,
-                            occurrenceId!!,
-                            occurredAtMillis = occurredAt
-                        )
-                    }
-                    stopSelf()
+                    if (!ring.alarm.canSnooze) return
+                    val occurredAt = System.currentTimeMillis()
+                    val snoozedUntil = AlarmHelper.snooze(
+                        this@AlarmService, ring.alarm, ring.ringTime,
+                        intent.getIntExtra(EXTRA_SNOOZE_MINUTES, ring.alarm.snoozeMinutes)
+                    ) ?: return
+                    SocialAlarmEvents.snooze(
+                        this@AlarmService, ring.alarm, snoozedUntil,
+                        ring.occurrenceId, occurredAtMillis = occurredAt
+                    )
+                    endRinging(ring)
                 }
                 ALERT_SHOWN_ACTION, ALERT_HIDDEN_ACTION -> {
-                    alertScreenVisible = action == ALERT_SHOWN_ACTION
-                    currentAlarm?.let {
-                        startForeground(
-                            notificationId,
-                            createNotification(this@AlarmService, it)
-                        )
-                    }
+                    if (intent.getLongExtra(RingingActivity.ALERT_GENERATION_EXTRA_KEY, -1L) != ring.alertGeneration) return
+                    ring.alertScreenVisible = action == ALERT_SHOWN_ACTION
+                    NotificationManagerCompat.from(this@AlarmService)
+                        .notify(ring.notificationId, createNotification(this@AlarmService, ring))
                 }
             }
         }
@@ -131,16 +151,21 @@ class AlarmService : Service() {
     }
 
     override fun onDestroy() {
-        stop()
-        timeoutHandler.removeCallbacksAndMessages(null)
+        val rings = ringingAlarms.values.toList()
+        ringingAlarms.clear()
+        RingingCoordinator.stop(*rings.toTypedArray())
+        rings.forEach {
+            timeoutHandler.removeCallbacks(it.timeout)
+            closeAlert(it)
+            NotificationManagerCompat.from(this).cancel(it.notificationId)
+        }
+        stopAudio()
         unregisterReceiver(alarmActionReceiver)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent): IBinder? {
-        return null
-    }
+    override fun onBind(intent: Intent): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val id = intent?.getLongExtra(AlarmHelper.EXTRA_ID, -1).takeIf { it != -1L }
@@ -152,26 +177,27 @@ class AlarmService : Service() {
         val activeOccurrenceId = Preferences.instance.getString("${SocialPreferences.alarmOccurrencePrefix}${alarm.id}", null)
         val deliveredOccurrenceId = intent?.getStringExtra(EXTRA_OCCURRENCE_ID)
         if (activeOccurrenceId != null && deliveredOccurrenceId != null && deliveredOccurrenceId != activeOccurrenceId) {
-            if (isPlaying) return START_STICKY
+            if (ringingAlarms.isNotEmpty()) return START_STICKY
             stopSelf()
             return START_NOT_STICKY
         }
-        val scheduledOccurrenceId = deliveredOccurrenceId ?: activeOccurrenceId ?: "${alarm.id}:${System.currentTimeMillis()}"
         var triggerTime = intent?.getLongExtra(
             AlarmHelper.EXTRA_TRIGGER_TIME,
             System.currentTimeMillis()
         ) ?: System.currentTimeMillis()
+        val scheduledOccurrenceId = deliveredOccurrenceId ?: activeOccurrenceId ?: "${alarm.id}:$triggerTime"
         val timeoutMillis = alarm.timeoutMinutes * 60_000L
         var originalDeadlineAt = triggerTime + timeoutMillis
         val deadlineKey = "${SocialPreferences.alarmDeadlinePrefix}${alarm.id}"
         val activeDeadline = Preferences.instance.getLong(deadlineKey, -1L)
         if (Preferences.instance.contains(deadlineKey) && activeDeadline != originalDeadlineAt) {
-            if (isPlaying && currentAlarm?.id == alarm.id && currentRingTime == activeDeadline - alarm.timeoutMinutes * 60_000L) {
+            if (ringingAlarms[alarm.id]?.ringTime == activeDeadline - alarm.timeoutMinutes * 60_000L) {
                 return START_STICKY
             }
             if (activeDeadline > System.currentTimeMillis()) {
                 AlarmHelper.snooze(this, alarm, snoozedUntil = activeDeadline - timeoutMillis)
-                if (isPlaying && currentAlarm?.id != alarm.id) return START_STICKY
+                ringingAlarms[alarm.id]?.let { endRinging(it, keepService = true) }
+                if (ringingAlarms.isNotEmpty()) return START_STICKY
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -179,7 +205,8 @@ class AlarmService : Service() {
                 triggerTime = activeDeadline - timeoutMillis
                 originalDeadlineAt = activeDeadline
             } else {
-                if (isPlaying && currentAlarm?.id != alarm.id) return START_STICKY
+                ringingAlarms[alarm.id]?.let { endRinging(it, keepService = true) }
+                if (ringingAlarms.isNotEmpty()) return START_STICKY
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -212,97 +239,115 @@ class AlarmService : Service() {
                 if (shared) {
                     SocialIgnoredAlarmWorker.schedule(this, alarm, nextRing, scheduledOccurrenceId, snoozedAtMillis = lastSnoozedAt)
                 }
-                if (isPlaying && currentAlarm?.id != alarm.id) return START_STICKY
+                ringingAlarms[alarm.id]?.let { endRinging(it, keepService = true) }
+                if (ringingAlarms.isNotEmpty()) return START_STICKY
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
-        val deadlineAt = triggerTime + timeoutMillis
-        currentRingTime = triggerTime
-        occurrenceId = scheduledOccurrenceId
-        val notification = createNotification(this, alarm)
-        startForeground(notificationId, notification)
-
-        play(alarm)
-        currentAlarm = alarm
-        outcomeRecorded = false
-        val alarmActivityIntent = Intent(this, AlarmActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
-            putExtra(AlarmHelper.EXTRA_ID, alarm.id)
-            putExtra(EXTRA_OCCURRENCE_ID, occurrenceId)
-            putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, currentRingTime!!)
+        val existing = ringingAlarms[id]
+        if (existing?.ringTime == triggerTime && existing.occurrenceId == scheduledOccurrenceId) return START_STICKY
+        existing?.let { endRinging(it, keepService = true) }
+        val ring = AlarmRing(alarm.copy(), triggerTime, scheduledOccurrenceId)
+        ringingAlarms[id] = ring
+        val foreground = ringingAlarms.values.firstOrNull { RingingCoordinator.selected === it } ?: ring
+        startForeground(foreground.notificationId, createNotification(this, foreground))
+        if (foreground !== ring) {
+            NotificationManagerCompat.from(this).notify(ring.notificationId, createNotification(this, ring))
         }
-        startActivity(alarmActivityIntent)
-        timeoutHandler.postDelayed({
-            currentAlarm?.takeUnless { outcomeRecorded }?.let { alarm ->
-                outcomeRecorded = true
-                if (alarm.missedRestartEnabled) {
-                    val snoozedUntil = AlarmHelper.snooze(
-                        this@AlarmService,
-                        alarm,
-                        snoozedUntil = deadlineAt + alarm.missedRestartMinutes * 60_000L
-                    )
-                    SocialAlarmEvents.snooze(
-                        this@AlarmService,
-                        alarm,
-                        snoozedUntil,
-                        occurrenceId!!,
-                        reason = "timed_out",
-                        occurredAtMillis = deadlineAt
-                    )
-                } else {
-                    if (Permission.NotificationPermission.hasPermission(this@AlarmService)) {
-                        val contentIntent = PendingIntent.getActivity(
-                            this@AlarmService,
-                            alarm.id.toInt(),
-                            Intent(this@AlarmService, MainActivity::class.java)
-                                .setAction(android.provider.AlarmClock.ACTION_SHOW_ALARMS),
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                        )
-                        NotificationManagerCompat.from(this@AlarmService).notify(
-                            alarm.id.toInt() + MISSED_ALARM_ID_OFFSET,
-                            NotificationCompat.Builder(
-                                this@AlarmService,
-                                NotificationHelper.MISSED_ALARM_CHANNEL
-                            )
-                                .setSmallIcon(R.drawable.ic_notification)
-                                .setSilent(true)
-                                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                                .setContentTitle(
-                                    alarm.label?.takeIf { it.isNotBlank() }?.let {
-                                        getString(
-                                            R.string.named_alarm_missed,
-                                            it,
-                                            TimeHelper.millisToFormatted(this@AlarmService, alarm.time)
-                                        )
-                                    } ?: getString(
-                                        R.string.alarm_missed,
-                                        TimeHelper.millisToFormatted(this@AlarmService, alarm.time)
-                                    )
-                                )
-                                .setContentText(
-                                    resources.getQuantityString(
-                                        R.plurals.alarm_rang_for_minutes,
-                                        alarm.timeoutMinutes,
-                                        alarm.timeoutMinutes
-                                    )
-                                )
-                                .setContentIntent(contentIntent)
-                                .setAutoCancel(true)
-                                .build()
-                        )
-                    }
-                    SocialAlarmEvents.ignore(this@AlarmService, alarm.id, occurrenceId, "timed_out")
-                }
-            }
-            stopSelf()
-        }, (deadlineAt - System.currentTimeMillis()).coerceAtLeast(0L))
+        timeoutHandler.postDelayed(
+            ring.timeout,
+            (triggerTime + timeoutMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+        )
+        RingingCoordinator.start(ring)
         return START_STICKY
     }
 
+    private fun handleTimeout(ring: AlarmRing) {
+        if (ringingAlarms[ring.alarm.id] !== ring) return
+        val alarm = ring.alarm
+        val deadlineAt = ring.ringTime + ring.timeoutMillis
+        if (alarm.missedRestartEnabled) {
+            val snoozedUntil = AlarmHelper.snooze(
+                this, alarm, snoozedUntil = deadlineAt + alarm.missedRestartMinutes * 60_000L
+            )
+            SocialAlarmEvents.snooze(
+                this, alarm, snoozedUntil, ring.occurrenceId,
+                reason = "timed_out", occurredAtMillis = deadlineAt
+            )
+        } else {
+            if (Permission.NotificationPermission.hasPermission(this)) {
+                val contentIntent = PendingIntent.getActivity(
+                    this, alarm.id.toInt(),
+                    Intent(this, MainActivity::class.java)
+                        .setAction(android.provider.AlarmClock.ACTION_SHOW_ALARMS),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                NotificationManagerCompat.from(this).notify(
+                    alarm.id.toInt() + MISSED_ALARM_ID_OFFSET,
+                    NotificationCompat.Builder(this, NotificationHelper.MISSED_ALARM_CHANNEL)
+                        .setSmallIcon(R.drawable.ic_notification)
+                        .setSilent(true)
+                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                        .setContentTitle(
+                            alarm.label?.takeIf { it.isNotBlank() }?.let {
+                                getString(R.string.named_alarm_missed, it, TimeHelper.millisToFormatted(this, alarm.time))
+                            } ?: getString(R.string.alarm_missed, TimeHelper.millisToFormatted(this, alarm.time))
+                        )
+                        .setContentText(resources.getQuantityString(
+                            R.plurals.alarm_rang_for_minutes, alarm.timeoutMinutes, alarm.timeoutMinutes
+                        ))
+                        .setContentIntent(contentIntent)
+                        .setAutoCancel(true)
+                        .build()
+                )
+            }
+            SocialAlarmEvents.ignore(this, alarm.id, ring.occurrenceId, "timed_out")
+        }
+        endRinging(ring)
+    }
+
+    private fun endRinging(ring: AlarmRing, keepService: Boolean = false) {
+        ringingAlarms.remove(ring.alarm.id)
+        timeoutHandler.removeCallbacks(ring.timeout)
+        RingingCoordinator.stop(ring)
+        closeAlert(ring)
+        val remaining = ringingAlarms.values.firstOrNull { RingingCoordinator.selected === it }
+            ?: ringingAlarms.values.firstOrNull()
+        if (remaining != null) {
+            startForeground(remaining.notificationId, createNotification(this, remaining))
+        } else if (!keepService) {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+        NotificationManagerCompat.from(this).cancel(ring.notificationId)
+    }
+
+    private fun alertIntent(ring: AlarmRing) =
+        Intent(this, AlarmActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+            .putExtra(AlarmHelper.EXTRA_ID, ring.alarm.id)
+            .putExtra(EXTRA_OCCURRENCE_ID, ring.occurrenceId)
+            .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ring.ringTime)
+            .putExtra(RingingActivity.ALERT_GENERATION_EXTRA_KEY, ring.alertGeneration)
+
+    private fun closeAlert(ring: AlarmRing) {
+        val selected = RingingCoordinator.selected as? AlarmRing
+        if (selected != null) {
+            if (ring.alertScreenVisible) startActivity(alertIntent(selected))
+            return
+        }
+        sendBroadcast(Intent(AlarmActivity.ALARM_ALERT_CLOSE_ACTION)
+            .putExtra(RingingActivity.ACTION_EXTRA_KEY, RingingActivity.CLOSE_ACTION)
+            .putExtra(AlarmHelper.EXTRA_ID, ring.alarm.id)
+            .putExtra(EXTRA_OCCURRENCE_ID, ring.occurrenceId)
+            .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ring.ringTime)
+            .putExtra(RingingActivity.ALERT_GENERATION_EXTRA_KEY, ring.alertGeneration)
+            .setPackage(packageName))
+    }
+
     private fun play(alarm: Alarm) {
-        // stop() checks to see if we are already playing.
-        stop()
+        stopAudio()
         if (alarm.soundEnabled) {
             val alert: Uri? = alarm.soundUri?.toUri() ?: RingtoneManager.getDefaultUri(
                 RingtoneManager.TYPE_ALARM
@@ -380,11 +425,7 @@ class AlarmService : Service() {
         ).apply { start() }
         player.start()
     }
-    /**
-     * Stops alarm
-     */
-    fun stop() {
-        timeoutHandler.removeCallbacksAndMessages(null)
+    private fun stopAudio() {
         if (!isPlaying) return
         isPlaying = false
 
@@ -403,30 +444,22 @@ class AlarmService : Service() {
             @Suppress("DEPRECATION")
             audioManager.abandonAudioFocus(null)
         }
-        NotificationManagerCompat.from(this).cancel(notificationId)
         // Stop vibrator
         vibrator?.cancel()
 
-        val closeAlarmAlertIntent = Intent(AlarmActivity.ALARM_ALERT_CLOSE_ACTION).apply {
-            putExtra(RingingActivity.ACTION_EXTRA_KEY, RingingActivity.CLOSE_ACTION)
-            `package` = packageName
-        }
-        sendBroadcast(closeAlarmAlertIntent)
     }
 
-    private fun createNotification(context: Context, alarm: Alarm): Notification {
+    private fun createNotification(context: Context, ring: AlarmRing): Notification {
+        val alarm = ring.alarm
+        val selected = RingingCoordinator.selected === ring
         NotificationManagerCompat.from(context).cancel(
             alarm.id.toInt() + AlarmHelper.PRE_ALARM_ID_OFFSET
         )
-        val alarmActivityIntent = Intent(context, AlarmActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
-            .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
-            .putExtra(EXTRA_OCCURRENCE_ID, occurrenceId)
-            .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, currentRingTime!!)
+        val alarmActivityIntent = alertIntent(ring)
 
         val pendingIntent = PendingIntent.getActivity(
             this@AlarmService,
-            0,
+            ring.notificationId,
             alarmActivityIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -448,15 +481,18 @@ class AlarmService : Service() {
 
         val dismissAlarmIntent = Intent(ALARM_INTENT_ACTION)
             .putExtra(ACTION_EXTRA_KEY, DISMISS_ACTION)
+            .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+            .putExtra(EXTRA_OCCURRENCE_ID, ring.occurrenceId)
+            .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ring.ringTime)
         val onDeleteIntent = getPendingIntent(dismissAlarmIntent, 1)
 
-        val dismissIntent = Intent(ALARM_INTENT_ACTION).putExtra(ACTION_EXTRA_KEY, DISMISS_ACTION)
+        val dismissIntent = Intent(dismissAlarmIntent)
         val dismissAction = NotificationCompat.Action.Builder(
             null,
             getString(R.string.dismiss),
             getPendingIntent(dismissIntent, 2)
         )
-        val targetAlarmTimeMs = currentRingTime ?: System.currentTimeMillis()
+        val targetAlarmTimeMs = ring.ringTime
 
         return NotificationCompat.Builder(context, NotificationHelper.ALARM_CHANNEL).apply {
             val formattedTime = TimeHelper.formatTime(
@@ -483,11 +519,14 @@ class AlarmService : Service() {
             foregroundServiceBehavior = FOREGROUND_SERVICE_IMMEDIATE
             setCategory(NotificationCompat.CATEGORY_ALARM)
             setContentIntent(pendingIntent)
-            setSilent(alertScreenVisible)
-            if (!alertScreenVisible) setFullScreenIntent(pendingIntent, true)
-            if (alarm.snoozeEnabled) {
+            setSilent(ring.alertScreenVisible || !selected)
+            if (selected && !ring.alertScreenVisible) setFullScreenIntent(pendingIntent, true)
+            if (alarm.canSnooze) {
                 val snoozeIntent = Intent(ALARM_INTENT_ACTION)
                     .putExtra(ACTION_EXTRA_KEY, SNOOZE_ACTION)
+                    .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                    .putExtra(EXTRA_OCCURRENCE_ID, ring.occurrenceId)
+                    .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ring.ringTime)
                 addAction(
                     NotificationCompat.Action.Builder(
                         null,
@@ -505,8 +544,8 @@ class AlarmService : Service() {
     private fun getPendingIntent(intent: Intent, requestCode: Int): PendingIntent =
         PendingIntent.getBroadcast(
             this,
-            requestCode,
-            intent,
+            requestCode + intent.getLongExtra(AlarmHelper.EXTRA_ID, -1L).toInt() * 10,
+            intent.setPackage(packageName),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -519,6 +558,8 @@ class AlarmService : Service() {
         const val ALERT_HIDDEN_ACTION = "ALERT_HIDDEN"
         const val CANCEL_SHARED_ALARM_INTENT_ACTION = "com.rispng.jay.CANCEL_SHARED_ALARM"
         const val EXTRA_OCCURRENCE_ID = "com.rispng.jay.ALARM_OCCURRENCE_ID"
+        const val EXTRA_SNOOZE_MINUTES = "snooze_minutes"
+        private const val ALARM_NOTIFICATION_ID_OFFSET = 20_000
         private const val MISSED_ALARM_ID_OFFSET = 8000
 
     }

@@ -72,6 +72,9 @@ class AlarmReceiver : BroadcastReceiver() {
                 }
             }
         }
+        if (alarm.snoozedUntil == null && (deliveredOccurrenceId == null || deliveredOccurrenceId == triggerTime.toString())) {
+            alarm.snoozeCount = 0
+        }
         alarm.snoozedUntil = null
 
         // the alarm rang its last occurrence, so it may not be re-enqueued for another one

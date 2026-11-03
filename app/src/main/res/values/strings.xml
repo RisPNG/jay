@@ -141,6 +141,13 @@
     <string name="minutes">Minutes</string>
     <string name="seconds">Seconds</string>
     <string name="snooze">Snooze</string>
+    <string name="snooze_limit">Snooze limit</string>
+    <string name="snooze_unlimited">Indefinitely</string>
+    <string name="snoozes_unit">snoozes</string>
+    <plurals name="snooze_limit_count">
+        <item quantity="one">%d snooze</item>
+        <item quantity="other">%d snoozes</item>
+    </plurals>
     <string name="dismiss">Dismiss</string>
     <string name="volume_buttons_during_alarm">Volume buttons</string>
     <string name="volume_buttons_during_timer">Volume buttons</string>

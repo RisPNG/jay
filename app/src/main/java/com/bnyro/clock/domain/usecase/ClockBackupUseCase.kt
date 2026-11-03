@@ -37,7 +37,7 @@ class ClockBackupUseCase(private val context: Context) {
             }
         val sharedAlarmIds = container.socialRepository.alarmGroupNames.first().map { it.localAlarmId }.toSet()
         return ClockBackup(
-            alarms = container.alarmRepository.getAlarms().filter { it.id !in sharedAlarmIds }.map { it.copy(id = 0, snoozedUntil = null) },
+            alarms = container.alarmRepository.getAlarms().filter { it.id !in sharedAlarmIds }.map { it.copy(id = 0, snoozedUntil = null, snoozeCount = 0) },
             timers = TimerSettings.getSavedTimers().map { it.copy(id = 0, groupId = null) },
             activeTimers = activeTimers,
             timeZones = container.timezoneRepository.getTimezones(),
@@ -63,8 +63,8 @@ class ClockBackupUseCase(private val context: Context) {
         val sharedAlarmIds = container.socialRepository.alarmGroupNames.first().map { it.localAlarmId }.toSet()
         val addedAlarms = container.database.withTransaction {
             val existingAlarms = container.alarmRepository.getAlarms().filter { it.id !in sharedAlarmIds }
-                .map { it.copy(id = 0, snoozedUntil = null) }.toSet()
-            val added = backup.alarms.map { it.copy(id = 0, snoozedUntil = null) }.distinct()
+                .map { it.copy(id = 0, snoozedUntil = null, snoozeCount = 0) }.toSet()
+            val added = backup.alarms.map { it.copy(id = 0, snoozedUntil = null, snoozeCount = 0) }.distinct()
                 .filter { it !in existingAlarms }.map { alarm ->
                     alarm.copy(id = container.alarmRepository.addAlarm(alarm))
                 }
