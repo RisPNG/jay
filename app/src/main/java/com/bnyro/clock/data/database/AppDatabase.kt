@@ -16,10 +16,11 @@ import com.bnyro.clock.data.database.dao.Converters
 import com.bnyro.clock.data.database.dao.TimeZonesDao
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.TimeZone
+import com.bnyro.clock.util.Preferences
 
 @Database(
     entities = [TimeZone::class, Alarm::class],
-    version = 15,
+    version = 17,
     autoMigrations = [
         AutoMigration(
             from = 2,
@@ -33,7 +34,8 @@ import com.bnyro.clock.domain.model.TimeZone
         AutoMigration(from = 9, to = 10, spec = AppDatabase.RemoveTimeZoneOffsetColumn::class),
         AutoMigration(from = 10, to = 11),
         AutoMigration(from = 13, to = 14),
-        AutoMigration(from = 14, to = 15, spec = AppDatabase.MigrateDefaultLabelColor::class)
+        AutoMigration(from = 14, to = 15, spec = AppDatabase.MigrateDefaultLabelColor::class),
+        AutoMigration(from = 15, to = 16)
     ]
 )
 @TypeConverters(Converters::class)
@@ -115,6 +117,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE alarms ADD COLUMN timeoutMinutes INTEGER NOT NULL DEFAULT 5")
+                db.execSQL("UPDATE alarms SET timeoutMinutes = ?", arrayOf(Preferences.instance.getInt("alarmTimeoutMinutes", 10)))
+                db.execSQL("ALTER TABLE alarms ADD COLUMN missedRestartEnabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE alarms ADD COLUMN missedRestartMinutes INTEGER NOT NULL DEFAULT 10")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val targetContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -141,7 +152,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_3_4,
                         MIGRATION_7_8,
                         MIGRATION_11_12,
-                        MIGRATION_12_13
+                        MIGRATION_12_13,
+                        MIGRATION_16_17
                     )
                     .build()
                 INSTANCE = instance
