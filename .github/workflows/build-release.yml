@@ -15,15 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: "zulu"
-          java-version: "17"
-          cache: "gradle"
+      - uses: jdx/mise-action@v2
 
       - name: Build APK
-        run: ./gradlew assembleRelease --no-daemon
+        run: mise exec -- ./gradlew assembleRelease --no-daemon
 
       - name: Sign APK
         uses: ilharp/sign-android-release@v1
