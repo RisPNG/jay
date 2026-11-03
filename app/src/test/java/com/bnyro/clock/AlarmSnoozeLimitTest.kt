@@ -220,6 +220,8 @@ class AlarmSnoozeLimitTest {
 
             context.sendBroadcast(Intent(AlarmService.ALARM_INTENT_ACTION)
                 .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.SNOOZE_ACTION)
+                .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ringTime)
                 .setPackage(context.packageName))
             shadowOf(Looper.getMainLooper()).idle()
 
