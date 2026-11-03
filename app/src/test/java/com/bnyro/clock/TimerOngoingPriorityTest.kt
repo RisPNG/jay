@@ -47,6 +47,9 @@ class TimerOngoingPriorityTest {
 
     @After
     fun tearDown() {
+        service.sendBroadcast(TimerService.updateStateIntent(TimerService.PRUNE_SHARED_TIMERS_ACTION, 0)
+            .putStringArrayListExtra(TimerService.ACTIVE_SHARED_TIMER_IDS_EXTRA_KEY, arrayListOf()))
+        shadowOf(Looper.getMainLooper()).idle()
         service.timerObjects.toList().forEach { sendAction(TimerService.ACTION_STOP, it.id) }
         controller.destroy()
         Preferences.instance.edit().clear().commit()
@@ -158,4 +161,27 @@ class TimerOngoingPriorityTest {
             }.map { it.id }.toSet()
         )
     }
+
+    @Test
+    fun aSharedDeadlineChangeTransfersPromotionBetweenSharedAndPersonalTimers() {
+        startTimer(1, 300)
+        val update = Intent(application, TimerService::class.java)
+            .setAction(TimerService.SYNC_SHARED_TIMER_ACTION)
+            .putExtra(TimerService.SHARED_TIMER_ID_EXTRA_KEY, "shared")
+            .putExtra(TimerService.SHARED_TIMER_GROUP_ID_EXTRA_KEY, "group")
+            .putExtra(TimerService.SHARED_TIMER_MEMBERSHIP_ID_EXTRA_KEY, "membership")
+            .putExtra(TimerService.SHARED_TIMER_RUN_ID_EXTRA_KEY, "run")
+            .putExtra(TimerService.SHARED_TIMER_DURATION_EXTRA_KEY, 600)
+            .putExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, System.currentTimeMillis() + 60_000)
+        service.onStartCommand(update, 0, 2)
+        val shared = service.timerObjects.single { it.sharedTimerId == "shared" }
+        assertEquals(shared.id, shadowOf(service).lastForegroundNotificationId)
+        assertPromotedTimers(shared.id)
+
+        update.putExtra(TimerService.SHARED_TIMER_EXPIRES_EXTRA_KEY, System.currentTimeMillis() + 600_000)
+        service.onStartCommand(update, 0, 3)
+        assertEquals(1, shadowOf(service).lastForegroundNotificationId)
+        assertPromotedTimers(1)
+    }
+
 }

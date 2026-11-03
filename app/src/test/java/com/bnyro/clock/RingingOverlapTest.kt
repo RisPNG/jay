@@ -14,6 +14,7 @@ import com.bnyro.clock.domain.model.TimerDescriptor
 import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.presentation.screens.alarm.AlarmActivity
 import com.bnyro.clock.util.AlarmHelper
+import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.RingingCoordinator
 import com.bnyro.clock.util.services.AlarmService
@@ -417,4 +418,32 @@ class RingingOverlapTest {
             activityController.destroy()
         }
     }
+
+    @Test
+    fun movingASuppressedAlarmToALaterPhaseStopsOnlyItsOldRing() = runBlocking {
+        val quiet = Alarm(time = 0L, soundEnabled = false, vibrate = false, timeoutMinutes = 5)
+        quiet.id = app.container.alarmRepository.addAlarm(quiet)
+        val important = Alarm(time = 0L, soundEnabled = false, vibrate = true, timeoutMinutes = 5)
+        important.id = app.container.alarmRepository.addAlarm(important)
+        val now = System.currentTimeMillis()
+        listOf(quiet, important).forEachIndexed { index, alarm ->
+            alarmController.get().onStartCommand(Intent(app, AlarmService::class.java)
+                .putExtra(AlarmHelper.EXTRA_ID, alarm.id).putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, now), 0, index + 1)
+        }
+        val nextRing = now + 10 * 60_000L
+        Preferences.edit { putLong("${SocialPreferences.alarmDeadlinePrefix}${quiet.id}", nextRing + 5 * 60_000L) }
+        alarmController.get().onStartCommand(Intent(app, AlarmService::class.java)
+            .putExtra(AlarmHelper.EXTRA_ID, quiet.id).putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, now), 0, 3)
+
+        assertTrue(RingingCoordinator.selected!!.vibrate)
+        assertEquals(nextRing, app.container.alarmRepository.getAlarmById(quiet.id)?.snoozedUntil)
+        alarmController.get().sendBroadcast(Intent(AlarmService.ALARM_INTENT_ACTION)
+            .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.DISMISS_ACTION)
+            .putExtra(AlarmHelper.EXTRA_ID, important.id)
+            .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, now).setPackage(app.packageName))
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertNull(RingingCoordinator.selected)
+    }
+
 }
