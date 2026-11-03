@@ -72,14 +72,14 @@ class LabelColorMigrationTest {
                 Alarm(
                     id = 1, time = 25_200_000L, label = "Weekdays", labelColor = DefaultLabelColor,
                     enabled = true, days = listOf(1, 2, 3, 4, 5), startDate = 20_000,
-                    repeatInterval = 2, advanced = true
+                    repeatInterval = 2, advanced = true, snoozeMinutes = 10
                 ),
                 upgraded.alarmsDao().findById(1)
             )
             assertEquals(
                 Alarm(
                     id = 2, time = 28_800_000L, label = "Colored", labelColor = LabelColor.Cocoa.argb,
-                    enabled = false, days = listOf(0, 6), vibrate = false, startDate = 0
+                    enabled = false, days = listOf(0, 6), vibrate = false, startDate = 0, snoozeMinutes = 10
                 ),
                 upgraded.alarmsDao().findById(2)
             )
