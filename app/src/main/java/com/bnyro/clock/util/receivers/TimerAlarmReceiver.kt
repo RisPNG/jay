@@ -14,6 +14,10 @@ class TimerAlarmReceiver : BroadcastReceiver() {
         val serviceIntent = Intent(context, TimerService::class.java).apply {
             action = TimerService.ACTION_TIMER_EXPIRED
             putExtra(TimerService.ID_EXTRA_KEY, id)
+            putExtra(
+                TimerService.EXPIRES_AT_EXTRA_KEY,
+                intent.getLongExtra(TimerService.EXPIRES_AT_EXTRA_KEY, 0L)
+            )
         }
         ContextCompat.startForegroundService(context, serviceIntent)
     }
