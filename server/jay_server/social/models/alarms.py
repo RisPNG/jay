@@ -28,7 +28,7 @@ class SharedAlarm(SavedState):
     advanced = models.BooleanField(default=False)
     snooze_enabled = models.BooleanField()
     snooze_minutes = models.PositiveSmallIntegerField()
-    snooze_limit = models.PositiveSmallIntegerField(default=0)
+    snooze_limit = models.PositiveSmallIntegerField(default=0, db_default=0)
     timeout_minutes = models.PositiveSmallIntegerField(default=5)
     missed_restart_enabled = models.BooleanField(default=False)
     missed_restart_minutes = models.PositiveSmallIntegerField(default=10)
@@ -82,7 +82,7 @@ class AlarmOccurrence(models.Model):
     deadline_at = models.DateTimeField()
     snoozed_until = models.DateTimeField(null=True)
     snoozed_at = models.DateTimeField(null=True)
-    snooze_count = models.PositiveIntegerField(default=0)
+    snooze_count = models.PositiveIntegerField(default=0, db_default=0)
     state = models.CharField(max_length=16, choices=State, default=State.PENDING)
     resolved_at = models.DateTimeField(null=True)
 

@@ -26,6 +26,8 @@ Shared alarms retain recurrence, date bounds, member-local or group-time-zone in
 
 The alarm's snooze limit applies to manual snoozes within one occurrence. A limit of `0` is unlimited, and values from `1` to `100` stop further snoozes once that count is reached. Answer as one shares the count across members in the same cycle. Automatic missed-alarm restarts preserve the count without consuming a snooze. Personal alarms persist the same budget locally, and a new scheduled occurrence starts with a fresh count. Deploy the snooze-limit server migration and API before distributing clients that send the new setting.
 
+Clients on 1.2.5 can keep using existing groups and unlimited shared alarms after the server update. Missing `snooze_limit` defaults to unlimited on creation, and an older client's edit preserves an existing limit. Finite shared snooze limits require every client in the group to be updated: 1.2.5 can schedule a local snooze before the server rejects an exhausted budget. Older clients ignore live group-ring frames and do not play them. The migration retains database defaults for the new columns so old server processes can continue inserting during a rolling deployment.
+
 Deleting a resource permanently reserves its identifier. Payload cleanup cannot allow a stale edit or create to resurrect it. Group deletion immediately denies access and schedules bounded cleanup. Storage deletion is recorded transactionally by a PostgreSQL trigger, including cascade and bulk sound deletion, so removing a database row cannot lose the obligation to delete its object.
 
 ## Offline writes and ordering
