@@ -11,7 +11,7 @@ import java.time.LocalDate
 /**
  * @property time The time of the day in milliseconds.
  * @property days The days of the week to ring the alarm on weekly repeats. Sunday-0, Monday-1 ,... ,Saturday-6
- * @property snoozeMinutes How long the snooze should last in minutes (default 10).
+ * @property snoozeMinutes How long the snooze should last in minutes (default 15).
  * @property startDate The first day the alarm can ring, as an epoch day.
  * @property repeatInterval How many [repeatUnit]s lie between the starts of two repetitions.
  * @property repeatDuration How many [repeatDurationUnit]s a repetition keeps ringing for, or null
@@ -34,7 +34,7 @@ data class Alarm(
     var soundName: String? = null,
     var soundUri: String? = null,
     @ColumnInfo(defaultValue = "1") var snoozeEnabled: Boolean = true,
-    @ColumnInfo(defaultValue = "10") var snoozeMinutes: Int = 10,
+    @ColumnInfo(defaultValue = "10") var snoozeMinutes: Int = 15,
     @ColumnInfo(defaultValue = "0") var snoozeLimit: Int = 0,
     @ColumnInfo(defaultValue = "0") var snoozeCount: Int = 0,
     @ColumnInfo(defaultValue = "NULL") var snoozedUntil: Long? = null,
