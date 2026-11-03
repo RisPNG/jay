@@ -17,10 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
+      - uses: jdx/mise-action@v2
 
       - uses: gradle/actions/setup-gradle@v4
 
@@ -58,7 +55,7 @@ jobs:
           ORG_GRADLE_PROJECT_jaySigningKeyAlias: ${{ secrets.PRODUCTION_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_jaySigningKeyPassword: ${{ secrets.PRODUCTION_KEY_PASSWORD }}
         run: |
-          ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest assembleFullRelease assembleLiteRelease \
+          mise exec -- ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest assembleFullRelease assembleLiteRelease \
             -PjayVersionCode="$VERSION_CODE" \
             -PjayVersionName="$PRERELEASE_VERSION" \
             --no-daemon
@@ -71,7 +68,7 @@ jobs:
           ORG_GRADLE_PROJECT_jaySigningKeyAlias: ${{ secrets.PRERELEASE_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_jaySigningKeyPassword: ${{ secrets.PRERELEASE_KEY_PASSWORD }}
         run: |
-          ./gradlew assembleFullDebug \
+          mise exec -- ./gradlew assembleFullDebug \
             -PjayVersionCode="$VERSION_CODE" \
             -PjayVersionName="$PRERELEASE_VERSION" \
             --no-daemon

@@ -17,10 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
+      - uses: jdx/mise-action@v2
 
       - uses: gradle/actions/setup-gradle@v4
 
@@ -46,7 +43,7 @@ jobs:
           ORG_GRADLE_PROJECT_jaySigningStorePassword: ${{ secrets.PRODUCTION_KEYSTORE_PASSWORD }}
           ORG_GRADLE_PROJECT_jaySigningKeyAlias: ${{ secrets.PRODUCTION_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_jaySigningKeyPassword: ${{ secrets.PRODUCTION_KEY_PASSWORD }}
-        run: ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest assembleFullRelease bundleFullRelease assembleLiteRelease bundleLiteRelease --no-daemon
+        run: mise exec -- ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest assembleFullRelease bundleFullRelease assembleLiteRelease bundleLiteRelease --no-daemon
 
       - name: Build debug APK
         env:
@@ -55,7 +52,7 @@ jobs:
           ORG_GRADLE_PROJECT_jaySigningStorePassword: ${{ secrets.PRERELEASE_KEYSTORE_PASSWORD }}
           ORG_GRADLE_PROJECT_jaySigningKeyAlias: ${{ secrets.PRERELEASE_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_jaySigningKeyPassword: ${{ secrets.PRERELEASE_KEY_PASSWORD }}
-        run: ./gradlew assembleFullDebug --no-daemon
+        run: mise exec -- ./gradlew assembleFullDebug --no-daemon
 
       - name: Read previous releases
         env:

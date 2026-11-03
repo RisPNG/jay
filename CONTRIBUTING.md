@@ -43,6 +43,8 @@ The `full` and `lite` product flavors share the clock, social and audio implemen
 
 Build with `mise exec -- ./gradlew assembleFullDebug assembleFullRelease assembleLiteRelease bundleFullRelease bundleLiteRelease`. Run the JVM suite with `mise exec -- ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest`; release tests cover edition-specific access behavior. Stable release automation publishes both editions' APKs and app bundles, plus the full debug APK. Prereleases publish all three APKs without app bundles.
 
+Use the Java runtime pinned in `mise.toml` for these checks. Android 16 notification tests require Java 21, and the build workflows use the same mise configuration.
+
 Firebase is initialized from Gradle properties. The editions share `jayFirebaseProjectId` and `jayFirebaseApiKey`; their Android application IDs use `jayFirebaseReleaseApplicationId`, `jayFirebaseLiteApplicationId` and `jayFirebaseDebugApplicationId`. Register each package in the Firebase project. Release automation reads the Lite ID from `FIREBASE_LITE_APPLICATION_ID`. Each production package has its own Play listing and must be included in the hosted app-link configuration with its Play signing certificate when verified links are enabled.
 
 See [shared sounds and Play access](docs/entitlements.md) for installation purchase verification and profile operator overrides.
