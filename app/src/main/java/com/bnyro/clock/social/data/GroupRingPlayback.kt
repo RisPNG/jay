@@ -63,13 +63,13 @@ class GroupRingPlayback(private val context: Context) : RingingSession {
             isLooping = true
             setOnPreparedListener { if (RingingCoordinator.selected === this@GroupRingPlayback) it.start() }
             setOnErrorListener { _, _, _ ->
-                onSuppressed()
+                RingingCoordinator.stop(this@GroupRingPlayback)
                 true
             }
             runCatching {
                 setDataSource(context, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
                 prepareAsync()
-            }.onFailure { onSuppressed() }
+            }.onFailure { RingingCoordinator.stop(this@GroupRingPlayback) }
         }
     }
 
