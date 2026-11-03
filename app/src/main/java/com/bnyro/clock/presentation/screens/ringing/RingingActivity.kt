@@ -58,6 +58,9 @@ abstract class RingingActivity : ComponentActivity() {
     private val closeAlertReciever = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.getStringExtra(ACTION_EXTRA_KEY) != CLOSE_ACTION) return
+            if (intent.getLongExtra(ALERT_GENERATION_EXTRA_KEY, 0L) !=
+                this@RingingActivity.intent.getLongExtra(ALERT_GENERATION_EXTRA_KEY, 0L)
+            ) return
             if (closesThisAlert(intent)) finish()
         }
     }
@@ -161,6 +164,7 @@ abstract class RingingActivity : ComponentActivity() {
     }
 
     companion object {
+        const val ALERT_GENERATION_EXTRA_KEY = "alert_generation"
         const val ACTION_EXTRA_KEY = "action"
         const val CLOSE_ACTION = "CLOSE"
     }

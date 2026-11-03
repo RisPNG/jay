@@ -48,12 +48,13 @@ class TimerAlertActivity : RingingActivity() {
     private fun reset() = answerWith(TimerService.TIMER_RESTART)
 
     private fun answerWith(action: String) {
-        sendBroadcast(TimerService.updateStateIntent(action, timerId))
-        finish()
+        sendBroadcast(TimerService.updateStateIntent(action, timerId)
+            .putExtra(TimerService.RINGING_SINCE_EXTRA_KEY, ringingSince))
     }
 
     override fun closesThisAlert(intent: Intent) =
-        intent.getIntExtra(TimerService.ID_EXTRA_KEY, 0) == timerId
+        intent.getIntExtra(TimerService.ID_EXTRA_KEY, 0) == timerId &&
+            intent.getLongExtra(TimerService.RINGING_SINCE_EXTRA_KEY, -1L) == ringingSince
 
     override fun onStart() {
         super.onStart()
@@ -66,12 +67,15 @@ class TimerAlertActivity : RingingActivity() {
     }
 
     private fun reportAlert(action: String) {
-        sendBroadcast(TimerService.updateStateIntent(action, timerId))
+        sendBroadcast(TimerService.updateStateIntent(action, timerId)
+            .putExtra(TimerService.RINGING_SINCE_EXTRA_KEY, ringingSince)
+            .putExtra(ALERT_GENERATION_EXTRA_KEY, intent.getLongExtra(ALERT_GENERATION_EXTRA_KEY, 0L)))
     }
 
     override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
+        super.onNewIntent(intent)
         // a takeover hands the showing screen to another timer, which counts as showing it anew
         reportAlert(TimerService.ACTION_ALERT_SHOWN)
     }
