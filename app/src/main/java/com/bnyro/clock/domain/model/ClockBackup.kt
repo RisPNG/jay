@@ -24,7 +24,9 @@ data class ClockBackup(
 @Serializable
 data class BackupTimer(
     val settings: TimerSettings,
-    val remainingMillis: Int
+    val remainingMillis: Int,
+    val repeatIndex: Int = 0,
+    val initialMillis: Int = settings.seconds * 1000
 )
 
 @Serializable

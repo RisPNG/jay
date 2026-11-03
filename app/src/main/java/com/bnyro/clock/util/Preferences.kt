@@ -22,7 +22,6 @@ object Preferences {
     const val timerIncrementSecondsKey = "timerIncrementSeconds"
     const val timerPickerBehaviourKey = "timerPickerBehaviour"
     const val timerFullScreenAlertKey = "timerFullScreenAlert"
-    const val timerTimeoutMinutesKey = "timerTimeoutMinutes"
     const val timerVolumeRampSecondsKey = "timerVolumeRampSeconds"
     const val alarmVolumeRampSecondsKey = "alarmVolumeRampSeconds"
     const val timerVolumeButtonActionKey = "timerVolumeButtonAction"
@@ -51,6 +50,7 @@ object Preferences {
         val migratedBigStartButton = instance.all[timerBigStartButtonKey]
         val oldBigStartButton = instance.all["timer_BIG_start_button"]
         instance.edit {
+            remove("timerTimeoutMinutes")
             if (timerPickerStyle is Boolean) {
                 putString(
                     timerPickerStyleKey,
