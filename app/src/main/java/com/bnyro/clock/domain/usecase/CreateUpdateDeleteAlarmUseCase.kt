@@ -21,6 +21,7 @@ class CreateUpdateDeleteAlarmUseCase(
 
     suspend fun createAlarm(alarm: Alarm) {
         alarm.snoozedUntil = null
+        alarm.snoozeCount = 0
         alarm.dismissedAt = null
         anchorStartDate(alarm)
         if (AlarmHelper.hasRecurrenceEnded(alarm)) alarm.enabled = false
@@ -31,6 +32,7 @@ class CreateUpdateDeleteAlarmUseCase(
 
     suspend fun updateAlarm(alarm: Alarm) {
         alarm.snoozedUntil = null
+        alarm.snoozeCount = 0
         alarm.dismissedAt = null
         anchorStartDate(alarm)
         if (AlarmHelper.hasRecurrenceEnded(alarm)) alarm.enabled = false

@@ -22,6 +22,7 @@ class AlarmReceiver : BroadcastReceiver() {
         } ?: return
 
         val triggerTime = intent.getLongExtra(AlarmHelper.EXTRA_TRIGGER_TIME, alarm.snoozedUntil ?: System.currentTimeMillis())
+        if (alarm.snoozedUntil == null) alarm.snoozeCount = 0
         alarm.snoozedUntil = null
 
         // the alarm rang its last occurrence, so it may not be re-enqueued for another one

@@ -41,7 +41,7 @@ abstract class RingingActivity : ComponentActivity() {
 
     protected abstract fun snooze()
 
-    /** Whether snoozing is offered at all, which the volume keys fall back from when it is not. */
+    /** Whether snoozing is available to the screen and volume keys. */
     protected open val snoozeAvailable: Boolean get() = true
 
     /** Whether a close broadcast is about what this screen is currently showing. */
@@ -131,7 +131,7 @@ abstract class RingingActivity : ComponentActivity() {
             )
         ) {
             VolumeButtonAction.SNOOZE -> {
-                if (snoozeAvailable) snooze() else dismiss()
+                if (snoozeAvailable) snooze()
                 true
             }
             VolumeButtonAction.DISMISS -> {

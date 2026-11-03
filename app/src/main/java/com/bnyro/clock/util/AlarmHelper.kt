@@ -375,7 +375,10 @@ object AlarmHelper {
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
-    fun snooze(context: Context, oldAlarm: Alarm, ringTime: Long, snoozeMinutes: Int): Long {
+    fun snooze(context: Context, oldAlarm: Alarm, ringTime: Long, snoozeMinutes: Int): Long? {
+        val repository = (context.applicationContext as App).container.alarmRepository
+        val alarm = runBlocking { repository.getAlarmById(oldAlarm.id) } ?: return null
+        if (!alarm.canSnooze) return null
         val now = System.currentTimeMillis()
         val calendar = Calendar.getInstance()
         calendar.timeInMillis = ringTime
@@ -388,9 +391,10 @@ object AlarmHelper {
             calendar.set(Calendar.SECOND, 0)
             calendar.set(Calendar.MILLISECOND, 0)
         }
-        val alarm = oldAlarm.copy(snoozedUntil = calendar.timeInMillis)
+        alarm.snoozedUntil = calendar.timeInMillis
+        alarm.snoozeCount += 1
         runBlocking {
-            (context.applicationContext as App).container.alarmRepository.updateAlarm(alarm)
+            repository.updateAlarm(alarm)
         }
         enqueue(context, alarm)
         return calendar.timeInMillis
