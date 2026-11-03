@@ -69,7 +69,7 @@ class AlarmView(APIView):
                 changes.append(("sound", str(alarm.sound_id), "upsert", SoundRepresentation(alarm.sound).data, None))
             current = AlarmRepresentation(alarm).data
             details = {}
-            for field in ["label", "label_color", "local_time_ms", "enabled", "days", "vibrate", "start_date", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "snooze_enabled", "snooze_minutes", "timeout_minutes", "missed_restart_enabled", "missed_restart_minutes", "sound_mode", "sound_id", "vibration_pattern", "vibration_pattern_name"]:
+            for field in ["label", "label_color", "local_time_ms", "enabled", "days", "vibrate", "start_date", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "snooze_enabled", "snooze_minutes", "snooze_limit", "timeout_minutes", "missed_restart_enabled", "missed_restart_minutes", "sound_mode", "sound_id", "vibration_pattern", "vibration_pattern_name"]:
                 key = "time" if field == "local_time_ms" else field
                 details[f"previous_{key}"], details[key] = previous[field], current[field]
             action = "edited" if previous["enabled"] == alarm.enabled else "enabled" if alarm.enabled else "disabled"

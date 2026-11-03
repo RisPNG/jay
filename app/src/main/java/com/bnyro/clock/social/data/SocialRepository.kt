@@ -322,6 +322,7 @@ class SocialRepository(
                         advanced = remote.advanced,
                         snoozeEnabled = remote.snoozeEnabled,
                         snoozeMinutes = remote.snoozeMinutes,
+                        snoozeLimit = remote.snoozeLimit,
                         timeoutMinutes = remote.timeoutMinutes,
                         missedRestartEnabled = remote.missedRestartEnabled,
                         missedRestartMinutes = remote.missedRestartMinutes,
@@ -377,6 +378,7 @@ class SocialRepository(
                             advanced = remote.advanced,
                             snoozeEnabled = remote.snoozeEnabled,
                             snoozeMinutes = remote.snoozeMinutes,
+                            snoozeLimit = remote.snoozeLimit,
                             timeoutMinutes = remote.timeoutMinutes,
                             missedRestartEnabled = remote.missedRestartEnabled,
                             missedRestartMinutes = remote.missedRestartMinutes,
@@ -405,11 +407,13 @@ class SocialRepository(
             } else {
                 alarmRepository.getAlarmById(link.localAlarmId)?.let { local ->
                     val timingChanged = local.timeoutMinutes != remote.timeoutMinutes ||
+                        local.snoozeLimit != remote.snoozeLimit ||
                         local.missedRestartEnabled != remote.missedRestartEnabled ||
                         local.missedRestartMinutes != remote.missedRestartMinutes
                     if (local.soundUri != soundUri || local.labelColor != remote.labelColor || timingChanged) {
                         val alarm = local.copy(
                             soundUri = soundUri, labelColor = remote.labelColor,
+                            snoozeLimit = remote.snoozeLimit,
                             timeoutMinutes = remote.timeoutMinutes, missedRestartEnabled = remote.missedRestartEnabled,
                             missedRestartMinutes = remote.missedRestartMinutes
                         )
@@ -459,13 +463,18 @@ class SocialRepository(
             val phaseRing = (pendingOccurrence?.snoozedUntil ?: pendingOccurrence?.triggerAt)
                 ?.let { Instant.parse(it).toEpochMilli() } ?: occurrenceId.toLongOrNull()
             if (pendingOccurrence != null && phaseRing != null) {
-                alarmRepository.getAlarmById(link.localAlarmId)?.let { alarm ->
+                alarmRepository.getAlarmById(link.localAlarmId)?.let { local ->
+                    var alarm = local
                     val deadlineAt = pendingOccurrence.deadlineAt?.let { Instant.parse(it).toEpochMilli() }
                         ?: phaseRing + alarm.timeoutMinutes * 60_000L
                     val snoozedAt = pendingOccurrence.snoozedAt?.let { Instant.parse(it).toEpochMilli() } ?: 0L
                     val activeDeadline = Preferences.instance.getLong("${SocialPreferences.alarmDeadlinePrefix}${alarm.id}", -1L)
                     val localSnoozedAt = Preferences.instance.getLong("${SocialPreferences.alarmSnoozedAtPrefix}${alarm.id}", 0L)
                     if (activeDeadline != 0L && snoozedAt >= localSnoozedAt) {
+                        if (alarm.snoozeCount != pendingOccurrence.snoozeCount) {
+                            alarm = alarm.copy(snoozeCount = pendingOccurrence.snoozeCount)
+                            alarmRepository.updateAlarm(alarm)
+                        }
                         if (
                             pendingOccurrence.snoozedUntil != null && phaseRing > System.currentTimeMillis() &&
                             activeDeadline != deadlineAt && alarm.snoozedUntil != phaseRing
@@ -823,7 +832,7 @@ class SocialRepository(
             repeatInterval = alarm.repeatInterval, repeatUnit = alarm.repeatUnit.name, repeatAnchor = alarm.repeatAnchor.name,
             repeatDuration = alarm.repeatDuration, repeatDurationUnit = alarm.repeatDurationUnit.name,
             endDate = alarm.endDate?.let { LocalDate.ofEpochDay(it).toString() }, endOccurrences = alarm.endOccurrences,
-            advanced = alarm.advanced, snoozeEnabled = alarm.snoozeEnabled, snoozeMinutes = alarm.snoozeMinutes,
+            advanced = alarm.advanced, snoozeEnabled = alarm.snoozeEnabled, snoozeMinutes = alarm.snoozeMinutes, snoozeLimit = alarm.snoozeLimit,
             timeoutMinutes = alarm.timeoutMinutes, missedRestartEnabled = alarm.missedRestartEnabled, missedRestartMinutes = alarm.missedRestartMinutes,
             vibrationPattern = alarm.vibrationPattern, vibrationPatternName = alarm.vibrationPatternName,
             sound = SharedSoundSelection(soundMode.name.lowercase(), soundId, alarm.soundName ?: "Shared sound"),
@@ -864,7 +873,7 @@ class SocialRepository(
                 repeatInterval = alarm.repeatInterval, repeatUnit = alarm.repeatUnit.name, repeatAnchor = alarm.repeatAnchor.name,
                 repeatDuration = alarm.repeatDuration, repeatDurationUnit = alarm.repeatDurationUnit.name,
                 endDate = alarm.endDate?.let { LocalDate.ofEpochDay(it).toString() }, endOccurrences = alarm.endOccurrences,
-                advanced = alarm.advanced, snoozeEnabled = alarm.snoozeEnabled, snoozeMinutes = alarm.snoozeMinutes,
+                advanced = alarm.advanced, snoozeEnabled = alarm.snoozeEnabled, snoozeMinutes = alarm.snoozeMinutes, snoozeLimit = alarm.snoozeLimit,
                 timeoutMinutes = alarm.timeoutMinutes, missedRestartEnabled = alarm.missedRestartEnabled, missedRestartMinutes = alarm.missedRestartMinutes,
                 vibrationPattern = alarm.vibrationPattern, vibrationPatternName = alarm.vibrationPatternName,
                 sound = SharedSoundSelection(soundMode.name.lowercase(), soundId, alarm.soundName ?: "Shared sound"),

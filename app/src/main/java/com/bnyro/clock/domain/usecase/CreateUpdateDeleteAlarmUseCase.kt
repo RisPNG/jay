@@ -24,6 +24,7 @@ class CreateUpdateDeleteAlarmUseCase(
 
     suspend fun updateAlarm(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()) {
         alarm.snoozedUntil = null
+        alarm.snoozeCount = 0
         alarm.dismissedAt = null
         if (AlarmHelper.hasRecurrenceEnded(alarm, timeZone)) alarm.enabled = false
         alarmRepository.updateAlarm(alarm)
@@ -32,6 +33,7 @@ class CreateUpdateDeleteAlarmUseCase(
 
     fun prepareForScheduling(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()) {
         alarm.snoozedUntil = null
+        alarm.snoozeCount = 0
         alarm.dismissedAt = null
         if (!alarm.advanced) alarm.startDate = LocalDate.now(timeZone).toEpochDay()
         alarm.startDate = AlarmHelper.getNextRepetitionStart(alarm, timeZone)?.toEpochDay()

@@ -51,6 +51,7 @@ def schedule_occurrences(alarm, identity_ids, after=None):
             occurrence.deadline_at = trigger + timedelta(minutes=alarm.timeout_minutes)
             occurrence.cycle_date = trigger.astimezone(ZoneInfo(zone)).date()
             occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "pending", None, None, None
+            occurrence.snooze_count = 0
             occurrence.save()
         changes.append(("occurrence", str(occurrence.pk), "upsert", OccurrenceRepresentation(occurrence).data, member.identity_id))
     return changes
@@ -113,6 +114,8 @@ def record_alarm_response(alarm, identity, data):
         previous.reason = "corrected"
         previous.save(update_fields=["reason"])
         changes.append(("outcome", str(previous.pk), "upsert", OutcomeRepresentation(previous).data, None))
+    if data["kind"] == "snoozed" and not automatic_restart and alarm.snooze_limit and (occurrence is None or occurrence.snooze_count >= alarm.snooze_limit):
+        raise DomainError("snooze_limit_reached", "This alarm has reached its snooze limit")
     activity = AlarmActivity.objects.create(
         id=data["id"], alarm=alarm, group=alarm.group, identity=identity, alarm_revision=alarm.revision,
         kind=data["kind"], occurred_at=data["occurred_at"], occurrence_key=occurrence_key, reason=data.get("reason"), request_fingerprint=fingerprint,
@@ -123,6 +126,7 @@ def record_alarm_response(alarm, identity, data):
             if automatic_restart:
                 snoozed_until = activity.occurred_at + timedelta(minutes=alarm.missed_restart_minutes)
             else:
+                occurrence.snooze_count += 1
                 snoozed_until = data.get("snoozed_until")
                 if snoozed_until is None:
                     ring_time = occurrence.snoozed_until or occurrence.trigger_at
@@ -141,6 +145,8 @@ def record_alarm_response(alarm, identity, data):
             shared = AlarmOccurrence.objects.filter(alarm=alarm, alarm_revision=alarm.revision, cycle_date=occurrence.cycle_date, state="pending").exclude(identity=identity)
             for other in shared:
                 if activity.kind == "snoozed":
+                    if not automatic_restart:
+                        other.snooze_count = occurrence.snooze_count
                     other.state, other.resolved_at, other.snoozed_until, other.snoozed_at = "pending", None, snoozed_until, activity.occurred_at
                     other.deadline_at = snoozed_until + timedelta(minutes=alarm.timeout_minutes)
                 else:

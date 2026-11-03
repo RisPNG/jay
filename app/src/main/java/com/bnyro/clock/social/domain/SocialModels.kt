@@ -234,6 +234,7 @@ data class SharedAlarmRequest(
     val advanced: Boolean = false,
     @SerialName("snooze_enabled") val snoozeEnabled: Boolean,
     @SerialName("snooze_minutes") val snoozeMinutes: Int,
+    @SerialName("snooze_limit") val snoozeLimit: Int = 0,
     @SerialName("timeout_minutes") val timeoutMinutes: Int = 5,
     @SerialName("missed_restart_enabled") val missedRestartEnabled: Boolean = false,
     @SerialName("missed_restart_minutes") val missedRestartMinutes: Int = 10,
@@ -343,6 +344,7 @@ data class SharedAlarmDto(
     val advanced: Boolean = false,
     @SerialName("snooze_enabled") val snoozeEnabled: Boolean,
     @SerialName("snooze_minutes") val snoozeMinutes: Int,
+    @SerialName("snooze_limit") val snoozeLimit: Int = 0,
     @SerialName("timeout_minutes") val timeoutMinutes: Int = 5,
     @SerialName("missed_restart_enabled") val missedRestartEnabled: Boolean = false,
     @SerialName("missed_restart_minutes") val missedRestartMinutes: Int = 10,
@@ -430,6 +432,7 @@ data class SocialOccurrenceDto(
     @SerialName("alarm_revision") val alarmRevision: Int,
     @SerialName("snoozed_until") val snoozedUntil: String? = null,
     @SerialName("snoozed_at") val snoozedAt: String? = null,
+    @SerialName("snooze_count") val snoozeCount: Int = 0,
     @SerialName("trigger_at") val triggerAt: String? = null,
     @SerialName("deadline_at") val deadlineAt: String? = null
 )

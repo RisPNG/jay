@@ -46,7 +46,7 @@ class SoundRepresentation(serializers.ModelSerializer):
 class AlarmRepresentation(serializers.ModelSerializer):
     class Meta:
         model = SharedAlarm
-        fields = ["id", "group_id", "revision", "local_time_ms", "label", "label_color", "enabled", "days", "vibrate", "start_date", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "advanced", "snooze_enabled", "snooze_minutes", "timeout_minutes", "missed_restart_enabled", "missed_restart_minutes", "vibration_pattern", "vibration_pattern_name", "sound_mode", "sound_id", "saved_at", "save_id"]
+        fields = ["id", "group_id", "revision", "local_time_ms", "label", "label_color", "enabled", "days", "vibrate", "start_date", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "advanced", "snooze_enabled", "snooze_minutes", "snooze_limit", "timeout_minutes", "missed_restart_enabled", "missed_restart_minutes", "vibration_pattern", "vibration_pattern_name", "sound_mode", "sound_id", "saved_at", "save_id"]
         read_only_fields = fields
 
 
@@ -67,7 +67,7 @@ class TimerOccurrenceRepresentation(serializers.ModelSerializer):
 class OccurrenceRepresentation(serializers.ModelSerializer):
     class Meta:
         model = AlarmOccurrence
-        fields = ["id", "alarm_id", "group_id", "identity_id", "alarm_revision", "occurrence_key", "cycle_date", "trigger_at", "deadline_at", "snoozed_until", "snoozed_at", "state", "resolved_at"]
+        fields = ["id", "alarm_id", "group_id", "identity_id", "alarm_revision", "occurrence_key", "cycle_date", "trigger_at", "deadline_at", "snoozed_until", "snoozed_at", "snooze_count", "state", "resolved_at"]
         read_only_fields = fields
 
 

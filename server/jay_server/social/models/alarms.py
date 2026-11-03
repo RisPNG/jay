@@ -28,6 +28,7 @@ class SharedAlarm(SavedState):
     advanced = models.BooleanField(default=False)
     snooze_enabled = models.BooleanField()
     snooze_minutes = models.PositiveSmallIntegerField()
+    snooze_limit = models.PositiveSmallIntegerField(default=0)
     timeout_minutes = models.PositiveSmallIntegerField(default=5)
     missed_restart_enabled = models.BooleanField(default=False)
     missed_restart_minutes = models.PositiveSmallIntegerField(default=10)
@@ -49,6 +50,7 @@ class SharedAlarm(SavedState):
             models.CheckConstraint(condition=models.Q(repeat_duration=None) | models.Q(repeat_duration__range=(1, 999)), name="alarm_repeat_duration_valid"),
             models.CheckConstraint(condition=models.Q(end_occurrences=None) | models.Q(end_occurrences__range=(1, 999)), name="alarm_end_count_valid"),
             models.CheckConstraint(condition=models.Q(snooze_minutes__range=(1, 1440)), name="alarm_snooze_valid"),
+            models.CheckConstraint(condition=models.Q(snooze_limit__range=(0, 100)), name="alarm_snooze_limit_valid"),
             models.CheckConstraint(condition=models.Q(timeout_minutes__range=(1, 1440)), name="alarm_timeout_valid"),
             models.CheckConstraint(condition=models.Q(missed_restart_minutes__range=(1, 1440)), name="alarm_restart_delay_valid"),
             models.CheckConstraint(condition=models.Q(days__contained_by=[0, 1, 2, 3, 4, 5, 6]), name="alarm_days_valid"),
@@ -80,6 +82,7 @@ class AlarmOccurrence(models.Model):
     deadline_at = models.DateTimeField()
     snoozed_until = models.DateTimeField(null=True)
     snoozed_at = models.DateTimeField(null=True)
+    snooze_count = models.PositiveIntegerField(default=0)
     state = models.CharField(max_length=16, choices=State, default=State.PENDING)
     resolved_at = models.DateTimeField(null=True)
 

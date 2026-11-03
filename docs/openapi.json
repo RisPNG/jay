@@ -2393,6 +2393,11 @@
                         "maximum": 1440,
                         "minimum": 1
                     },
+                    "snooze_limit": {
+                        "type": "integer",
+                        "maximum": 100,
+                        "minimum": 0
+                    },
                     "timeout_minutes": {
                         "type": "integer",
                         "maximum": 1440,
@@ -2544,6 +2549,11 @@
                         "type": "integer",
                         "maximum": 1440,
                         "minimum": 1
+                    },
+                    "snooze_limit": {
+                        "type": "integer",
+                        "maximum": 100,
+                        "minimum": 0
                     },
                     "timeout_minutes": {
                         "type": "integer",
@@ -2716,6 +2726,10 @@
                         "type": "integer",
                         "readOnly": true
                     },
+                    "snooze_limit": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "timeout_minutes": {
                         "type": "integer",
                         "readOnly": true
@@ -2788,6 +2802,7 @@
                     "save_id",
                     "saved_at",
                     "snooze_enabled",
+                    "snooze_limit",
                     "snooze_minutes",
                     "sound_id",
                     "sound_mode",
@@ -3408,6 +3423,10 @@
                         "readOnly": true,
                         "nullable": true
                     },
+                    "snooze_count": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "state": {
                         "allOf": [
                             {
@@ -3433,6 +3452,7 @@
                     "identity_id",
                     "occurrence_key",
                     "resolved_at",
+                    "snooze_count",
                     "snoozed_at",
                     "snoozed_until",
                     "state",

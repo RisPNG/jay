@@ -156,6 +156,7 @@ class AlarmPayload(MemberCommand):
     advanced = serializers.BooleanField()
     snooze_enabled = serializers.BooleanField()
     snooze_minutes = serializers.IntegerField(min_value=1, max_value=1440)
+    snooze_limit = serializers.IntegerField(min_value=0, max_value=100, required=False)
     timeout_minutes = serializers.IntegerField(min_value=1, max_value=1440, required=False)
     missed_restart_enabled = serializers.BooleanField(required=False)
     missed_restart_minutes = serializers.IntegerField(min_value=1, max_value=1440, required=False)

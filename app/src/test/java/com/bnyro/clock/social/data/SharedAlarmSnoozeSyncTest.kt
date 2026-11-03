@@ -23,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -67,12 +68,12 @@ class SharedAlarmSnoozeSyncTest {
                         days = listOf(0, 1, 2, 3, 4, 5, 6), vibrate = true,
                         startDate = LocalDate.now().minusDays(1).toString(),
                         repeatInterval = 1, repeatUnit = "DAY", repeatAnchor = "DAY_OF_MONTH",
-                        repeatDurationUnit = "DAY", snoozeEnabled = true, snoozeMinutes = 10,
+                        repeatDurationUnit = "DAY", snoozeEnabled = true, snoozeMinutes = 10, snoozeLimit = 1,
                         vibrationPattern = listOf(0, 1000), vibrationPatternName = "Default"
                     )
                 )),
                 SyncedResource("group", "occurrence", "occurrence", Json.encodeToString(
-                    SocialOccurrenceDto("alarm", occurrenceId, "pending", 1, Instant.ofEpochMilli(snoozedUntil).toString())
+                    SocialOccurrenceDto("alarm", occurrenceId, "pending", 1, Instant.ofEpochMilli(snoozedUntil).toString(), snoozeCount = 1)
                 ))
             ))
 
@@ -82,6 +83,8 @@ class SharedAlarmSnoozeSyncTest {
             assertEquals(snoozedUntil, postponed.snoozedUntil)
             assertEquals(snoozedUntil, AlarmHelper.getAlarmTime(postponed))
             assertNull(postponed.dismissedAt)
+            assertEquals(1, postponed.snoozeCount)
+            assertFalse(postponed.canSnooze)
             assertEquals(occurrenceId, Preferences.instance.getString("${SocialPreferences.alarmOccurrencePrefix}$localId", null))
             assertTrue(shadowOf(context).broadcastIntents.any {
                 it.action == AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION &&

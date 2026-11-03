@@ -126,6 +126,24 @@ class SharedAlarmNativeDeliveryTest {
     }
 
     @Test
+    fun aSyncedSnoozeBudgetSurvivesDeliveryWithoutALocalSnoozeTarget() = runBlocking {
+        val original = today - 15 * 60_000L
+        alarm.snoozeLimit = 1
+        alarm.snoozeCount = 1
+        context.container.alarmRepository.updateAlarm(alarm)
+        SocialIgnoredAlarmWorker.schedule(context, alarm, today, original.toString(), today - 60_000L)
+
+        AlarmReceiver().onReceive(context, Intent(context, AlarmReceiver::class.java)
+            .putExtra(AlarmHelper.EXTRA_ID, alarm.id).putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, today)
+            .putExtra(AlarmService.EXTRA_OCCURRENCE_ID, original.toString()))
+
+        val delivered = requireNotNull(context.container.alarmRepository.getAlarmById(alarm.id))
+        assertEquals(1, delivered.snoozeCount)
+        assertFalse(delivered.canSnooze)
+        assertNotNull(shadowOf(context).nextStartedService)
+    }
+
+    @Test
     fun aSnoozedDeliveryRetainsItsOriginalOccurrenceEvenWhenTheAlarmIsDisabled() = runBlocking {
         val ring = today - 60_000L
         val original = today - 15 * 60_000L

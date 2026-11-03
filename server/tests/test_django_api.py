@@ -340,6 +340,7 @@ def test_api_contract_exposes_the_supported_operations():
         ("post", "/v1/groups"),
         ("post", "/v1/groups/join"),
         ("post", "/v1/groups/{group_id}/invites"),
+        ("post", "/v1/groups/{group_id}/ring"),
         ("post", "/v1/groups/{group_id}/sounds/uploads"),
         ("post", "/v1/groups/{group_id}/timers"),
         ("post", "/v1/identities/register"),

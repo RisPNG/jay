@@ -221,6 +221,9 @@ fun SocialChange.logDetails(context: Context): String? {
                 if (details?.get("previous_snooze_minutes") != details?.get("snooze_minutes")) {
                     add(context.getString(R.string.alarm_log_snooze_duration))
                 }
+                if (details?.get("previous_snooze_limit") != details?.get("snooze_limit")) {
+                    add(context.getString(R.string.snooze_limit))
+                }
                 if (details?.get("previous_timeout_minutes") != details?.get("timeout_minutes")) {
                     add(context.getString(R.string.timeout_after))
                 }

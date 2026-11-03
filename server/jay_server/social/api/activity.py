@@ -39,6 +39,8 @@ class OccurrenceView(APIView):
             data.pop("membership_id")
             occurrence, created = AlarmOccurrence.objects.get_or_create(alarm=alarm, identity=request.user, occurrence_key=data["occurrence_key"], defaults={"group": alarm.group, **{key: value for key, value in data.items() if key != "occurrence_key"}})
             if not created and occurrence.state in {"pending", "canceled"} and (occurrence.snoozed_until is None or occurrence.alarm_revision != data["alarm_revision"]):
+                if occurrence.alarm_revision != data["alarm_revision"] or occurrence.state == "canceled":
+                    occurrence.snooze_count = 0
                 for name, value in data.items():
                     setattr(occurrence, name, value)
                 occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "pending", None, None, None

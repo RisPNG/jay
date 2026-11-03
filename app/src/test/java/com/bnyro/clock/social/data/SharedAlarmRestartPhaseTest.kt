@@ -214,8 +214,8 @@ class SharedAlarmRestartPhaseTest {
             shadowOf(Looper.getMainLooper()).idle()
 
             assertEquals(trigger + 6 * 60_000L, Preferences.instance.getLong("${SocialPreferences.alarmDeadlinePrefix}$localId", -1L))
-            val current = AlarmService::class.java.getDeclaredField("currentAlarm").apply { isAccessible = true }
-            assertEquals(other.id, (current.get(controller.get()) as Alarm).id)
+            val notification = requireNotNull(shadowOf(controller.get()).lastForegroundNotification)
+            assertEquals(other.id, shadowOf(notification.contentIntent).savedIntent.getLongExtra(AlarmHelper.EXTRA_ID, -1L))
             val playing = AlarmService::class.java.getDeclaredField("isPlaying").apply { isAccessible = true }
             assertTrue(playing.getBoolean(controller.get()))
             assertFalse(shadowOf(context).broadcastIntents.any { it.action == AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION })
@@ -376,7 +376,9 @@ class SharedAlarmRestartPhaseTest {
             assertNull(shadowOf(context).nextStartedActivity)
 
             context.sendBroadcast(Intent(AlarmService.ALARM_INTENT_ACTION)
-                .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.SNOOZE_ACTION).setPackage(context.packageName))
+                .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.SNOOZE_ACTION)
+                .putExtra(AlarmHelper.EXTRA_ID, other.id)
+                .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, trigger).setPackage(context.packageName))
             shadowOf(Looper.getMainLooper()).idle()
             val event = Preferences.instance.all.entries.filter { it.key.startsWith("jayPendingAlarmActivity:") }
                 .map { JSONObject(it.value as String) }.single { it.getLong("alarm_id") == other.id }
