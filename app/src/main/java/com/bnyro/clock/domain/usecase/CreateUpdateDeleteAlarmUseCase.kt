@@ -25,6 +25,7 @@ class CreateUpdateDeleteAlarmUseCase(
 
     fun prepareForScheduling(alarm: Alarm) {
         alarm.snoozedUntil = null
+        alarm.snoozeCount = 0
         alarm.dismissedAt = null
         if (!alarm.advanced) alarm.startDate = LocalDate.now().toEpochDay()
         alarm.startDate = AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay() ?: alarm.startDate

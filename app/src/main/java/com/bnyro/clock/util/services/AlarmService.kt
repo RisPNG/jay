@@ -69,9 +69,9 @@ class AlarmService : Service() {
                     stopSelf()
                 }
                 SNOOZE_ACTION -> {
-                    currentAlarm?.let { alarm ->
-                        AlarmHelper.snooze(this@AlarmService, alarm, currentRingTime!!, alarm.snoozeMinutes)
-                    }
+                    val alarm = currentAlarm ?: return
+                    AlarmHelper.snooze(this@AlarmService, alarm, currentRingTime!!, alarm.snoozeMinutes)
+                        ?: return
                     stopSelf()
                 }
                 ALERT_SHOWN_ACTION, ALERT_HIDDEN_ACTION -> {
@@ -365,7 +365,7 @@ class AlarmService : Service() {
             setContentIntent(pendingIntent)
             setSilent(alertScreenVisible)
             if (!alertScreenVisible) setFullScreenIntent(pendingIntent, true)
-            if (alarm.snoozeEnabled) {
+            if (alarm.canSnooze) {
                 val snoozeIntent = Intent(ALARM_INTENT_ACTION)
                     .putExtra(ACTION_EXTRA_KEY, SNOOZE_ACTION)
                 addAction(

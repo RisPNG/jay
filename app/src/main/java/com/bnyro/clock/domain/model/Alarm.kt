@@ -35,6 +35,8 @@ data class Alarm(
     var soundUri: String? = null,
     @ColumnInfo(defaultValue = "1") var snoozeEnabled: Boolean = true,
     @ColumnInfo(defaultValue = "10") var snoozeMinutes: Int = 10,
+    @ColumnInfo(defaultValue = "0") var snoozeLimit: Int = 0,
+    @ColumnInfo(defaultValue = "0") var snoozeCount: Int = 0,
     @ColumnInfo(defaultValue = "NULL") var snoozedUntil: Long? = null,
     @ColumnInfo(defaultValue = "5") var timeoutMinutes: Int = 5,
     @ColumnInfo(defaultValue = "0") var missedRestartEnabled: Boolean = false,
@@ -53,6 +55,10 @@ data class Alarm(
     @ColumnInfo(defaultValue = "NULL") var endOccurrences: Int? = null,
     @ColumnInfo(defaultValue = "0") var advanced: Boolean = false,
 ) {
+    @get:Ignore
+    val canSnooze: Boolean
+        get() = snoozeEnabled && (snoozeLimit == 0 || snoozeCount < snoozeLimit)
+
     @Ignore
     @kotlinx.serialization.Transient
     val isWeekends: Boolean = days == listOf(0, 6)

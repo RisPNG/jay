@@ -23,7 +23,7 @@ class AlarmActivity : RingingActivity() {
 
     override val volumeButtonActionKey = Preferences.volumeButtonActionKey
 
-    override val snoozeAvailable get() = alarm.snoozeEnabled
+    override val snoozeAvailable get() = alarm.canSnooze
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,7 +32,7 @@ class AlarmActivity : RingingActivity() {
                 onDismiss = this@AlarmActivity::dismiss,
                 onSnooze = this@AlarmActivity::snooze,
                 label = alarm.label,
-                snoozeEnabled = alarm.snoozeEnabled,
+                snoozeEnabled = alarm.canSnooze,
                 snoozeTime = alarm.snoozeMinutes,
                 ringingSince = ringingSince
             )
@@ -53,17 +53,17 @@ class AlarmActivity : RingingActivity() {
     override fun snooze() = snooze(alarm.snoozeMinutes)
 
     private fun snooze(minutes: Int) {
-        stopService(
-            Intent(
-                this@AlarmActivity.applicationContext,
-                AlarmService::class.java
-            )
-        )
         AlarmHelper.snooze(
             this@AlarmActivity,
             alarm,
             intent.getLongExtra(AlarmHelper.EXTRA_TRIGGER_TIME, System.currentTimeMillis()),
             minutes
+        ) ?: return
+        stopService(
+            Intent(
+                this@AlarmActivity.applicationContext,
+                AlarmService::class.java
+            )
         )
         this@AlarmActivity.finish()
     }

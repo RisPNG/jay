@@ -76,6 +76,7 @@ fun AlarmPicker(
     val context = LocalContext.current
     var showRingtoneDialog by remember { mutableStateOf(false) }
     var showSnoozeDialog by remember { mutableStateOf(false) }
+    var showSnoozeLimitDialog by remember { mutableStateOf(false) }
     var showMissedRestartDialog by remember { mutableStateOf(false) }
     var showTimeoutDialog by remember { mutableStateOf(false) }
     var showVibrationDialog by remember { mutableStateOf(false) }
@@ -111,6 +112,7 @@ fun AlarmPicker(
 
     var snoozeMinutes by remember { mutableIntStateOf(currentAlarm.snoozeMinutes) }
     var snoozeEnabled by remember { mutableStateOf(currentAlarm.snoozeEnabled) }
+    var snoozeLimit by remember { mutableIntStateOf(currentAlarm.snoozeLimit) }
     var timeoutMinutes by remember { mutableIntStateOf(currentAlarm.timeoutMinutes) }
     var missedRestartEnabled by remember { mutableStateOf(currentAlarm.missedRestartEnabled) }
     var missedRestartMinutes by remember { mutableIntStateOf(currentAlarm.missedRestartMinutes) }
@@ -294,6 +296,31 @@ fun AlarmPicker(
                         snoozeEnabled = it
                     }
                 )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = snoozeEnabled) { showSnoozeLimitDialog = true }
+                        .padding(8.dp, 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Snooze,
+                        contentDescription = null,
+                        modifier = Modifier.padding(start = 8.dp, end = 16.dp).size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.snooze_limit),
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            text = if (snoozeLimit == 0) stringResource(R.string.snooze_unlimited)
+                                else pluralStringResource(R.plurals.snooze_limit_count, snoozeLimit, snoozeLimit),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
                 SwitchWithDivider(
                     title = stringResource(R.string.missed_restart),
                     description = pluralStringResource(
@@ -342,6 +369,7 @@ fun AlarmPicker(
                         soundUri = soundUri,
                         snoozeEnabled = snoozeEnabled,
                         snoozeMinutes = snoozeMinutes,
+                        snoozeLimit = snoozeLimit,
                         timeoutMinutes = timeoutMinutes,
                         missedRestartEnabled = missedRestartEnabled,
                         missedRestartMinutes = missedRestartMinutes,
@@ -384,6 +412,20 @@ fun AlarmPicker(
             onValueSet = {
                 snoozeMinutes = it
                 showSnoozeDialog = false
+            }
+        )
+    }
+    if (showSnoozeLimitDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showSnoozeLimitDialog = false },
+            title = stringResource(R.string.snooze_limit),
+            unit = stringResource(R.string.snoozes_unit),
+            value = snoozeLimit,
+            maxValue = 101,
+            label = { it.toString() },
+            onValueSet = {
+                snoozeLimit = it
+                showSnoozeLimitDialog = false
             }
         )
     }
