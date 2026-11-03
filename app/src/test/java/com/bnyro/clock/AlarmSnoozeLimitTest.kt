@@ -268,6 +268,8 @@ class AlarmSnoozeLimitTest {
 
     @Test
     fun automaticMissedRestartsPreserveTheManualSnoozeBudgetEvenWhenItIsSpent() = runBlocking {
+        assertTrue(SystemClock.setCurrentTimeMillis(ringTime))
+        val initialElapsedRealtime = SystemClock.elapsedRealtime()
         for (count in listOf(0, 1)) {
             alarm.snoozeLimit = 1
             alarm.snoozeCount = count
@@ -276,17 +278,17 @@ class AlarmSnoozeLimitTest {
             alarm.missedRestartEnabled = true
             alarm.missedRestartMinutes = 7
             context.container.alarmRepository.updateAlarm(alarm)
-            assertTrue(SystemClock.setCurrentTimeMillis(ringTime))
+            val triggerTime = ringTime + SystemClock.elapsedRealtime() - initialElapsedRealtime
             val controller = Robolectric.buildService(AlarmService::class.java).create()
             try {
                 controller.get().onStartCommand(Intent(context, AlarmService::class.java)
                     .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
-                    .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ringTime), 0, 1)
+                    .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, triggerTime), 0, 1)
 
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(61))
 
                 val restarted = requireNotNull(context.container.alarmRepository.getAlarmById(alarm.id))
-                assertEquals(ringTime + 8 * 60_000L, restarted.snoozedUntil)
+                assertEquals(triggerTime + 8 * 60_000L, restarted.snoozedUntil)
                 assertEquals(count, restarted.snoozeCount)
                 assertEquals(count == 0, restarted.canSnooze)
                 assertTrue(shadowOf(controller.get()).isStoppedBySelf)

@@ -68,7 +68,7 @@ class AlarmSnoozeAnchorTest {
     fun snoozingAfterTheRingStartsKeepsTheScheduledFiveMinuteTarget() = runBlocking {
         assertTrue(SystemClock.setCurrentTimeMillis(ringTime + 100_000L))
 
-        val target = AlarmHelper.snooze(context, alarm, ringTime, 5)
+        val target = requireNotNull(AlarmHelper.snooze(context, alarm, ringTime, 5))
 
         assertEquals(ringTime + 5 * 60_000L, target)
         assertEquals(target, context.container.alarmRepository.getAlarmById(alarm.id)?.snoozedUntil)
@@ -79,7 +79,7 @@ class AlarmSnoozeAnchorTest {
     fun snoozingAfterTheTargetHasPassedUsesTheNextClockMinute() = runBlocking {
         assertTrue(SystemClock.setCurrentTimeMillis(ringTime + 400_000L))
 
-        val target = AlarmHelper.snooze(context, alarm, ringTime, 5)
+        val target = requireNotNull(AlarmHelper.snooze(context, alarm, ringTime, 5))
 
         assertEquals(ringTime + 7 * 60_000L, target)
         assertEquals(target, context.container.alarmRepository.getAlarmById(alarm.id)?.snoozedUntil)
@@ -90,7 +90,7 @@ class AlarmSnoozeAnchorTest {
     fun snoozingAtTheTargetBoundaryUsesTheNextClockMinute() = runBlocking {
         assertTrue(SystemClock.setCurrentTimeMillis(ringTime + 5 * 60_000L))
 
-        val target = AlarmHelper.snooze(context, alarm, ringTime, 5)
+        val target = requireNotNull(AlarmHelper.snooze(context, alarm, ringTime, 5))
 
         assertEquals(ringTime + 6 * 60_000L, target)
         assertEquals(target, context.container.alarmRepository.getAlarmById(alarm.id)?.snoozedUntil)
@@ -100,11 +100,11 @@ class AlarmSnoozeAnchorTest {
     @Test
     fun snoozingAgainStartsFromTheCurrentSnoozedRing() = runBlocking {
         assertTrue(SystemClock.setCurrentTimeMillis(ringTime + 100_000L))
-        val firstTarget = AlarmHelper.snooze(context, alarm, ringTime, 5)
+        val firstTarget = requireNotNull(AlarmHelper.snooze(context, alarm, ringTime, 5))
         assertTrue(SystemClock.setCurrentTimeMillis(firstTarget + 100_000L))
         val snoozed = requireNotNull(context.container.alarmRepository.getAlarmById(alarm.id))
 
-        val secondTarget = AlarmHelper.snooze(context, snoozed, firstTarget, 5)
+        val secondTarget = requireNotNull(AlarmHelper.snooze(context, snoozed, firstTarget, 5))
 
         assertEquals(ringTime + 10 * 60_000L, secondTarget)
         assertEquals(secondTarget, context.container.alarmRepository.getAlarmById(alarm.id)?.snoozedUntil)
@@ -150,27 +150,36 @@ class AlarmSnoozeAnchorTest {
         assertTrue(SystemClock.setCurrentTimeMillis(ringTime + 100_000L))
         shadowOf(context.getSystemService(KeyguardManager::class.java)).setKeyguardLocked(true)
         shadowOf(context).grantPermissions("${context.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
-        val controller = Robolectric.buildActivity(
-            AlarmActivity::class.java,
-            Intent(context, AlarmActivity::class.java)
-                .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
-                .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ringTime)
-        ).create()
+        val serviceController = Robolectric.buildService(AlarmService::class.java).create()
         try {
-            val nextRing = ringTime + 5 * 60_000L
-            assertTrue(SystemClock.setCurrentTimeMillis(nextRing + 100_000L))
-            controller.newIntent(Intent(context, AlarmActivity::class.java)
+            serviceController.get().onStartCommand(Intent(context, AlarmService::class.java)
                 .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
-                .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, nextRing))
+                .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ringTime), 0, 1)
+            val firstPresentation = requireNotNull(shadowOf(context).nextStartedActivity)
+            val controller = Robolectric.buildActivity(AlarmActivity::class.java, firstPresentation).create()
+            try {
+                val nextRing = ringTime + 5 * 60_000L
+                assertTrue(SystemClock.setCurrentTimeMillis(nextRing + 100_000L))
+                serviceController.get().onStartCommand(Intent(context, AlarmService::class.java)
+                    .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                    .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, nextRing), 0, 2)
+                controller.newIntent(requireNotNull(shadowOf(context).nextStartedActivity))
+                assertEquals(nextRing, controller.get().intent.getLongExtra(AlarmHelper.EXTRA_TRIGGER_TIME, -1L))
 
-            assertTrue(controller.get().onKeyDown(KeyEvent.KEYCODE_VOLUME_DOWN, null))
+                assertTrue(controller.get().onKeyDown(KeyEvent.KEYCODE_VOLUME_DOWN, null))
+                shadowOf(Looper.getMainLooper()).idle()
 
-            val snoozed = requireNotNull(context.container.alarmRepository.getAlarmById(alarm.id))
-            assertEquals(ringTime + 10 * 60_000L, snoozed.snoozedUntil)
-            assertEquals(snoozed.snoozedUntil, context.getSystemService(AlarmManager::class.java).nextAlarmClock.triggerTime)
-            assertTrue(controller.get().isFinishing)
+                val snoozed = requireNotNull(context.container.alarmRepository.getAlarmById(alarm.id))
+                assertEquals(ringTime + 10 * 60_000L, snoozed.snoozedUntil)
+                assertEquals(snoozed.snoozedUntil, context.getSystemService(AlarmManager::class.java).nextAlarmClock.triggerTime)
+                assertEquals(1, snoozed.snoozeCount)
+                assertTrue(controller.get().isFinishing)
+                assertTrue(shadowOf(serviceController.get()).isStoppedBySelf)
+            } finally {
+                controller.destroy()
+            }
         } finally {
-            controller.destroy()
+            serviceController.destroy()
         }
     }
 }

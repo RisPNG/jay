@@ -41,37 +41,35 @@ class AlarmActivity : RingingActivity() {
         handleIntent(intent)
     }
     override fun dismiss() {
-        stopService(
-            Intent(
-                this@AlarmActivity.applicationContext,
-                AlarmService::class.java
-            )
-        )
-        this@AlarmActivity.finish()
+        sendBroadcast(Intent(AlarmService.ALARM_INTENT_ACTION)
+            .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.DISMISS_ACTION)
+            .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+            .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ringingSince)
+            .setPackage(packageName))
     }
 
     override fun snooze() = snooze(alarm.snoozeMinutes)
 
     private fun snooze(minutes: Int) {
-        AlarmHelper.snooze(
-            this@AlarmActivity,
-            alarm,
-            intent.getLongExtra(AlarmHelper.EXTRA_TRIGGER_TIME, System.currentTimeMillis()),
-            minutes
-        ) ?: return
-        stopService(
-            Intent(
-                this@AlarmActivity.applicationContext,
-                AlarmService::class.java
-            )
-        )
-        this@AlarmActivity.finish()
+        if (!alarm.canSnooze) return
+        sendBroadcast(Intent(AlarmService.ALARM_INTENT_ACTION)
+            .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.SNOOZE_ACTION)
+            .putExtra(AlarmService.EXTRA_SNOOZE_MINUTES, minutes)
+            .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+            .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ringingSince)
+            .setPackage(packageName))
     }
 
     override fun onNewIntent(intent: Intent) {
         setIntent(intent)
         handleIntent(intent)
         super.onNewIntent(intent)
+        sendBroadcast(Intent(AlarmService.ALARM_INTENT_ACTION)
+            .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.ALERT_SHOWN_ACTION)
+            .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+            .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ringingSince)
+            .putExtra(ALERT_GENERATION_EXTRA_KEY, intent.getLongExtra(ALERT_GENERATION_EXTRA_KEY, 0L))
+            .setPackage(packageName))
     }
 
     private fun handleIntent(intent: Intent) {
@@ -83,11 +81,18 @@ class AlarmActivity : RingingActivity() {
         } ?: return
     }
 
+    override fun closesThisAlert(intent: Intent) =
+        intent.getLongExtra(AlarmHelper.EXTRA_ID, -1L) == alarm.id &&
+            intent.getLongExtra(AlarmHelper.EXTRA_TRIGGER_TIME, -1L) == ringingSince
+
     override fun onStart() {
         super.onStart()
         sendBroadcast(
             Intent(AlarmService.ALARM_INTENT_ACTION)
                 .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.ALERT_SHOWN_ACTION)
+                .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ringingSince)
+                .putExtra(ALERT_GENERATION_EXTRA_KEY, intent.getLongExtra(ALERT_GENERATION_EXTRA_KEY, 0L))
                 .setPackage(packageName)
         )
     }
@@ -96,6 +101,9 @@ class AlarmActivity : RingingActivity() {
         sendBroadcast(
             Intent(AlarmService.ALARM_INTENT_ACTION)
                 .putExtra(AlarmService.ACTION_EXTRA_KEY, AlarmService.ALERT_HIDDEN_ACTION)
+                .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
+                .putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ringingSince)
+                .putExtra(ALERT_GENERATION_EXTRA_KEY, intent.getLongExtra(ALERT_GENERATION_EXTRA_KEY, 0L))
                 .setPackage(packageName)
         )
         super.onStop()
