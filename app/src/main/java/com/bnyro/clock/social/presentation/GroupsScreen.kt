@@ -2,6 +2,8 @@ package com.bnyro.clock.social.presentation
 
 import android.content.Intent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,6 +38,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +52,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.bnyro.clock.R
 import com.bnyro.clock.navigation.TopBarScaffold
 import com.bnyro.clock.presentation.components.DialogButton
@@ -60,6 +66,7 @@ import com.bnyro.clock.social.domain.AlarmTimeBasis
 import com.bnyro.clock.social.domain.AlarmPermission
 import com.bnyro.clock.social.domain.MemberRole
 import com.bnyro.clock.social.domain.SocialGroup
+import com.bnyro.clock.social.domain.canEditAlarms
 import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.Preferences
 
@@ -261,6 +268,28 @@ fun GroupsScreen(
     }
 
     selectedGroup?.let { group ->
+        val currentGroup = groups.firstOrNull { it.id == group.id }
+        val canRing = currentGroup?.canEditAlarms == true
+        val ringInteractions = remember(group.id) { MutableInteractionSource() }
+        val lifecycleOwner = LocalLifecycleOwner.current
+        DisposableEffect(group.id, lifecycleOwner, canRing) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) socialModel.ringGroup(null)
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+                socialModel.ringGroup(null)
+            }
+        }
+        LaunchedEffect(ringInteractions, canRing) {
+            ringInteractions.interactions.collect { interaction ->
+                when (interaction) {
+                    is PressInteraction.Press -> if (canRing) socialModel.ringGroup(group.id)
+                    is PressInteraction.Release, is PressInteraction.Cancel -> socialModel.ringGroup(null)
+                }
+            }
+        }
         var showDeleteConfirmation by remember(group.id) { mutableStateOf(false) }
         var name by remember(group.id, group.name) { mutableStateOf(group.name) }
         var permission by remember(group.id, group.alarmPermission) {
@@ -318,6 +347,14 @@ fun GroupsScreen(
                 Column(
                     Modifier.verticalScroll(rememberScrollState()),
                 ) {
+                    Button(
+                        onClick = {},
+                        enabled = canRing,
+                        interactionSource = ringInteractions,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.hold_to_ring))
+                    }
                     if (group.role == MemberRole.LEADER) {
                         SettingsCategory(stringResource(R.string.group_section))
                         OutlinedTextField(

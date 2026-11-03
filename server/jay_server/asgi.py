@@ -10,14 +10,15 @@ from channels.routing import URLRouter
 from django.conf import settings
 from django.urls import path, re_path
 
-from .social.live import EventConsumer, LiveBroker
+from .social.live import EventConsumer, GroupRingConsumer, LiveBroker
 
 
 class Application:
     def __init__(self):
         self.broker = LiveBroker()
         self.active_requests = 0
-        self.router = URLRouter([path("v1/events", EventConsumer.as_asgi()), re_path(r"", django_application)])
+        self.live_routes = [path("v1/events", EventConsumer.as_asgi()), path("v1/groups/<uuid:group_id>/ring", GroupRingConsumer.as_asgi())]
+        self.router = URLRouter([*self.live_routes, re_path(r"", django_application)])
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "lifespan":
@@ -32,7 +33,8 @@ class Application:
                     return
         if scope["type"] != "http":
             return
-        if scope["path"] == "/v1/events":
+        request_path = scope.get("path_remaining", scope["path"].removeprefix(scope.get("root_path", ""))).lstrip("/")
+        if any(route.pattern.match(request_path) for route in self.live_routes):
             await self.router({**scope, "jay.broker": self.broker}, receive, send)
             return
         if self.active_requests >= settings.MAX_HTTP_REQUESTS:

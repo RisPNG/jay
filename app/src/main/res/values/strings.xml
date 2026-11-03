@@ -407,4 +407,5 @@
     <string name="toggle">Toggle</string>
     <string name="option_information">About %1$s</string>
     <string name="duration">Duration</string>
+    <string name="hold_to_ring">Hold to ring</string>
 </resources>

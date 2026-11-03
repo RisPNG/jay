@@ -41,9 +41,10 @@ class SocialApiProtocolTest {
                 "/v1/sync" -> """{"scope_id":"identity","mode":"snapshot","from_revision":0,"through_revision":1,"next_cursor":"complete","has_more":false,"server_time":"${Instant.now()}","items":[]}"""
                 "/v1/identity/capabilities" -> """{"advanced_group_timing":true}"""
                 "/v1/events" -> "data: {\"scopes\":[\"group\"]}\n\n"
+                "/v1/groups/group/ring" -> ": ringing\n\n"
                 else -> "{}"
             }
-            exchange.responseHeaders.add("Content-Type", if (path == "/v1/events") "text/event-stream" else "application/json")
+            exchange.responseHeaders.add("Content-Type", if (path == "/v1/events" || path.endsWith("/ring")) "text/event-stream" else "application/json")
             val bytes = body.toByteArray()
             exchange.sendResponseHeaders(200, bytes.size.toLong())
             exchange.responseBody.use { it.write(bytes) }
@@ -66,8 +67,9 @@ class SocialApiProtocolTest {
                 changes += it
                 listening = false
             }
+            api.holdGroupRing("group")
 
-            assertEquals(5, requests.size)
+            assertEquals(6, requests.size)
             assertTrue(requests.all { it.protocol == "2" })
             val registration = requests.single { it.path == "/v1/identities/register" }
             assertEquals("POST", registration.method)
@@ -83,6 +85,11 @@ class SocialApiProtocolTest {
             assertEquals(operation.operationId, mutation.operationId)
             assertEquals(operation.payload, mutation.body)
             assertEquals("text/event-stream", requests.single { it.path == "/v1/events" }.accept)
+            val ring = requests.single { it.path == "/v1/groups/group/ring" }
+            assertEquals("POST", ring.method)
+            assertEquals("text/event-stream", ring.accept)
+            assertNull(ring.operationId)
+            assertEquals("", ring.body)
             assertEquals(listOf(setOf("group")), changes)
         } finally {
             server.stop(0)

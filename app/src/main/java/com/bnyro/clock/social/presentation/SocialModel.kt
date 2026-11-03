@@ -19,11 +19,16 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 class SocialModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as App).container.socialRepository
     private var rejectedOperation: com.bnyro.clock.social.domain.PendingOperation? = null
     private var invitationOperation: com.bnyro.clock.social.domain.PendingOperation? = null
+    private var groupRingJob: Job? = null
 
     val canUploadSharedSounds: Boolean
         get() = repository.canUploadSharedSounds
@@ -121,6 +126,22 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
                 repository.startSharedTimer(groupId, label, settings)
             }.onFailure { message = it.message ?: "Unable to start group timer" }
             busy = false
+        }
+    }
+
+    fun ringGroup(groupId: String?) {
+        groupRingJob?.cancel()
+        groupRingJob = groupId?.let {
+            viewModelScope.launch {
+                try {
+                    repository.holdGroupRing(it)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    currentCoroutineContext().ensureActive()
+                    message = error.message ?: "Unable to ring group"
+                }
+            }
         }
     }
 

@@ -44,7 +44,7 @@ Rejected edits lose their optimistic effect and retain a local rejection record.
 
 ## Transactions and retries
 
-Mutations other than registration require a UUID `Idempotency-Key`. A receipt binds the identity and credential generation to the method, normalized path/query and validated payload. Receipt claims and successful domain effects commit atomically. Duplicate claims serialize; mismatched requests receive `idempotency_mismatch`. Receipt replay rechecks current access and cannot expose revoked resource data.
+Durable mutations other than registration require a UUID `Idempotency-Key`. A receipt binds the identity and credential generation to the method, normalized path/query and validated payload. Receipt claims and successful domain effects commit atomically. Duplicate claims serialize; mismatched requests receive `idempotency_mismatch`. Receipt replay rechecks current access and cannot expose revoked resource data.
 
 Safe response bodies are retained for 30 days. Compact completion markers remain while the identity exists; an older retry receives `operation_completed` and must synchronize instead of executing again. Registration is idempotent on identity and secret. Credentials and expiring signed URLs are not persisted as replay bodies.
 
@@ -64,6 +64,8 @@ Android replaces a scope's authoritative state only when its snapshot completes,
 
 SSE and Firebase messages are invalidation hints. Clients obtain authoritative data through authorized synchronization requests and acknowledge alarm metadata only after applying it locally. Listener recovery invalidates subscribers so hints lost during a disconnection cannot prevent catch-up. Subscriber queues coalesce scope IDs; overflow requests a complete refresh rather than dropping unrelated changes. Client synchronization runs at most two requests concurrently and reconnects with jittered backoff.
 
+Hold to ring uses the live connection for an ephemeral group sound. A held authenticated request checks the same edit permission as shared alarms, then renews a five-second playback lease every two seconds. Connected members receive the device's default alarm sound through `ring` frames. Releasing the button, losing the event connection, or reaching the lease expiry stops playback. PostgreSQL notifications carry these transient frames between server processes, and the request rechecks permission on each renewal. Rings are not saved, queued for offline delivery, or sent through Firebase.
+
 ## HTTP contract
 
 The [OpenAPI schema](openapi.json) defines the current JSON API. The server generates it from DRF serializers at `/openapi.json` and serves the bundled Scalar reference at `/docs`. Tests validate response examples and check generated-schema drift.
@@ -77,6 +79,8 @@ Unknown fields, invalid types and omitted required fields are rejected. UTC inst
 Creates return 201, updates 200, deletion/leave/reset acknowledgements 204 and queued sound verification 202. History returns `items` and `next_before`, with 50 entries by default and a maximum of 100. Per-process throttles are soft overload controls rather than distributed quotas: 120 writes, 600 reads and ten upload sessions per minute per identity, and 60 registrations per minute per source IP.
 
 ## Audio and workers
+
+Overlapping alarms and timers retain their own ringing state and deadlines. Playback settings and local timeout priority are captured when each ring starts. One device-wide ringing session owns playback, vibration, and the alert screen, ordered by enabled sound, vibration, and configured ringing duration. Alarms win otherwise equal comparisons, and the earlier arrival wins a complete tie. Suppressed sessions continue towards their own timeout and resume playback if they become the highest-priority remaining session. Countdown notifications separately nominate only the running timer with the earliest deadline for Android's promoted status chip, recalculating after timer changes.
 
 Shared metadata scheduling never waits for audio preparation or transfer. Android stages the source and upload manifest durably and performs upload/download/decode in separate bounded work. The file picker accepts any openable file; shared sound preparation selects a supported audio track from audio or video media through Android's extractor and decoder. Personal alarms pass the selected URI directly to Android MediaPlayer without conversion. Shared sound IDs can refer to pending assets. Missing audio uses the member's default ringtone at ring time; disabled sound stays silent. Audio completion updates the cache without rescheduling or changing an already ringing occurrence. [Shared sounds](entitlements.md) describes encoding, playback and entitlement policy.
 

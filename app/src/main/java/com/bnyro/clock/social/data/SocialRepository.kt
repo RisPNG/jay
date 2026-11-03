@@ -69,6 +69,9 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -574,6 +577,14 @@ class SocialRepository(
         }
     }
 
+    suspend fun holdGroupRing(groupId: String) = withContext(Dispatchers.IO) {
+        val group = groups.first().first { it.id == groupId }
+        check(group.canEditAlarms) { "Only group leaders may ring this group" }
+        val serverUrl = Preferences.instance.getString(SocialPreferences.serverUrlKey, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
+        val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
+        SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl)).holdGroupRing(groupId)
+    }
+
     suspend fun followLiveChanges() = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
             SocialPreferences.serverUrlKey,
@@ -587,17 +598,41 @@ class SocialRepository(
                     registeredIdentity = serverUrl to identity.id
                 }
             }
-            listenForChanges(
-                shouldContinue = {
-                    val configuredServer = Preferences.instance.getString(
-                        SocialPreferences.serverUrlKey,
-                        DEFAULT_SERVER_URL
-                    ) ?: DEFAULT_SERVER_URL
-                    configuredServer.trimEnd('/') == serverUrl.trimEnd('/') &&
-                        DeviceIdentityStore.loadOrCreate(context, configuredServer).id == identity.id
-                },
-                onChange = { synchronize(it) }
-            )
+            val playback = withContext(Dispatchers.Main) { GroupRingPlayback(context) }
+            val wake = Channel<Unit>(Channel.CONFLATED)
+            val pendingMutex = Mutex()
+            var pendingScopes: Set<String>? = emptySet()
+            val synchronizeJob = launch {
+                for (signal in wake) {
+                    val scopes = pendingMutex.withLock {
+                        pendingScopes.also { pendingScopes = emptySet() }
+                    }
+                    synchronize(scopes)
+                }
+            }
+            try {
+                listenForChanges(
+                    shouldContinue = {
+                        val configuredServer = Preferences.instance.getString(
+                            SocialPreferences.serverUrlKey,
+                            DEFAULT_SERVER_URL
+                        ) ?: DEFAULT_SERVER_URL
+                        configuredServer.trimEnd('/') == serverUrl.trimEnd('/') &&
+                            DeviceIdentityStore.loadOrCreate(context, configuredServer).id == identity.id
+                    },
+                    onRing = { withContext(Dispatchers.Main) { playback.receive(it) } },
+                    onChange = { scopes ->
+                        pendingMutex.withLock {
+                            pendingScopes = if (pendingScopes == null || scopes == null) null else pendingScopes.orEmpty() + scopes
+                        }
+                        wake.trySend(Unit)
+                    }
+                )
+            } finally {
+                synchronizeJob.cancel()
+                wake.close()
+                withContext(NonCancellable + Dispatchers.Main) { playback.receive(null) }
+            }
         }
     }
 

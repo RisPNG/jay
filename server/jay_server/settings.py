@@ -78,12 +78,25 @@ SPECTACULAR_SETTINGS = {
     "APPEND_PATHS": {
         "/v1/events": {"get": {
             "operationId": "v1_events_listen", "tags": ["v1"],
-            "description": "Authenticated SSE invalidations. Sync frames contain all and scopes; heartbeats arrive every fifteen seconds. Fetch durable scope pages after each hint and reconnect. Frames are not durable events or acknowledgements.",
+            "description": "Authenticated SSE invalidations and transient group ringing. Sync frames contain all and scopes; heartbeats arrive every fifteen seconds. Fetch durable scope pages after sync hints. Ring frames contain group_id, session_id, active, and lease_seconds. Stop ringing when a lease expires, on ring_reset, or on stream disconnect. Frames are not durable events or acknowledgements.",
             "security": [{"bearerIdentity": [], "identityId": []}],
             "responses": {
                 "200": {"description": "Live invalidation stream", "content": {"text/event-stream": {"schema": {"type": "string"}, "example": "event: sync\ndata: {\"all\":true,\"scopes\":[]}\n\n"}}},
                 "401": {"description": "Invalid identity credentials"},
                 "503": {"description": "Capacity or database unavailable; retry"},
+            },
+        }},
+        "/v1/groups/{group_id}/ring": {"post": {
+            "operationId": "v1_groups_ring_hold", "tags": ["v1"],
+            "description": "Hold this empty-body authenticated stream open to ring connected group members. Requires the same editor permission as shared alarms. The server renews a five-second ringing lease every two seconds and sends a stop when this stream disconnects. This transient connection does not create a durable or retryable mutation and has no Idempotency-Key.",
+            "security": [{"bearerIdentity": [], "identityId": []}],
+            "parameters": [{"in": "path", "name": "group_id", "required": True, "schema": {"type": "string", "format": "uuid"}}],
+            "responses": {
+                "200": {"description": "Group ringing remains active while the stream is connected", "content": {"text/event-stream": {"schema": {"type": "string"}}}},
+                "401": {"description": "Invalid identity credentials"},
+                "403": {"description": "Group editor permission required"},
+                "404": {"description": "Group not found or membership removed"},
+                "503": {"description": "Capacity or database unavailable"},
             },
         }},
     },

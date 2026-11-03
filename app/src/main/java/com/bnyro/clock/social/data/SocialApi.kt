@@ -19,11 +19,14 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import java.net.HttpURLConnection
 import java.net.URI
 import java.time.ZoneId
@@ -164,8 +167,9 @@ class SocialApi(
 
     suspend fun listenForChanges(
         shouldContinue: () -> Boolean,
+        onRing: suspend (JsonObject?) -> Unit = {},
         onChange: suspend (Set<String>?) -> Unit
-    ) = withContext(Dispatchers.IO) {
+    ) = coroutineScope {
         val connection = URI("$baseUrl/v1/events").toURL().openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
         connection.readTimeout = 25_000
@@ -174,25 +178,77 @@ class SocialApi(
         connection.setRequestProperty("Authorization", "Bearer ${identity.token}")
         connection.setRequestProperty("X-Jay-Identity-ID", identity.id)
         installationCredential?.let { connection.setRequestProperty("X-Jay-Installation", it) }
-        try {
-            val status = connection.responseCode
-            if (status !in 200..299) {
-                val response = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                throw SocialApiException(status, response)
+        val cancellation = launch(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            try {
+                awaitCancellation()
+            } finally {
+                connection.disconnect()
             }
-            connection.inputStream.bufferedReader().use { reader ->
-                while (shouldContinue()) {
-                    currentCoroutineContext().ensureActive()
-                    val line = reader.readLine() ?: break
-                    currentCoroutineContext().ensureActive()
-                    if (line.startsWith("data: ")) {
-                        val hint = Json.parseToJsonElement(line.removePrefix("data: ")).jsonObject
-                        onChange(if (hint["all"]?.jsonPrimitive?.booleanOrNull == true) null
-                            else hint["scopes"]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet().orEmpty())
+        }
+        try {
+            withContext(Dispatchers.IO) {
+                val status = connection.responseCode
+                if (status !in 200..299) {
+                    val response = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    throw SocialApiException(status, response)
+                }
+                connection.inputStream.bufferedReader().use { reader ->
+                    var event = "sync"
+                    while (shouldContinue()) {
+                        currentCoroutineContext().ensureActive()
+                        val line = reader.readLine() ?: break
+                        currentCoroutineContext().ensureActive()
+                        if (line.startsWith("event: ")) event = line.removePrefix("event: ")
+                        if (line.startsWith("data: ")) {
+                            val hint = Json.parseToJsonElement(line.removePrefix("data: ")).jsonObject
+                            when (event) {
+                                "ring" -> onRing(hint)
+                                "ring_reset" -> onRing(null)
+                                "sync" -> onChange(
+                                    if (hint["all"]?.jsonPrimitive?.booleanOrNull == true) null
+                                    else hint["scopes"]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet().orEmpty()
+                                )
+                            }
+                        }
                     }
                 }
             }
         } finally {
+            cancellation.cancelAndJoin()
+            connection.disconnect()
+        }
+    }
+
+    suspend fun holdGroupRing(groupId: String) = coroutineScope {
+        val connection = URI("$baseUrl/v1/groups/$groupId/ring").toURL().openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 7_000
+        connection.setRequestProperty("X-Jay-Protocol", "2")
+        connection.setRequestProperty("Accept", "text/event-stream")
+        connection.setRequestProperty("Authorization", "Bearer ${identity.token}")
+        connection.setRequestProperty("X-Jay-Identity-ID", identity.id)
+        installationCredential?.let { connection.setRequestProperty("X-Jay-Installation", it) }
+        val cancellation = launch(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            try {
+                awaitCancellation()
+            } finally {
+                connection.disconnect()
+            }
+        }
+        try {
+            withContext(Dispatchers.IO) {
+                val status = connection.responseCode
+                if (status !in 200..299) {
+                    val response = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    throw SocialApiException(status, response)
+                }
+                connection.inputStream.bufferedReader().use { reader ->
+                    while (reader.readLine() != null) currentCoroutineContext().ensureActive()
+                }
+            }
+        } finally {
+            cancellation.cancelAndJoin()
             connection.disconnect()
         }
     }
