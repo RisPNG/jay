@@ -109,7 +109,7 @@
     <string name="select_alarm_timeout">Select alarm timeout</string>
     <string name="missed_restart">Missed restart</string>
     <string name="select_missed_restart_time">Select missed restart delay</string>
-    <string name="missed_restart_info">After the alarm times out, wait this long before ringing again. It keeps restarting until you dismiss it, even when Snooze is off.</string>
+    <string name="missed_restart_info">After an alarm alert times out, wait this long before ringing again. Restarts continue until you dismiss the alarm, even when Snooze is off.</string>
     <string name="select_timer_timeout">Select timer timeout</string>
     <string name="volume_ramp">Gradually increase volume</string>
     <string name="select_volume_ramp">Select volume ramp</string>
@@ -382,4 +382,9 @@
     <string name="toggle">Toggle</string>
     <string name="option_information">About %1$s</string>
     <string name="duration">Duration</string>
+    <string name="alarm_timeout_info">Choose how long each alarm alert rings before it stops automatically. Snoozing starts another alert with the same timeout.</string>
+    <string name="timer_timeout_info">Choose how long the alert rings after a timer finishes. This does not change the countdown duration.</string>
+    <string name="alarm_picker_style_info">Choose the controls used to enter an alarm time. This changes the picker layout, not the alarm\'s behavior.</string>
+    <string name="timer_picker_style_info">Choose how to enter a timer duration. The clock face sets hours and minutes. The wheels and number pad also let you enter seconds.</string>
+    <string name="upcoming_alarm_info">Choose how long before an alarm its upcoming notification appears. You can dismiss that occurrence from the notification before it rings. Snoozed alarms show the notification immediately.</string>
 </resources>
