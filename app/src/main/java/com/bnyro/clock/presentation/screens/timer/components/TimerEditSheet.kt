@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import com.bnyro.clock.presentation.components.LabelColorPreference
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -50,6 +51,7 @@ import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.PickerStyle
 import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.presentation.components.ScrollPickerDialog
+import com.bnyro.clock.presentation.components.InfoButton
 import com.bnyro.clock.presentation.components.SwitchWithDivider
 import com.bnyro.clock.presentation.features.RingtonePickerDialog
 import com.bnyro.clock.presentation.features.VibrationPatternPickerDialog
@@ -168,10 +170,20 @@ fun TimerEditSheet(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Column(Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.timeout_after),
-                                style = MaterialTheme.typography.titleLarge
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = stringResource(R.string.timeout_after),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                InfoButton(
+                                    title = stringResource(R.string.timeout_after),
+                                    explanation = stringResource(R.string.timer_timeout_info),
+                                    modifier = Modifier.height(with(LocalDensity.current) {
+                                        MaterialTheme.typography.titleLarge.lineHeight.toDp()
+                                    })
+                                )
+                            }
                             Text(
                                 text = pluralStringResource(R.plurals.duration_minutes, timeoutMinutes, timeoutMinutes),
                                 style = MaterialTheme.typography.bodyMedium
