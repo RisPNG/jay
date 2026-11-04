@@ -227,11 +227,12 @@ fun AlarmPicker(
                             )
                             InfoButton(
                                 title = stringResource(R.string.timeout_after),
-                                explanation = stringResource(R.string.alarm_timeout_info),
                                 modifier = Modifier.height(with(LocalDensity.current) {
                                     MaterialTheme.typography.titleLarge.lineHeight.toDp()
                                 })
-                            )
+                            ) {
+                                Text(text = stringResource(R.string.alarm_timeout_info))
+                            }
                         }
                         Text(
                             text = pluralStringResource(
