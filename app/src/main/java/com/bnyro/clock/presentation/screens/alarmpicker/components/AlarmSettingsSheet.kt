@@ -1,7 +1,6 @@
 package com.bnyro.clock.presentation.screens.alarmpicker.components
 
 import com.bnyro.clock.ui.theme.resolveLabelColor
-import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -53,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.PickerStyle
-import com.bnyro.clock.presentation.components.ClockTimePicker
 import com.bnyro.clock.presentation.components.LabelColorPreference
 import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
@@ -62,8 +59,7 @@ import com.bnyro.clock.presentation.components.ScrollPickerDialog
 import com.bnyro.clock.presentation.components.SwitchWithDivider
 import com.bnyro.clock.presentation.features.RingtonePickerDialog
 import com.bnyro.clock.presentation.features.VibrationPatternPickerDialog
-import com.bnyro.clock.presentation.screens.alarm.components.AlarmTimePicker
-import com.bnyro.clock.presentation.screens.alarm.components.ScrollAlarmTimePicker
+import com.bnyro.clock.presentation.screens.alarm.components.AlarmPickerSelector
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.TimeHelper
 
@@ -75,7 +71,6 @@ fun AlarmPicker(
     onDelete: ((Alarm) -> Unit)? = null,
     onCancel: () -> Unit
 ) {
-    val context = LocalContext.current
     var showRingtoneDialog by remember { mutableStateOf(false) }
     var showSnoozeDialog by remember { mutableStateOf(false) }
     var showSnoozeLimitDialog by remember { mutableStateOf(false) }
@@ -150,30 +145,14 @@ fun AlarmPicker(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceEvenly
         ) {
-            when (pickerStyle) {
-                PickerStyle.WHEEL -> ScrollAlarmTimePicker(
-                    initialHours = hours,
-                    initialMinutes = minutes,
-                    onHoursChanged = { hours = it },
-                    onMinutesChanged = { minutes = it }
-                )
-
-                PickerStyle.NUMBER_PAD -> AlarmTimePicker(
-                    initialHours = hours,
-                    initialMinutes = minutes,
-                    isEditing = currentAlarm.id != 0L,
-                    onHoursChanged = { hours = it },
-                    onMinutesChanged = { minutes = it }
-                )
-
-                PickerStyle.CLOCK -> ClockTimePicker(
-                    initialHours = hours,
-                    initialMinutes = minutes,
-                    is24Hour = DateFormat.is24HourFormat(context),
-                    onHoursChanged = { hours = it },
-                    onMinutesChanged = { minutes = it }
-                )
-            }
+            AlarmPickerSelector(
+                pickerStyle = pickerStyle,
+                initialHours = hours,
+                initialMinutes = minutes,
+                isEditing = currentAlarm.id != 0L,
+                onHoursChanged = { hours = it },
+                onMinutesChanged = { minutes = it }
+            )
             Spacer(modifier = Modifier.height(16.dp))
 
             Column {
