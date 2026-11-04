@@ -70,6 +70,7 @@ import com.bnyro.clock.presentation.screens.settings.components.SettingsCategory
 import com.bnyro.clock.presentation.screens.settings.components.SwitchPref
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.util.Preferences
+import com.bnyro.clock.social.data.PlayInstallationStore
 import com.bnyro.clock.social.presentation.SocialSettingsSection
 import com.bnyro.clock.social.presentation.JaySupportPreference
 
@@ -81,6 +82,7 @@ fun SettingsScreen(
     settingsModel: SettingsModel
 ) {
     val context = LocalContext.current
+    val isEligiblePlayInstallation = PlayInstallationStore.isEligible(context)
     val scrollState = rememberScrollState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState()
@@ -171,11 +173,13 @@ fun SettingsScreen(
                 .verticalScroll(scrollState)
         ) {
             val uriHandler = LocalUriHandler.current
-            JaySupportPreference()
-            HorizontalDivider(
-                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            )
+            if (!isEligiblePlayInstallation) {
+                JaySupportPreference(isEligiblePlayInstallation = false)
+                HorizontalDivider(
+                    modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
             SettingsCategory(stringResource(R.string.general))
 
             ButtonGroupPref(
@@ -527,6 +531,9 @@ fun SettingsScreen(
                 imageVector = Icons.AutoMirrored.Filled.OpenInNew
             ) {
                 uriHandler.openUri("https://github.com/RisPNG/jay")
+            }
+            if (isEligiblePlayInstallation) {
+                JaySupportPreference(isEligiblePlayInstallation = true)
             }
             IconPreference(
                 title = stringResource(R.string.jay_version),

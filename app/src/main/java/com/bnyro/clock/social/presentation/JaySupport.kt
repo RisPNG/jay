@@ -18,7 +18,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -28,7 +27,6 @@ import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.presentation.screens.settings.components.IconPreference
 import com.bnyro.clock.presentation.screens.settings.components.PreferenceItem
-import com.bnyro.clock.social.data.PlayInstallationStore
 import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.Preferences
 
@@ -67,10 +65,9 @@ fun JaySupportDialog() {
 }
 
 @Composable
-fun JaySupportPreference() {
-    val context = LocalContext.current
+fun JaySupportPreference(isEligiblePlayInstallation: Boolean) {
     val uriHandler = LocalUriHandler.current
-    if (PlayInstallationStore.isEligible(context)) {
+    if (isEligiblePlayInstallation) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -78,8 +75,7 @@ fun JaySupportPreference() {
         ) {
             PreferenceItem(
                 modifier = Modifier.weight(1f),
-                title = stringResource(R.string.jay_support_thanks),
-                summary = stringResource(R.string.jay_support_thanks_summary)
+                title = stringResource(R.string.jay_support_thanks)
             )
             Icon(
                 imageVector = Icons.Rounded.Favorite,
@@ -89,8 +85,7 @@ fun JaySupportPreference() {
         }
     } else {
         IconPreference(
-            title = stringResource(R.string.jay_support_us),
-            summary = stringResource(R.string.jay_support_summary),
+            title = stringResource(R.string.jay_support_title),
             imageVector = Icons.Rounded.VolunteerActivism
         ) {
             uriHandler.openUri(PLAY_STORE_URL)
