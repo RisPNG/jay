@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 fun SwitchWithDivider(
     title: String,
     description: String? = null,
+    info: String? = null,
     icon: ImageVector? = null,
     isChecked: Boolean = true,
     onClick: (() -> Unit) = {},
@@ -61,7 +63,18 @@ fun SwitchWithDivider(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Text(text = title, style = MaterialTheme.typography.titleLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f, fill = false))
+                    info?.let {
+                        InfoButton(
+                            title = title,
+                            explanation = it,
+                            modifier = Modifier.height(with(LocalDensity.current) {
+                                MaterialTheme.typography.titleLarge.lineHeight.toDp()
+                            })
+                        )
+                    }
+                }
                 if (!description.isNullOrEmpty()) {
                     Text(
                         text = description,
