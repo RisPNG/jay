@@ -394,7 +394,15 @@ fun AlarmPicker(
                 )
                 SwitchWithDivider(
                     title = stringResource(R.string.snooze_limit),
-                    info = stringResource(R.string.snooze_limit_info),
+                    info = if (selectedGroupId == null) {
+                        stringResource(R.string.snooze_limit_info)
+                    } else {
+                        stringResource(
+                            R.string.shared_snooze_limit_info,
+                            stringResource(R.string.snooze_limit_info),
+                            stringResource(R.string.answer_as_one)
+                        )
+                    },
                     description = if (snoozeLimitEnabled) {
                         pluralStringResource(R.plurals.snooze_limit_count, snoozeLimit, snoozeLimit)
                     } else {

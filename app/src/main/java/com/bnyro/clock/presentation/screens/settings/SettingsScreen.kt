@@ -167,6 +167,11 @@ fun SettingsScreen(
                 .verticalScroll(scrollState)
         ) {
             val uriHandler = LocalUriHandler.current
+            JaySupportPreference()
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            )
             SettingsCategory(stringResource(R.string.general))
 
             ButtonGroupPref(
@@ -491,7 +496,6 @@ fun SettingsScreen(
             ) {
                 uriHandler.openUri("https://github.com/RisPNG/jay")
             }
-            JaySupportPreference()
             IconPreference(
                 title = stringResource(R.string.jay_version),
                 summary = BuildConfig.JAY_VERSION,

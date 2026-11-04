@@ -58,7 +58,7 @@ fun JaySupportDialog() {
                 }
             },
             dismissButton = {
-                DialogButton(R.string.maybe_later, DialogButtonStyle.SECONDARY) {
+                DialogButton(R.string.jay_support_not_now, DialogButtonStyle.SECONDARY) {
                     showDialog = false
                 }
             }
@@ -70,15 +70,7 @@ fun JaySupportDialog() {
 fun JaySupportPreference() {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    if (BuildConfig.FLAVOR == "lite") {
-        IconPreference(
-            title = stringResource(R.string.jay_support_us),
-            summary = stringResource(R.string.jay_support_summary),
-            imageVector = Icons.Rounded.VolunteerActivism
-        ) {
-            uriHandler.openUri(PLAY_STORE_URL)
-        }
-    } else if (PlayInstallationStore.isEligible(context)) {
+    if (PlayInstallationStore.isEligible(context)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -94,6 +86,14 @@ fun JaySupportPreference() {
                 contentDescription = null,
                 modifier = Modifier.padding(12.dp)
             )
+        }
+    } else {
+        IconPreference(
+            title = stringResource(R.string.jay_support_us),
+            summary = stringResource(R.string.jay_support_summary),
+            imageVector = Icons.Rounded.VolunteerActivism
+        ) {
+            uriHandler.openUri(PLAY_STORE_URL)
         }
     }
 }
