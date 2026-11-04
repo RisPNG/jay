@@ -137,6 +137,9 @@ class SocialRepository(
     val canUseAdvancedGroupTiming: Boolean
         get() = deviceCapabilities.advancedGroupTiming
 
+    val canUseHourlyGroupRecurrence: Boolean
+        get() = deviceCapabilities.hourlyAlarmRecurrence
+
     private fun applyDeviceCapabilities(
         capabilities: DeviceCapabilities,
         serverUrl: String,
@@ -315,6 +318,7 @@ class SocialRepository(
                         days = remote.days,
                         vibrate = remote.vibrate,
                         startDate = LocalDate.parse(remote.startDate).toEpochDay(),
+                        startWithLaterOffset = remote.startWithLaterOffset,
                         repeatInterval = remote.repeatInterval,
                         repeatUnit = RepeatUnit.valueOf(remote.repeatUnit),
                         repeatAnchor = RepeatAnchor.valueOf(remote.repeatAnchor),
@@ -371,6 +375,7 @@ class SocialRepository(
                             days = remote.days,
                             vibrate = remote.vibrate,
                             startDate = LocalDate.parse(remote.startDate).toEpochDay(),
+                            startWithLaterOffset = remote.startWithLaterOffset,
                             repeatInterval = remote.repeatInterval,
                             repeatUnit = RepeatUnit.valueOf(remote.repeatUnit),
                             repeatAnchor = RepeatAnchor.valueOf(remote.repeatAnchor),
@@ -852,6 +857,7 @@ class SocialRepository(
     ): Long = withContext(Dispatchers.IO) {
         val group = groups.first().first { it.id == groupId }
         val advancedGroupTiming = canUseAdvancedGroupTiming
+        val hourlyGroupRecurrence = canUseHourlyGroupRecurrence
         val timeZone = if (group.alarmTimeBasis == AlarmTimeBasis.GROUP_TIME_ZONE) ZoneId.of(group.alarmTimeZone) else ZoneId.systemDefault()
         alarmUseCase.prepareForScheduling(alarm, timeZone)
         val soundMode = when {
@@ -864,6 +870,7 @@ class SocialRepository(
         val payload = JsonObject(json.encodeToJsonElement(SharedAlarmRequest(
             groupId = groupId, time = alarm.time, label = alarm.label, labelColor = alarm.labelColor, enabled = alarm.enabled,
             days = alarm.days, vibrate = alarm.vibrate, startDate = LocalDate.ofEpochDay(alarm.startDate).toString(),
+            startWithLaterOffset = alarm.startWithLaterOffset,
             repeatInterval = alarm.repeatInterval, repeatUnit = alarm.repeatUnit.name, repeatAnchor = alarm.repeatAnchor.name,
             repeatDuration = alarm.repeatDuration, repeatDurationUnit = alarm.repeatDurationUnit.name,
             endDate = alarm.endDate?.let { LocalDate.ofEpochDay(it).toString() }, endOccurrences = alarm.endOccurrences,
@@ -873,7 +880,8 @@ class SocialRepository(
             sound = SharedSoundSelection(soundMode.name.lowercase(), soundId, alarm.soundName ?: "Shared sound"),
             membershipId = group.membershipId, id = alarmId
         )).jsonObject.filterKeys {
-            advancedGroupTiming || it !in setOf("timeout_minutes", "missed_restart_enabled", "missed_restart_minutes")
+            (advancedGroupTiming || it !in setOf("timeout_minutes", "missed_restart_enabled", "missed_restart_minutes")) &&
+                (hourlyGroupRecurrence || it != "start_with_later_offset")
         })
         val optimistic = JsonObject(payload + mapOf(
             "sound_title" to JsonPrimitive(alarm.soundName ?: "Shared sound"),
@@ -892,6 +900,7 @@ class SocialRepository(
         } else {
             val group = groups.first().first { it.id == link.groupId }
             val advancedGroupTiming = canUseAdvancedGroupTiming
+            val hourlyGroupRecurrence = canUseHourlyGroupRecurrence
             alarmUseCase.prepareForScheduling(alarm, link.timeZone?.let(ZoneId::of) ?: ZoneId.systemDefault())
             val local = alarmRepository.getAlarmById(alarm.id)
             val keepSound = alarm.soundEnabled && link.soundMode == SharedSoundMode.SHARED &&
@@ -905,6 +914,7 @@ class SocialRepository(
             val payload = JsonObject(json.encodeToJsonElement(SharedAlarmRequest(
                 time = alarm.time, label = alarm.label, labelColor = alarm.labelColor, enabled = alarm.enabled, days = alarm.days,
                 vibrate = alarm.vibrate, startDate = LocalDate.ofEpochDay(alarm.startDate).toString(),
+                startWithLaterOffset = alarm.startWithLaterOffset,
                 repeatInterval = alarm.repeatInterval, repeatUnit = alarm.repeatUnit.name, repeatAnchor = alarm.repeatAnchor.name,
                 repeatDuration = alarm.repeatDuration, repeatDurationUnit = alarm.repeatDurationUnit.name,
                 endDate = alarm.endDate?.let { LocalDate.ofEpochDay(it).toString() }, endOccurrences = alarm.endOccurrences,
@@ -915,7 +925,8 @@ class SocialRepository(
                 membershipId = group.membershipId
             )).jsonObject.filterKeys {
                 it !in setOf("id", "group_id") && (advancedGroupTiming ||
-                    it !in setOf("timeout_minutes", "missed_restart_enabled", "missed_restart_minutes"))
+                    it !in setOf("timeout_minutes", "missed_restart_enabled", "missed_restart_minutes")) &&
+                    (hourlyGroupRecurrence || it != "start_with_later_offset")
             })
             val optimistic = JsonObject(payload + mapOf(
                 "id" to JsonPrimitive(link.remoteAlarmId), "group_id" to JsonPrimitive(link.groupId),

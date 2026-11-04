@@ -163,7 +163,8 @@ data class DeviceCapabilities(
     @SerialName("shared_sound_upload") val sharedSoundUpload: Boolean = false,
     @SerialName("requires_play_entitlement") val requiresPlayEntitlement: Boolean = true,
     @SerialName("expires_at") val expiresAt: String? = null,
-    @SerialName("advanced_group_timing") val advancedGroupTiming: Boolean = false
+    @SerialName("advanced_group_timing") val advancedGroupTiming: Boolean = false,
+    @SerialName("hourly_alarm_recurrence") val hourlyAlarmRecurrence: Boolean = false
 ) {
     fun canUploadSharedSounds(now: java.time.Instant = java.time.Instant.now()): Boolean =
         sharedSoundUpload && (!requiresPlayEntitlement ||
@@ -224,6 +225,7 @@ data class SharedAlarmRequest(
     val days: List<Int>,
     val vibrate: Boolean,
     @SerialName("start_date") val startDate: String,
+    @SerialName("start_with_later_offset") val startWithLaterOffset: Boolean = false,
     @SerialName("repeat_interval") val repeatInterval: Int,
     @SerialName("repeat_unit") val repeatUnit: String,
     @SerialName("repeat_anchor") val repeatAnchor: String,
@@ -334,6 +336,7 @@ data class SharedAlarmDto(
     val days: List<Int>,
     val vibrate: Boolean,
     @SerialName("start_date") val startDate: String,
+    @SerialName("start_with_later_offset") val startWithLaterOffset: Boolean = false,
     @SerialName("repeat_interval") val repeatInterval: Int,
     @SerialName("repeat_unit") val repeatUnit: String,
     @SerialName("repeat_anchor") val repeatAnchor: String,

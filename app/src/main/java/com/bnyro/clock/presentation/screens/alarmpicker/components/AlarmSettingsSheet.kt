@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.PickerStyle
+import com.bnyro.clock.domain.model.RepeatUnit
 import com.bnyro.clock.presentation.components.LabelColorPreference
 import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
@@ -70,6 +71,8 @@ import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.TimeHelper
 import com.bnyro.clock.social.domain.SharedSoundProgress
 import com.bnyro.clock.social.domain.SocialGroup
+import com.bnyro.clock.social.domain.AlarmTimeBasis
+import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +84,7 @@ fun AlarmPicker(
     canSave: Boolean = true,
     canUploadSharedSounds: Boolean = false,
     canUseAdvancedGroupTiming: Boolean = false,
+    canUseHourlyGroupRecurrence: Boolean = false,
     busy: Boolean = false,
     soundProgress: SharedSoundProgress? = null,
     onSave: (Alarm, String?) -> Unit,
@@ -115,6 +119,7 @@ fun AlarmPicker(
     var soundUri by remember { mutableStateOf(currentAlarm.soundUri) }
 
     var startDate by remember { mutableLongStateOf(currentAlarm.startDate) }
+    var startWithLaterOffset by remember { mutableStateOf(currentAlarm.startWithLaterOffset) }
     var repeatDuration by remember { mutableStateOf(currentAlarm.repeatDuration) }
     var repeatDurationUnit by remember { mutableStateOf(currentAlarm.repeatDurationUnit) }
     var repeatInterval by remember { mutableIntStateOf(currentAlarm.repeatInterval) }
@@ -134,6 +139,14 @@ fun AlarmPicker(
     var selectedGroupId by remember { mutableStateOf(currentGroupId) }
     var groupMenuExpanded by remember { mutableStateOf(false) }
     val timingEditable = selectedGroupId == null || canUseAdvancedGroupTiming
+    val availableRepeatUnits = if (selectedGroupId == null || canUseHourlyGroupRecurrence) {
+        RepeatUnit.entries
+    } else {
+        RepeatUnit.entries.filter { it != RepeatUnit.HOUR }
+    }
+    val repetitionTimeZone = groups.firstOrNull {
+        it.id == selectedGroupId && it.alarmTimeBasis == AlarmTimeBasis.GROUP_TIME_ZONE
+    }?.alarmTimeZone?.let(ZoneId::of) ?: ZoneId.systemDefault()
 
     val initialTime = remember { TimeHelper.millisToTime(currentAlarm.time) }
     var hours by remember { mutableIntStateOf(initialTime.hours) }
@@ -170,8 +183,18 @@ fun AlarmPicker(
                 initialMinutes = minutes,
                 isEditing = currentAlarm.id != 0L,
                 enabled = canSave,
-                onHoursChanged = { hours = it },
-                onMinutesChanged = { minutes = it }
+                onHoursChanged = {
+                    if (hours != it) {
+                        hours = it
+                        startWithLaterOffset = false
+                    }
+                },
+                onMinutesChanged = {
+                    if (minutes != it) {
+                        minutes = it
+                        startWithLaterOffset = false
+                    }
+                }
             )
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -226,7 +249,9 @@ fun AlarmPicker(
             Column {
                 RecurrencePicker(
                     advanced = advanced,
+                    time = (hours * 60 + minutes) * 60_000L,
                     startDate = startDate,
+                    startWithLaterOffset = startWithLaterOffset,
                     repeatDuration = repeatDuration,
                     repeatDurationUnit = repeatDurationUnit,
                     repeatInterval = repeatInterval,
@@ -236,19 +261,43 @@ fun AlarmPicker(
                     endDate = endDate,
                     endOccurrences = endOccurrences,
                     enabled = canSave,
-                    onStartDateChange = { startDate = it },
+                    timeZone = repetitionTimeZone,
+                    repeatUnits = availableRepeatUnits,
+                    onStartDateChange = {
+                        if (startDate != it) {
+                            startDate = it
+                            startWithLaterOffset = false
+                        }
+                    },
                     onRepeatDurationChange = { duration, unit ->
                         repeatDuration = duration
                         repeatDurationUnit = unit
                     },
                     onRepeatIntervalChange = { repeatInterval = it },
-                    onRepeatUnitChange = { repeatUnit = it },
+                    onRepeatUnitChange = {
+                        if (repeatUnit != it) {
+                            repeatUnit = it
+                            startWithLaterOffset = false
+                        }
+                        if (it == RepeatUnit.HOUR) repeatDuration = null
+                    },
                     onRepeatAnchorChange = { repeatAnchor = it },
                     onEndChange = { newEndDate, newEndOccurrences ->
                         endDate = newEndDate
                         endOccurrences = newEndOccurrences
                     }
                 )
+                if (selectedGroupId != null && repeatUnit == RepeatUnit.HOUR) {
+                    Text(
+                        text = stringResource(
+                            if (canUseHourlyGroupRecurrence) R.string.shared_hourly_alarm_info
+                            else R.string.shared_hourly_alarm_unavailable
+                        ),
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Row(
                     modifier = Modifier.padding(8.dp, 16.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -426,7 +475,7 @@ fun AlarmPicker(
             }
             Spacer(modifier = Modifier.width(16.dp))
             Button(
-                enabled = canSave && !busy,
+                enabled = canSave && !busy && repeatUnit in availableRepeatUnits,
                 onClick = {
                 val alarm =
                     currentAlarm.copy(
@@ -447,6 +496,7 @@ fun AlarmPicker(
                         vibrationPattern = vibrationPattern,
                         vibrationPatternName = vibrationPatternName,
                         startDate = startDate,
+                        startWithLaterOffset = startWithLaterOffset,
                         repeatDuration = repeatDuration,
                         repeatDurationUnit = repeatDurationUnit,
                         repeatInterval = repeatInterval,

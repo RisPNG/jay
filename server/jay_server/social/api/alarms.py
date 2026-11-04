@@ -4,7 +4,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ..access import require_membership, select_shared_sound
+from ..access import require_alarm_protocol, require_membership, select_shared_sound
 from ..models import AlarmDelivery, AlarmOccurrence, DeliveryWork, Group, SharedAlarm
 from ..synchronization import publish_changes
 from ..transactions import accept_saved_state, mutation
@@ -18,6 +18,7 @@ class AlarmListView(APIView):
         serializer = AlarmCreate(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data.copy()
+        require_alarm_protocol(data["repeat_unit"], request.supports_hourly_alarms)
         group = get_object_or_404(Group, pk=data["group_id"])
         with mutation(request, data, [group.scope_id]) as receipt:
             group = Group.objects.select_for_update().get(pk=group.pk)
@@ -44,10 +45,12 @@ class AlarmView(APIView):
         serializer = AlarmPayload(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data.copy()
+        require_alarm_protocol(data["repeat_unit"], request.supports_hourly_alarms)
         alarm = get_object_or_404(SharedAlarm.objects.select_related("group"), pk=alarm_id, deleted_at=None)
         with mutation(request, data, [alarm.group.scope_id]) as receipt:
             alarm = get_object_or_404(SharedAlarm.objects.select_for_update().select_related("group"), pk=alarm_id, deleted_at=None)
             require_membership(alarm.group, request.user, data["membership_id"], editor=True)
+            require_alarm_protocol(alarm.repeat_unit, request.supports_hourly_alarms)
             if receipt.completed_at:
                 return Response(receipt.response, status=receipt.status)
             accept_saved_state(alarm, data.pop("saved_at"), receipt.operation_id, AlarmRepresentation(alarm).data)
@@ -62,6 +65,7 @@ class AlarmView(APIView):
             alarm.revision += 1
             alarm.inactive_cycle_streak = 0
             alarm.last_evaluated_cycle_date = None
+            alarm.last_evaluated_cycle_index = None
             alarm.save()
             AlarmOccurrence.objects.filter(alarm=alarm, state="pending").update(state="canceled", resolved_at=timezone.now(), snoozed_until=None, snoozed_at=None)
             changes = [("alarm", str(alarm.pk), "upsert", AlarmRepresentation(alarm).data, None)]
@@ -69,7 +73,7 @@ class AlarmView(APIView):
                 changes.append(("sound", str(alarm.sound_id), "upsert", SoundRepresentation(alarm.sound).data, None))
             current = AlarmRepresentation(alarm).data
             details = {}
-            for field in ["label", "label_color", "local_time_ms", "enabled", "days", "vibrate", "start_date", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "snooze_enabled", "snooze_minutes", "snooze_limit", "timeout_minutes", "missed_restart_enabled", "missed_restart_minutes", "sound_mode", "sound_id", "vibration_pattern", "vibration_pattern_name"]:
+            for field in ["label", "label_color", "local_time_ms", "enabled", "days", "vibrate", "start_date", "start_with_later_offset", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "snooze_enabled", "snooze_minutes", "snooze_limit", "timeout_minutes", "missed_restart_enabled", "missed_restart_minutes", "sound_mode", "sound_id", "vibration_pattern", "vibration_pattern_name"]:
                 key = "time" if field == "local_time_ms" else field
                 details[f"previous_{key}"], details[key] = previous[field], current[field]
             action = "edited" if previous["enabled"] == alarm.enabled else "enabled" if alarm.enabled else "disabled"
@@ -89,6 +93,7 @@ class AlarmView(APIView):
                 return Response(status=receipt.status)
             alarm = get_object_or_404(SharedAlarm.objects.select_for_update().select_related("group"), pk=alarm_id, deleted_at=None)
             require_membership(alarm.group, request.user, data["membership_id"], editor=True)
+            require_alarm_protocol(alarm.repeat_unit, request.supports_hourly_alarms)
             alarm.deleted_at, alarm.revision = timezone.now(), alarm.revision + 1
             alarm.save(update_fields=["deleted_at", "revision"])
             AlarmOccurrence.objects.filter(alarm=alarm, state="pending").update(state="canceled", resolved_at=timezone.now(), snoozed_until=None, snoozed_at=None)
@@ -106,6 +111,7 @@ class AlarmDeliveryView(APIView):
         alarm = get_object_or_404(SharedAlarm.objects.select_related("group"), pk=alarm_id, deleted_at=None)
         with mutation(request, data, [alarm.group.scope_id]) as receipt:
             require_membership(alarm.group, request.user)
+            require_alarm_protocol(alarm.repeat_unit, request.supports_hourly_alarms)
             if not receipt.completed_at:
                 from ..errors import DomainError
                 if data["revision"] > SharedAlarm.objects.get(pk=alarm_id).revision:

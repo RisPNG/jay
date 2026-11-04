@@ -23,15 +23,21 @@ def require_membership(group, identity, generation=None, leader=False, editor=Fa
     return member
 
 
+def require_alarm_protocol(repeat_unit, supports_hourly_alarms):
+    if repeat_unit == "HOUR" and not supports_hourly_alarms:
+        raise DomainError("client_upgrade_required", "Update Jay to use hourly shared alarms", 403)
+
+
 def identity_capabilities(identity, installation=None):
     if settings.SHARED_SOUND_ACCESS == "everyone" or ProfileSoundGrant.objects.filter(identity=identity).exists():
-        return {"shared_sound_upload": True, "requires_play_entitlement": False, "expires_at": None, "advanced_group_timing": True}
+        return {"shared_sound_upload": True, "requires_play_entitlement": False, "expires_at": None, "advanced_group_timing": True, "hourly_alarm_recurrence": True}
     entitlement = PlayInstallation.objects.filter(pk=installation).first() if installation else None
     return {
         "shared_sound_upload": entitlement is not None and entitlement.expires_at > timezone.now(),
         "requires_play_entitlement": True,
         "expires_at": entitlement.expires_at.isoformat() if entitlement else None,
         "advanced_group_timing": True,
+        "hourly_alarm_recurrence": True,
     }
 
 

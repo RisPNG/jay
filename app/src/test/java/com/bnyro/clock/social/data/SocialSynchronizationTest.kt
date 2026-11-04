@@ -17,6 +17,7 @@ import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -25,11 +26,15 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
 class SocialSynchronizationTest {
+    @Before
+    fun initializePreferences() {
+        Preferences.init(ApplicationProvider.getApplicationContext<Application>())
+        Preferences.edit { clear() }
+    }
+
     @Test
     fun aQueuedLegacyDeleteRetainsItsOriginalIntentWhenRetriedByTheNewClient() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Application>()
-        Preferences.init(context)
-        Preferences.edit { clear() }
         val database = Room.inMemoryDatabaseBuilder(context, SocialDatabase::class.java).build()
         val attempts = Collections.synchronizedList(mutableListOf<Triple<String?, String?, String>>())
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
@@ -53,7 +58,7 @@ class SocialSynchronizationTest {
             assertEquals(operation, database.socialDao().getOperation(operation.operationId))
             synchronization.flushOperations(api)
             assertEquals(2, attempts.size)
-            assertTrue(attempts.all { it.first == "2" && it.second == operation.operationId && it.third == operation.payload })
+            assertTrue(attempts.all { it.first == "3" && it.second == operation.operationId && it.third == operation.payload })
             val accepted = requireNotNull(database.socialDao().getOperation(operation.operationId))
             assertEquals("accepted", accepted.state)
             assertEquals(operation.payload, accepted.payload)

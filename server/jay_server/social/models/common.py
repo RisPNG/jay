@@ -42,6 +42,7 @@ class ActivityKind(models.TextChoices):
 
 
 class RepeatUnit(models.TextChoices):
+    HOUR = "HOUR"
     DAY = "DAY"
     WEEK = "WEEK"
     MONTH = "MONTH"

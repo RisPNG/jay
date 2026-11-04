@@ -36,7 +36,7 @@ class RegistrationView(APIView):
                 try:
                     with transaction.atomic():
                         scope = SyncScope.objects.create()
-                        identity = Identity.objects.create(id=data["id"], name=data["name"], time_zone=data["time_zone"], token_hash=digest, scope=scope, saved_at=datetime(1970, 1, 1, tzinfo=UTC))
+                        identity = Identity.objects.create(id=data["id"], name=data["name"], time_zone=data["time_zone"], token_hash=digest, scope=scope, saved_at=datetime(1970, 1, 1, tzinfo=UTC), client_protocol=3 if request.headers.get("X-Jay-Protocol") == "3" else 2)
                 except IntegrityError:
                     identity = Identity.objects.select_for_update().get(pk=data["id"])
                 else:
@@ -45,6 +45,13 @@ class RegistrationView(APIView):
                 raise DomainError("identity_retired", "This identity was removed; generate a new profile")
             if not hmac.compare_digest(bytes(identity.token_hash), digest):
                 raise DomainError("identity_registered", "This identity is already registered")
+            if request.headers.get("X-Jay-Protocol") == "3" and identity.client_protocol < 3:
+                identity.client_protocol = 3
+                identity.save(update_fields=["client_protocol"])
+                DeliveryWork.objects.get_or_create(
+                    deduplication_key=f"reschedule:protocol:{identity.pk}:3",
+                    defaults={"kind": "reschedule", "payload": {"identity_id": identity.pk}},
+                )
             if identity.time_zone != data["time_zone"]:
                 identity.time_zone = data["time_zone"]
                 identity.save(update_fields=["time_zone"])
@@ -98,7 +105,7 @@ class PushSubscriptionView(APIView):
 
 
 class CapabilitiesView(APIView):
-    @extend_schema(responses={200: {"type": "object", "properties": {"shared_sound_upload": {"type": "boolean"}, "requires_play_entitlement": {"type": "boolean"}, "expires_at": {"type": "string", "format": "date-time", "nullable": True}, "advanced_group_timing": {"type": "boolean"}}, "required": ["shared_sound_upload", "requires_play_entitlement", "expires_at", "advanced_group_timing"]}})
+    @extend_schema(responses={200: {"type": "object", "properties": {"shared_sound_upload": {"type": "boolean"}, "requires_play_entitlement": {"type": "boolean"}, "expires_at": {"type": "string", "format": "date-time", "nullable": True}, "advanced_group_timing": {"type": "boolean"}, "hourly_alarm_recurrence": {"type": "boolean"}}, "required": ["shared_sound_upload", "requires_play_entitlement", "expires_at", "advanced_group_timing", "hourly_alarm_recurrence"]}})
     def get(self, request):
         return Response(identity_capabilities(request.user, request.auth))
 
@@ -133,4 +140,4 @@ class EntitlementView(APIView):
 class IdentitySyncView(APIView):
     @extend_schema(responses=ScopeSyncRepresentation)
     def get(self, request):
-        return Response(synchronize_scope(SyncScope.objects.get(pk=request.user.scope_id), request.user, None, request.query_params.get("cursor")))
+        return Response(synchronize_scope(SyncScope.objects.get(pk=request.user.scope_id), request.user, None, request.query_params.get("cursor"), supports_hourly_alarms=request.supports_hourly_alarms))

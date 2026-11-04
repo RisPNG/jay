@@ -129,6 +129,8 @@
     <string name="jay_support_never_show_again">Never show again</string>
     <string name="jay_support_thanks">Thank you for supporting Jay</string>
     <string name="recent_activity">Recent activity</string>
+    <string name="shared_hourly_alarm_info">Members need an updated app to receive hourly shared alarms.</string>
+    <string name="shared_hourly_alarm_unavailable">Update this server to use hourly shared alarms.</string>
     <string name="alarm_source">Alarm source</string>
     <string name="deselect_all">Deselect all</string>
     <string name="selected_alarms_edit_denied">You do not have permission to change one or more selected shared alarms. Deselect the alarms with an error-colored ring to continue.</string>

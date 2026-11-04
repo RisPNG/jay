@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from .api.representations import ActivityRepresentation
 from .errors import DomainError
-from .models import DeliveryWork, GroupActivity, GroupMembership, SyncScope, SyncVersion
+from .models import DeliveryWork, GroupActivity, GroupMembership, SharedAlarm, SyncScope, SyncVersion
 
 
 def publish_changes(scope_id, changes, group=None, actor=None, activity=None):
@@ -51,7 +51,7 @@ def publish_changes(scope_id, changes, group=None, actor=None, activity=None):
     return scope.head_revision
 
 
-def synchronize_scope(scope, identity, membership_id, cursor_token):
+def synchronize_scope(scope, identity, membership_id, cursor_token, supports_hourly_alarms=False):
     if membership_id is not None:
         access = GroupMembership.objects.filter(pk=membership_id, identity=identity, identity__retired_at=None, removed_at=None, group__deleted_at=None, group__scope=scope).values("group__scope__head_revision", "group__scope__retention_floor").first()
         if access is None:
@@ -62,7 +62,7 @@ def synchronize_scope(scope, identity, membership_id, cursor_token):
         scope = SyncScope.objects.filter(pk=scope.pk, identity=identity, identity__retired_at=None).first()
         if scope is None:
             raise DomainError("identity_retired", "This identity is retired", 401)
-    binding = {"identity": identity.pk, "scope": str(scope.pk), "membership": str(membership_id) if membership_id else None}
+    binding = {"identity": identity.pk, "scope": str(scope.pk), "membership": str(membership_id) if membership_id else None, "hourly_alarms": supports_hourly_alarms}
     state = None
     if cursor_token:
         try:
@@ -73,8 +73,10 @@ def synchronize_scope(scope, identity, membership_id, cursor_token):
             raise DomainError("cursor_expired", "Restart synchronization for this scope") from None
         except signing.BadSignature:
             raise DomainError("cursor_invalid", "Invalid synchronization cursor", 400) from None
-        if any(state.get(key) != value for key, value in binding.items()):
+        if any(state.get(key) != binding[key] for key in ["identity", "scope", "membership"]):
             raise DomainError("cursor_invalid", "This cursor belongs to a different identity or membership", 400)
+        if state.get("hourly_alarms", False) != supports_hourly_alarms:
+            state = None
     if state is None or (state["mode"] != "snapshot" and state.get("after", 0) < scope.retention_floor):
         state = {**binding, "mode": "snapshot", "upper": scope.head_revision, "after": 0, "position": None, "recent_after": (timezone.now() - timedelta(days=2)).isoformat()}
     elif state["mode"] == "checkpoint":
@@ -92,10 +94,23 @@ def synchronize_scope(scope, identity, membership_id, cursor_token):
         revision, ordinal = state["position"]
         rows = visible.filter(Q(revision__gt=revision) | Q(revision=revision, ordinal__gt=ordinal)).order_by("revision", "ordinal")
     candidates = list(rows[:settings.SYNC_PAGE_SIZE + 1])
+    hourly_alarm_ids = set() if supports_hourly_alarms else {str(key) for key in SharedAlarm.objects.filter(group__scope=scope, repeat_unit="HOUR").values_list("pk", flat=True)}
     items = []
     byte_count = 1024
     for row in candidates[:settings.SYNC_PAGE_SIZE]:
         item = {"kind": row.kind, "key": row.key, "action": row.action, "data": row.representation, "revision": row.revision, "ordinal": row.ordinal}
+        if not supports_hourly_alarms:
+            details = row.representation.get("details") or {}
+            if (
+                (row.kind == "alarm" and (row.key in hourly_alarm_ids or row.representation.get("repeat_unit") == "HOUR"))
+                or (row.kind in {"occurrence", "outcome"} and row.representation.get("alarm_id") in hourly_alarm_ids)
+                or (row.kind == "activity" and (
+                    (row.representation.get("entity_type") in {"alarm", "outcome", "delivery"} and row.representation.get("entity_id") in hourly_alarm_ids)
+                    or details.get("repeat_unit") == "HOUR"
+                    or details.get("previous_repeat_unit") == "HOUR"
+                ))
+            ):
+                item["action"], item["data"] = "delete", {"id": row.key}
         size = len(json.dumps(item, separators=(",", ":"), ensure_ascii=False).encode())
         if byte_count + size > settings.SYNC_PAGE_BYTES:
             if not items:

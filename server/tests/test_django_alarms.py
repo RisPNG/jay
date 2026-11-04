@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from jay_server.social.alarms import schedule_occurrences
+from jay_server.social.alarms import record_alarm_response, schedule_occurrences
 from jay_server.social.models import AlarmActivity, AlarmDelivery, AlarmOccurrence, DeliveryWork, GroupMembership, Identity, SharedAlarm, SyncVersion
 from jay_server.social.worker import process_deadlines
 
@@ -405,3 +405,77 @@ def test_explicit_snooze_preserves_a_response_just_before_its_target_when_proces
     assert source.deadline_at == trigger + timedelta(minutes=10)
     assert source.trigger_at == trigger and source.occurrence_key == key and source.cycle_date == trigger.date()
     assert AlarmOccurrence.objects.filter(alarm=alarm, identity_id="1" * 64).count() == 1
+
+
+def test_hourly_scheduling_skips_legacy_members_without_inactivity_penalties(client, group, member, alarm_payload):
+    assert client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 201
+    alarm = SharedAlarm.objects.select_related("group").get(pk=alarm_payload["id"])
+    origin = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    alarm.repeat_unit, alarm.start_date, alarm.local_time_ms = "HOUR", origin.date(), 8 * 3_600_000
+    alarm.save(update_fields=["repeat_unit", "start_date", "local_time_ms"])
+    Identity.objects.filter(pk="1" * 64).update(client_protocol=3)
+    with transaction.atomic():
+        schedule_occurrences(alarm, list(Identity.objects.values_list("id", flat=True)), origin - timedelta(days=1))
+    occurrence = AlarmOccurrence.objects.get(alarm=alarm)
+    assert occurrence.identity_id == "1" * 64
+    assert occurrence.trigger_at == origin and occurrence.cycle_index == 0
+    with transaction.atomic():
+        record_alarm_response(alarm, occurrence.identity, {"id": uuid4(), "alarm_revision": 1, "kind": "ignored", "occurred_at": occurrence.deadline_at, "occurrence_key": occurrence.occurrence_key, "reason": "deadline"})
+    alarm.refresh_from_db()
+    assert alarm.inactive_cycle_streak == 1 and alarm.last_evaluated_cycle_index == 0
+    assert not AlarmOccurrence.objects.filter(alarm=alarm, identity_id="2" * 64).exists()
+    assert not AlarmActivity.objects.filter(alarm=alarm, identity_id="2" * 64).exists()
+    Identity.objects.filter(pk="2" * 64).update(client_protocol=3)
+    with transaction.atomic():
+        schedule_occurrences(alarm, ["2" * 64], origin - timedelta(days=1))
+    other = AlarmOccurrence.objects.get(alarm=alarm, identity_id="2" * 64)
+    assert other.trigger_at == origin - timedelta(hours=8)
+    assert other.cycle_index == occurrence.cycle_index == 0
+
+
+def test_shared_hourly_answer_does_not_answer_a_later_hour_on_the_same_date(client, group, member, alarm_payload):
+    group.shared_answers, group.alarm_time_basis = True, "group_time_zone"
+    group.save(update_fields=["shared_answers", "alarm_time_basis"])
+    assert client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 201
+    alarm = SharedAlarm.objects.select_related("group").get(pk=alarm_payload["id"])
+    origin = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    alarm.repeat_unit, alarm.start_date, alarm.local_time_ms = "HOUR", origin.date(), 8 * 3_600_000
+    alarm.save(update_fields=["repeat_unit", "start_date", "local_time_ms"])
+    Identity.objects.update(client_protocol=3)
+    with transaction.atomic():
+        schedule_occurrences(alarm, list(Identity.objects.values_list("id", flat=True)), origin - timedelta(microseconds=1))
+    later = origin + timedelta(hours=1)
+    later_occurrence = AlarmOccurrence.objects.create(alarm=alarm, group=group, identity_id="2" * 64, alarm_revision=1, occurrence_key=str(int(later.timestamp() * 1000)), cycle_date=origin.date(), cycle_index=1, trigger_at=later, deadline_at=later + timedelta(minutes=alarm.timeout_minutes))
+    source = AlarmOccurrence.objects.get(alarm=alarm, identity_id="1" * 64)
+    with transaction.atomic():
+        record_alarm_response(alarm, source.identity, {"id": uuid4(), "alarm_revision": 1, "kind": "dismissed", "occurred_at": origin + timedelta(minutes=1), "occurrence_key": source.occurrence_key, "reason": None})
+    assert AlarmOccurrence.objects.filter(alarm=alarm, cycle_index=0, state="dismissed").count() == 2
+    later_occurrence.refresh_from_db()
+    assert later_occurrence.state == "pending" and later_occurrence.resolved_at is None
+    assert later_occurrence.snoozed_until is None
+    assert AlarmOccurrence.objects.filter(alarm=alarm, cycle_index=1, state="pending").count() == 2
+
+
+@pytest.mark.parametrize("shared", [False, True])
+def test_three_inactive_hourly_cycles_on_one_date_delete_the_alarm(client, group, member, alarm_payload, shared):
+    group.shared_answers, group.alarm_time_basis = shared, "group_time_zone"
+    group.save(update_fields=["shared_answers", "alarm_time_basis"])
+    assert client.post("/v1/alarms", alarm_payload, format="json", headers={"Idempotency-Key": str(uuid4())}).status_code == 201
+    alarm = SharedAlarm.objects.select_related("group").get(pk=alarm_payload["id"])
+    origin = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    alarm.repeat_unit, alarm.start_date, alarm.local_time_ms = "HOUR", origin.date(), 8 * 3_600_000
+    alarm.save(update_fields=["repeat_unit", "start_date", "local_time_ms"])
+    Identity.objects.update(client_protocol=3)
+    with transaction.atomic():
+        schedule_occurrences(alarm, list(Identity.objects.values_list("id", flat=True)), origin - timedelta(microseconds=1))
+    for cycle in range(3):
+        for occurrence in AlarmOccurrence.objects.filter(alarm=alarm, cycle_index=cycle):
+            occurrence.refresh_from_db()
+            if occurrence.state == "pending":
+                with transaction.atomic():
+                    record_alarm_response(alarm, occurrence.identity, {"id": uuid4(), "alarm_revision": 1, "kind": "ignored", "occurred_at": occurrence.deadline_at, "occurrence_key": occurrence.occurrence_key, "reason": "deadline"})
+        alarm.refresh_from_db()
+        assert alarm.inactive_cycle_streak == cycle + 1
+        assert alarm.last_evaluated_cycle_index == cycle
+    assert alarm.deleted_at is not None
+    assert AlarmOccurrence.objects.filter(alarm=alarm).values("cycle_date").distinct().count() == 1

@@ -277,6 +277,9 @@ class AlarmService : Service() {
             )
         } else {
             if (Permission.NotificationPermission.hasPermission(this)) {
+                val formattedRingTime = TimeHelper.formatTime(
+                    this, java.time.Instant.ofEpochMilli(ring.ringTime).atZone(java.time.ZoneId.systemDefault())
+                )
                 val contentIntent = PendingIntent.getActivity(
                     this, alarm.id.toInt(),
                     Intent(this, MainActivity::class.java)
@@ -291,8 +294,8 @@ class AlarmService : Service() {
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                         .setContentTitle(
                             alarm.label?.takeIf { it.isNotBlank() }?.let {
-                                getString(R.string.named_alarm_missed, it, TimeHelper.millisToFormatted(this, alarm.time))
-                            } ?: getString(R.string.alarm_missed, TimeHelper.millisToFormatted(this, alarm.time))
+                                getString(R.string.named_alarm_missed, it, formattedRingTime)
+                            } ?: getString(R.string.alarm_missed, formattedRingTime)
                         )
                         .setContentText(resources.getQuantityString(
                             R.plurals.alarm_rang_for_minutes, alarm.timeoutMinutes, alarm.timeoutMinutes

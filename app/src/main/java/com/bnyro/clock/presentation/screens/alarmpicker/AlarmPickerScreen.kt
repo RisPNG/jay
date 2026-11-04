@@ -27,6 +27,7 @@ fun AlarmPickerScreen(onNavigateBack: () -> Unit) {
         canSave = currentGroup == null || currentGroup.canEditAlarms,
         canUploadSharedSounds = viewModel.canUploadSharedSounds,
         canUseAdvancedGroupTiming = viewModel.canUseAdvancedGroupTiming,
+        canUseHourlyGroupRecurrence = viewModel.canUseHourlyGroupRecurrence,
         busy = viewModel.busy,
         soundProgress = viewModel.soundProgress,
         onDelete = { alarm ->

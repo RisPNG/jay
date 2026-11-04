@@ -24,11 +24,12 @@ import com.bnyro.clock.util.services.AlarmService
 import com.bnyro.clock.util.receivers.AlarmReceiver
 import com.bnyro.clock.util.receivers.PreAlarmReceiver
 import kotlinx.coroutines.runBlocking
-import java.time.Instant
+import java.time.Clock
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.YearMonth
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.util.Calendar
@@ -72,7 +73,7 @@ object AlarmHelper {
         context: Context,
         alarm: Alarm,
         skipToday: Boolean = false,
-        timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
+        timeZone: ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
     ) {
         if (!Permission.AlarmPermission.hasPermission(context)) return
         cancel(context, alarm)
@@ -203,212 +204,192 @@ object AlarmHelper {
     fun getAlarmTime(
         alarm: Alarm,
         skipToday: Boolean = false,
-        timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
+        timeZone: ZoneId = SocialAlarmSchedule.timeZone(alarm.id),
+        clock: Clock = Clock.system(timeZone)
     ): Long? {
         alarm.snoozedUntil?.let { return it }
-        val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
-        return getNextOccurrence(alarm, skipToday, timeZone)
-            ?.atTime(hours, minutes)
-            ?.atZone(timeZone)
-            ?.toInstant()
-            ?.toEpochMilli()
+        return getNextOccurrence(alarm, skipToday, timeZone, clock)?.toInstant()?.toEpochMilli()
     }
 
-
-
-    /**
-     * @return the day the alarm rings next, skipping the occurrence the user dismissed upfront,
-     * or null when its repetition never lets it ring.
-     */
+    /** @return the next scheduled occurrence after the current minute, excluding an occurrence dismissed in advance. */
     fun getNextOccurrence(
         alarm: Alarm,
         skipToday: Boolean = false,
-        timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
-    ): LocalDate? {
-        val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
-        val now = LocalDateTime.now(timeZone)
-        val hasEventPassed = now.toLocalTime()
-            .truncatedTo(ChronoUnit.MINUTES) >= LocalTime.of(hours, minutes)
-        val earliestDate = if (skipToday || hasEventPassed) {
-            now.toLocalDate().plusDays(1)
+        timeZone: ZoneId = SocialAlarmSchedule.timeZone(alarm.id),
+        clock: Clock = Clock.system(timeZone)
+    ): ZonedDateTime? {
+        val now = ZonedDateTime.now(clock.withZone(timeZone))
+        val skipCalendarDay = skipToday && alarm.repeatUnit != RepeatUnit.HOUR
+        val earliest = if (skipCalendarDay) {
+            now.toLocalDate().plusDays(1).atStartOfDay(timeZone)
         } else {
-            now.toLocalDate()
+            now.truncatedTo(ChronoUnit.MINUTES).plusMinutes(1)
         }
-
-        val occurrence =
-            occurrenceOnOrAfter(alarm, maxOf(earliestDate, LocalDate.ofEpochDay(alarm.startDate)))
-                ?: return null
-        val dismissedOccurrence = alarm.dismissedAt?.let {
-            Instant.ofEpochMilli(it).atZone(timeZone).toLocalDate()
-        }
-        if (skipToday || occurrence != dismissedOccurrence) return occurrence
-
-        return occurrenceOnOrAfter(alarm, occurrence.plusDays(1))
+        val occurrence = occurrenceOnOrAfter(alarm, earliest) ?: return null
+        if (skipCalendarDay || occurrence.toInstant().toEpochMilli() != alarm.dismissedAt) return occurrence
+        return occurrenceOnOrAfter(alarm, occurrence.plusNanos(1))
     }
 
-    /**
-     * @return the next ring date for a one-time alarm, or the day the next repetition begins for
-     * an alarm that repeats. Repeating alarms keep their run start so later repetitions do not shift.
-     */
+    /** @return the next occurrence for a one-time alarm, or the start of the run containing the next occurrence. */
     fun getNextRepetitionStart(
         alarm: Alarm,
-        timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
-    ): LocalDate? = getNextOccurrence(alarm, timeZone = timeZone)
+        timeZone: ZoneId = SocialAlarmSchedule.timeZone(alarm.id),
+        clock: Clock = Clock.system(timeZone)
+    ): ZonedDateTime? = getNextOccurrence(alarm, timeZone = timeZone, clock = clock)
         ?.let { occurrence ->
             if (alarm.isOneTime) occurrence else runStartsOnOrBefore(alarm, occurrence).first()
         }
 
-    /**
-     * @return the last day the repetition the alarm begins with rings on, or null when its
-     * repetition never lets it ring.
-     */
-    fun getRepetitionLastOccurrence(alarm: Alarm): LocalDate? {
-        val runStart = runStartsOnOrBefore(alarm, LocalDate.ofEpochDay(alarm.startDate)).first()
-        if (!ringsWithinRun(alarm, runStart)) return null
-
-        return generateSequence(runStart) { it.plusDays(1) }
-            .takeWhile { it < runEnd(alarm, runStart) }
-            .last { ringsOn(alarm, it) }
+    /** @return the final occurrence in the alarm's first run, or null when that run cannot ring. */
+    fun getRepetitionLastOccurrence(
+        alarm: Alarm,
+        timeZone: ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
+    ): ZonedDateTime? {
+        val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
+        var origin = LocalDate.ofEpochDay(alarm.startDate).atTime(hours, minutes).atZone(timeZone)
+        if (alarm.startWithLaterOffset) origin = origin.withLaterOffsetAtOverlap()
+        return occurrencesWithinRun(alarm, origin, origin).lastOrNull()
     }
 
-    /**
-     * @return the first day the repetition following the one the alarm begins with rings on, or
-     * null when its repetition never lets it ring.
-     */
-    fun getFollowingRepetitionOccurrence(alarm: Alarm): LocalDate? {
-        val runStart = runStartsOnOrBefore(alarm, LocalDate.ofEpochDay(alarm.startDate)).first()
-        if (!ringsWithinRun(alarm, runStart)) return null
-
-        return occurrenceOnOrAfter(alarm, runEnd(alarm, runStart))
+    /** @return the first occurrence after the alarm's first run, or null when its repetitions cannot ring. */
+    fun getFollowingRepetitionOccurrence(
+        alarm: Alarm,
+        timeZone: ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
+    ): ZonedDateTime? {
+        val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
+        var origin = LocalDate.ofEpochDay(alarm.startDate).atTime(hours, minutes).atZone(timeZone)
+        if (alarm.startWithLaterOffset) origin = origin.withLaterOffsetAtOverlap()
+        if (occurrencesWithinRun(alarm, origin, origin).none()) return null
+        return occurrenceOnOrAfter(alarm, runEnd(alarm, origin))
     }
 
-    /**
-     * @return whether the alarm has rung all the occurrences its repetition allows for. An alarm
-     * whose repetition never lets it ring has not ended, it simply stays silent.
-     */
+    /** @return whether the next scheduled occurrence lies beyond the alarm's inclusive end date or occurrence count. */
     fun hasRecurrenceEnded(
         alarm: Alarm,
-        timeZone: java.time.ZoneId = SocialAlarmSchedule.timeZone(alarm.id)
+        timeZone: ZoneId = SocialAlarmSchedule.timeZone(alarm.id),
+        clock: Clock = Clock.system(timeZone)
     ): Boolean {
-        val nextOccurrence = getNextOccurrence(alarm, timeZone = timeZone) ?: return false
-        alarm.endDate?.let { if (nextOccurrence > LocalDate.ofEpochDay(it)) return true }
+        val nextOccurrence = getNextOccurrence(alarm, timeZone = timeZone, clock = clock) ?: return false
+        alarm.endDate?.let { if (nextOccurrence.toLocalDate() > LocalDate.ofEpochDay(it)) return true }
         alarm.endOccurrences?.let { count ->
-            val last = lastOccurrence(alarm, count) ?: return false
-            return nextOccurrence > last
+            val last = lastOccurrence(alarm, count, timeZone) ?: return false
+            return nextOccurrence.isAfter(last)
         }
         return false
     }
 
-    /**
-     * @return the first day on or after [from] that the alarm rings on, or null when its
-     * repetition never lets it ring. Every repetition starts a run that lasts for the duration the
-     * alarm repeats for, and the alarm rings on each day of that run a weekly repetition also
-     * selects.
-     */
-    internal fun occurrenceOnOrAfter(alarm: Alarm, from: LocalDate): LocalDate? {
+    /** @return the first scheduled occurrence at or after [from], independent of snoozing and recurrence end limits. */
+    internal fun occurrenceOnOrAfter(alarm: Alarm, from: ZonedDateTime): ZonedDateTime? {
         val runStarts = runStartsOnOrBefore(alarm, from)
-        if (!ringsWithinRun(alarm, runStarts.first())) return null
-
+        val firstRun = runStarts.first()
+        if (occurrencesWithinRun(alarm, firstRun, firstRun).none()) return null
         return runStarts.firstNotNullOf { runStart ->
-            val runEnd = runEnd(alarm, runStart)
-            generateSequence(maxOf(from, runStart)) { it.plusDays(1) }
-                .takeWhile { it < runEnd }
-                .firstOrNull { ringsOn(alarm, it) }
+            occurrencesWithinRun(alarm, runStart, from).firstOrNull()
         }
     }
 
-    /**
-     * @return the day each repetition of the alarm starts its run on, beginning with the last one
-     * that starts on or before [from].
-     */
-    private fun runStartsOnOrBefore(alarm: Alarm, from: LocalDate): Sequence<LocalDate> {
+    /** @return run starts beginning with the most recent run on or before [from], or the original start when [from] precedes it. */
+    private fun runStartsOnOrBefore(alarm: Alarm, from: ZonedDateTime): Sequence<ZonedDateTime> {
         val startDate = LocalDate.ofEpochDay(alarm.startDate)
+        val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
+        val time = LocalTime.of(hours, minutes)
+        var origin = startDate.atTime(time).atZone(from.zone)
+        if (alarm.startWithLaterOffset) origin = origin.withLaterOffsetAtOverlap()
         val interval = alarm.repeatInterval.toLong()
 
         return when (alarm.repeatUnit) {
-            RepeatUnit.DAY -> {
-                val elapsed = ChronoUnit.DAYS.between(startDate, from) / interval
-                generateSequence(startDate.plusDays(elapsed * interval)) { it.plusDays(interval) }
+            RepeatUnit.HOUR -> {
+                val elapsed = (ChronoUnit.HOURS.between(origin, from) / interval).coerceAtLeast(0)
+                generateSequence(elapsed) { it + 1 }.map { origin.plusHours(it * interval) }
             }
 
-            RepeatUnit.WEEK -> {
-                val elapsed = ChronoUnit.WEEKS.between(startDate, from) / interval
-                generateSequence(startDate.plusWeeks(elapsed * interval)) { it.plusWeeks(interval) }
+            RepeatUnit.DAY, RepeatUnit.WEEK -> {
+                val days = if (alarm.repeatUnit == RepeatUnit.WEEK) interval * DAYS_PER_WEEK else interval
+                val elapsed = (ChronoUnit.DAYS.between(startDate, from.toLocalDate()) / days).coerceAtLeast(0)
+                generateSequence(elapsed) { it + 1 }.map {
+                    val date = startDate.plusDays(it * days)
+                    if (date == startDate) origin else date.atTime(time).atZone(from.zone)
+                }
             }
 
             RepeatUnit.MONTH, RepeatUnit.YEAR -> {
                 val startMonth = YearMonth.from(startDate)
                 val weekOfMonth = (startDate.dayOfMonth - 1) / DAYS_PER_WEEK + 1
-                val months =
-                    if (alarm.repeatUnit == RepeatUnit.YEAR) interval * MONTHS_PER_YEAR else interval
-                val elapsed = ChronoUnit.MONTHS.between(startMonth, YearMonth.from(from)) / months
+                val months = if (alarm.repeatUnit == RepeatUnit.YEAR) interval * MONTHS_PER_YEAR else interval
+                val elapsed = (ChronoUnit.MONTHS.between(startMonth, YearMonth.from(from)) / months).coerceAtLeast(0)
                 val lastRun = generateSequence(startMonth.plusMonths(elapsed * months)) {
                     it.minusMonths(months).takeIf { previous -> previous >= startMonth }
                 }.mapNotNull { month ->
                     val day = when (alarm.repeatAnchor) {
-                        RepeatAnchor.DAY_OF_MONTH ->
-                            month.atDay(minOf(startDate.dayOfMonth, month.lengthOfMonth()))
-
+                        RepeatAnchor.DAY_OF_MONTH -> month.atDay(minOf(startDate.dayOfMonth, month.lengthOfMonth()))
                         RepeatAnchor.DAY_OF_WEEK -> month.atDay(1).with(
                             TemporalAdjusters.dayOfWeekInMonth(weekOfMonth, startDate.dayOfWeek)
                         )
                     }
                     day.takeIf { YearMonth.from(it) == month }
-                }.first { it <= from }
-                generateSequence(YearMonth.from(lastRun)) {
-                    it.plusMonths(months)
-                }.mapNotNull { month ->
+                }.firstOrNull { it <= from.toLocalDate() } ?: startDate
+                generateSequence(YearMonth.from(lastRun)) { it.plusMonths(months) }.mapNotNull { month ->
                     val day = when (alarm.repeatAnchor) {
-                        RepeatAnchor.DAY_OF_MONTH ->
-                            month.atDay(minOf(startDate.dayOfMonth, month.lengthOfMonth()))
-
+                        RepeatAnchor.DAY_OF_MONTH -> month.atDay(minOf(startDate.dayOfMonth, month.lengthOfMonth()))
                         RepeatAnchor.DAY_OF_WEEK -> month.atDay(1).with(
                             TemporalAdjusters.dayOfWeekInMonth(weekOfMonth, startDate.dayOfWeek)
                         )
                     }
-                    day.takeIf { YearMonth.from(it) == month }
+                    day.takeIf { YearMonth.from(it) == month }?.let {
+                        if (it == startDate) origin else it.atTime(time).atZone(from.zone)
+                    }
                 }
             }
         }
     }
 
-    /**
-     * @return the day after the last one a run beginning at [runStart] rings on.
-     */
-    private fun runEnd(alarm: Alarm, runStart: LocalDate): LocalDate {
-        val duration = alarm.repeatDuration?.toLong() ?: return when (alarm.repeatUnit) {
-            RepeatUnit.WEEK -> runStart.plusWeeks(1)
-            else -> runStart.plusDays(1)
+    /** @return the exclusive end of a run; hourly runs contain only their starting instant. */
+    private fun runEnd(alarm: Alarm, runStart: ZonedDateTime): ZonedDateTime {
+        if (alarm.repeatUnit == RepeatUnit.HOUR) return runStart.plusNanos(1)
+        val duration = alarm.repeatDuration?.toLong()
+        val endDate = if (duration == null) {
+            if (alarm.repeatUnit == RepeatUnit.WEEK) runStart.toLocalDate().plusWeeks(1) else runStart.toLocalDate().plusDays(1)
+        } else {
+            when (alarm.repeatDurationUnit) {
+                RepeatUnit.HOUR -> return runStart.plusHours(duration)
+                RepeatUnit.DAY -> runStart.toLocalDate().plusDays(duration)
+                RepeatUnit.WEEK -> runStart.toLocalDate().plusWeeks(duration)
+                RepeatUnit.MONTH -> runStart.toLocalDate().plusMonths(duration)
+                RepeatUnit.YEAR -> runStart.toLocalDate().plusYears(duration)
+            }
         }
+        val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
+        return endDate.atTime(hours, minutes).atZone(runStart.zone)
+    }
 
-        return when (alarm.repeatDurationUnit) {
-            RepeatUnit.DAY -> runStart.plusDays(duration)
-            RepeatUnit.WEEK -> runStart.plusWeeks(duration)
-            RepeatUnit.MONTH -> runStart.plusMonths(duration)
-            RepeatUnit.YEAR -> runStart.plusYears(duration)
-        }
+    /** @return the occurrences in a run at or after [from], retaining elapsed-hour cadence and calendar wall times. */
+    private fun occurrencesWithinRun(
+        alarm: Alarm,
+        runStart: ZonedDateTime,
+        from: ZonedDateTime
+    ): Sequence<ZonedDateTime> {
+        if (alarm.repeatUnit == RepeatUnit.HOUR) return sequenceOf(runStart).filter { !it.isBefore(from) }
+        val end = runEnd(alarm, runStart)
+        val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
+        return generateSequence(maxOf(from.toLocalDate(), runStart.toLocalDate())) { it.plusDays(1) }
+            .map { date ->
+                if (date == runStart.toLocalDate()) runStart else date.atTime(hours, minutes).atZone(runStart.zone)
+            }
+            .takeWhile { it.isBefore(end) }
+            .filter { !it.isBefore(from) && ringsOn(alarm, it.toLocalDate()) }
     }
 
     private fun ringsOn(alarm: Alarm, date: LocalDate): Boolean =
         alarm.repeatUnit != RepeatUnit.WEEK || date.dayOfWeek.value % DAYS_PER_WEEK in alarm.days
 
-    /**
-     * Every run of a weekly repetition covers the same weekdays, so a run that selects none of
-     * them never will, however far ahead the alarm is searched.
-     */
-    private fun ringsWithinRun(alarm: Alarm, runStart: LocalDate): Boolean =
-        generateSequence(runStart) { it.plusDays(1) }
-            .takeWhile { it < runEnd(alarm, runStart) }
-            .any { ringsOn(alarm, it) }
-
-    /**
-     * @return the day of the [count]th occurrence, counted from the start date of the alarm, or
-     * null when the alarm never rings.
-     */
-    private fun lastOccurrence(alarm: Alarm, count: Int): LocalDate? {
-        var occurrence = occurrenceOnOrAfter(alarm, LocalDate.ofEpochDay(alarm.startDate))
+    /** @return the [count]th scheduled occurrence from the original start, or null when the alarm never rings. */
+    private fun lastOccurrence(alarm: Alarm, count: Int, timeZone: ZoneId): ZonedDateTime? {
+        val (hours, minutes, _, _) = TimeHelper.millisToTime(alarm.time)
+        var origin = LocalDate.ofEpochDay(alarm.startDate).atTime(hours, minutes).atZone(timeZone)
+        if (alarm.startWithLaterOffset) origin = origin.withLaterOffsetAtOverlap()
+        var occurrence = occurrenceOnOrAfter(alarm, origin)
         repeat(count - 1) {
-            occurrence = occurrence?.let { occurrenceOnOrAfter(alarm, it.plusDays(1)) }
+            occurrence = occurrence?.let { occurrenceOnOrAfter(alarm, it.plusNanos(1)) }
         }
         return occurrence
     }

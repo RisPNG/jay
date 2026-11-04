@@ -36,6 +36,9 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
     val canUseAdvancedGroupTiming: Boolean
         get() = repository.canUseAdvancedGroupTiming
 
+    val canUseHourlyGroupRecurrence: Boolean
+        get() = repository.canUseHourlyGroupRecurrence
+
     val groups: StateFlow<List<SocialGroup>> = repository.groups.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),

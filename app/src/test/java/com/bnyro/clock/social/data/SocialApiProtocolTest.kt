@@ -39,7 +39,7 @@ class SocialApiProtocolTest {
             )
             val body = when (path) {
                 "/v1/sync" -> """{"scope_id":"identity","mode":"snapshot","from_revision":0,"through_revision":1,"next_cursor":"complete","has_more":false,"server_time":"${Instant.now()}","items":[]}"""
-                "/v1/identity/capabilities" -> """{"advanced_group_timing":true}"""
+                "/v1/identity/capabilities" -> """{"advanced_group_timing":true,"hourly_alarm_recurrence":true}"""
                 "/v1/events" -> "data: {\"scopes\":[\"group\"]}\n\n"
                 "/v1/groups/group/ring" -> ": ringing\n\n"
                 else -> "{}"
@@ -54,7 +54,9 @@ class SocialApiProtocolTest {
             val api = SocialApi("http://127.0.0.1:${server.address.port}", DeviceIdentity("identity", "Test device", "test-token", "test-secret"), "installation")
             api.register()
             api.synchronizeScope("/v1/sync", null)
-            assertTrue(api.deviceCapabilities().advancedGroupTiming)
+            val capabilities = api.deviceCapabilities()
+            assertTrue(capabilities.advancedGroupTiming)
+            assertTrue(capabilities.hourlyAlarmRecurrence)
             val operation = PendingOperation(
                 operationId = "4ea76593-8579-4871-b770-8fbded455b03", scopeId = "group", kind = "timer", targetId = "timer",
                 method = "DELETE", path = "/v1/timers/timer", payload = """{"membership_id":"member"}""",
@@ -70,7 +72,7 @@ class SocialApiProtocolTest {
             api.holdGroupRing("group")
 
             assertEquals(6, requests.size)
-            assertTrue(requests.all { it.protocol == "2" })
+            assertTrue(requests.all { it.protocol == "3" })
             val registration = requests.single { it.path == "/v1/identities/register" }
             assertEquals("POST", registration.method)
             assertNull(registration.authorization)
@@ -110,6 +112,7 @@ class SocialApiProtocolTest {
             val api = SocialApi("http://127.0.0.1:${server.address.port}", DeviceIdentity("identity", "Test device", "test-token", "test-secret"))
 
             assertFalse(api.deviceCapabilities().advancedGroupTiming)
+            assertFalse(api.deviceCapabilities().hourlyAlarmRecurrence)
         } finally {
             server.stop(0)
         }

@@ -9,6 +9,7 @@ class Identity(SavedState):
     name = models.CharField(max_length=64)
     token_hash = models.BinaryField(max_length=32)
     time_zone = models.CharField(max_length=100, default="UTC")
+    client_protocol = models.PositiveSmallIntegerField(default=2, db_default=2)
     last_seen_at = models.DateTimeField(default=timezone.now, db_index=True)
     retired_at = models.DateTimeField(null=True)
     purged_at = models.DateTimeField(null=True)

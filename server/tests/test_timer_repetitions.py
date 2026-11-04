@@ -2,6 +2,7 @@ from datetime import timedelta
 from uuid import UUID, uuid4
 
 import pytest
+from django.core import signing
 from django.db import connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
@@ -301,7 +302,11 @@ def test_timer_upgrade_preserves_initial_run_lineage_and_later_reset_uses_a_new_
             representation = {"id": str(timer.pk), "group_id": str(group.pk), "label": timer.label, "label_color": timer.label_color, "duration_seconds": timer.duration_seconds, "increment_seconds": timer.increment_seconds, "expires_at": timer.expires_at.isoformat(), "vibrate": timer.vibrate, "vibration_pattern": timer.vibration_pattern, "vibration_pattern_name": timer.vibration_pattern_name, "sound_mode": timer.sound_mode, "sound_id": None, "saved_at": timer.saved_at.isoformat(), "save_id": str(timer.save_id)}
             version = versions.objects.create(scope_id=scope.pk, revision=scope.head_revision, ordinal=0, kind="timer", key=str(timer.pk), action="upsert", representation=representation)
             legacy.append((timer, version.pk, representation))
-        checkpoint = client.get(f"/v1/groups/{group.pk}/sync").data["next_cursor"]
+        membership = apps.get_model("social", "GroupMembership").objects.get(group_id=group.pk, identity_id="1" * 64, removed_at=None)
+        checkpoint = signing.dumps({
+            "identity": "1" * 64, "scope": str(scope.pk), "membership": str(membership.pk),
+            "mode": "checkpoint", "after": scope.head_revision,
+        }, salt="jay.sync", compress=True)
     finally:
         MigrationExecutor(connection).migrate(after)
     snapshot = client.get(f"/v1/groups/{group.pk}/sync")

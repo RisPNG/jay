@@ -41,6 +41,7 @@ class JaySchema(AutoSchema):
 
     def get_override_parameters(self):
         parameters = super().get_override_parameters()
+        parameters.append(OpenApiParameter("X-Jay-Protocol", OpenApiTypes.STR, OpenApiParameter.HEADER, description="Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."))
         if not self.path.endswith("/identities/register"):
             parameters.append(OpenApiParameter("X-Jay-Installation", OpenApiTypes.STR, OpenApiParameter.HEADER, description="Private installation credential bound to a verified paid Play installation; never part of a profile export."))
         if self.method in {"POST", "PUT", "PATCH", "DELETE"} and not self.path.endswith("/identities/register"):

@@ -59,7 +59,7 @@ class GroupView(APIView):
             group.save()
             if reschedule:
                 from django.db.models import F
-                SharedAlarm.objects.filter(group=group, deleted_at=None).update(revision=F("revision") + 1, inactive_cycle_streak=0, last_evaluated_cycle_date=None)
+                SharedAlarm.objects.filter(group=group, deleted_at=None).update(revision=F("revision") + 1, inactive_cycle_streak=0, last_evaluated_cycle_date=None, last_evaluated_cycle_index=None)
                 DeliveryWork.objects.create(kind="reschedule", deduplication_key=f"reschedule:group:{receipt.operation_id}", payload={"group_id": str(group.id)})
             publish_changes(group.scope_id, [("group", str(group.id), "upsert", GroupRepresentation(group).data, None)], group=group, actor=request.user, activity={"entity_type": "group", "entity_id": str(group.id), "action": "updated"})
             receipt.status, receipt.response = 200, GroupRepresentation(group).data
@@ -216,4 +216,4 @@ class GroupSyncView(APIView):
     def get(self, request, group_id):
         group = get_object_or_404(Group, pk=group_id)
         member = require_membership(group, request.user)
-        return Response(synchronize_scope(SyncScope.objects.get(pk=group.scope_id), request.user, member.pk, request.query_params.get("cursor")))
+        return Response(synchronize_scope(SyncScope.objects.get(pk=group.scope_id), request.user, member.pk, request.query_params.get("cursor"), supports_hourly_alarms=request.supports_hourly_alarms))

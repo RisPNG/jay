@@ -40,6 +40,8 @@ class AlarmPickerModel(application: Application, savedStateHandle: SavedStateHan
         get() = socialRepository.canUploadSharedSounds
     val canUseAdvancedGroupTiming: Boolean
         get() = socialRepository.canUseAdvancedGroupTiming
+    val canUseHourlyGroupRecurrence: Boolean
+        get() = socialRepository.canUseHourlyGroupRecurrence
 
     var busy by mutableStateOf(false)
         private set

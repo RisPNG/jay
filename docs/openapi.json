@@ -17,6 +17,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -50,6 +58,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -85,6 +101,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -120,6 +144,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -170,6 +202,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -226,6 +266,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "path",
@@ -291,6 +339,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "alarm_id",
                         "schema": {
@@ -337,6 +393,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "path",
@@ -407,6 +471,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "alarm_id",
                         "schema": {
@@ -472,6 +544,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "alarm_id",
                         "schema": {
@@ -528,6 +608,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "path",
@@ -593,6 +681,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -649,6 +745,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "path",
@@ -714,6 +818,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -760,6 +872,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "query",
@@ -832,6 +952,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -895,6 +1023,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "path",
@@ -967,6 +1103,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -1033,6 +1177,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -1089,6 +1241,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "path",
@@ -1156,6 +1316,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -1209,6 +1377,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "query",
@@ -1274,6 +1450,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "group_id",
                         "schema": {
@@ -1337,6 +1521,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -1375,6 +1567,16 @@
         "/v1/identities/register": {
             "post": {
                 "operationId": "v1_identities_register_create",
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    }
+                ],
                 "tags": [
                     "v1"
                 ],
@@ -1423,6 +1625,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -1476,6 +1686,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -1505,6 +1723,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -1536,13 +1762,17 @@
                                         },
                                         "advanced_group_timing": {
                                             "type": "boolean"
+                                        },
+                                        "hourly_alarm_recurrence": {
+                                            "type": "boolean"
                                         }
                                     },
                                     "required": [
                                         "shared_sound_upload",
                                         "requires_play_entitlement",
                                         "expires_at",
-                                        "advanced_group_timing"
+                                        "advanced_group_timing",
+                                        "hourly_alarm_recurrence"
                                     ]
                                 }
                             }
@@ -1573,6 +1803,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -1629,6 +1867,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     }
                 ],
                 "tags": [
@@ -1668,6 +1914,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "path",
@@ -1725,6 +1979,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "sound_id",
                         "schema": {
@@ -1768,6 +2030,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "path",
@@ -1827,6 +2097,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "sound_id",
                         "schema": {
@@ -1870,6 +2148,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "query",
@@ -1924,6 +2210,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "path",
@@ -1989,6 +2283,14 @@
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
                     },
                     {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
+                    },
+                    {
                         "in": "path",
                         "name": "timer_id",
                         "schema": {
@@ -2045,6 +2347,14 @@
                             "type": "string"
                         },
                         "description": "Private installation credential bound to a verified paid Play installation; never part of a profile export."
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Jay-Protocol",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."
                     },
                     {
                         "in": "path",
@@ -2401,6 +2711,9 @@
                         "type": "string",
                         "format": "date"
                     },
+                    "start_with_later_offset": {
+                        "type": "boolean"
+                    },
                     "repeat_interval": {
                         "type": "integer",
                         "maximum": 999,
@@ -2419,7 +2732,7 @@
                         "nullable": true
                     },
                     "repeat_duration_unit": {
-                        "$ref": "#/components/schemas/RepeatUnit"
+                        "$ref": "#/components/schemas/RepeatDurationUnitEnum"
                     },
                     "end_date": {
                         "type": "string",
@@ -2558,6 +2871,9 @@
                         "type": "string",
                         "format": "date"
                     },
+                    "start_with_later_offset": {
+                        "type": "boolean"
+                    },
                     "repeat_interval": {
                         "type": "integer",
                         "maximum": 999,
@@ -2576,7 +2892,7 @@
                         "nullable": true
                     },
                     "repeat_duration_unit": {
-                        "$ref": "#/components/schemas/RepeatUnit"
+                        "$ref": "#/components/schemas/RepeatDurationUnitEnum"
                     },
                     "end_date": {
                         "type": "string",
@@ -2720,6 +3036,10 @@
                         "format": "date",
                         "readOnly": true
                     },
+                    "start_with_later_offset": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "repeat_interval": {
                         "type": "integer",
                         "readOnly": true
@@ -2748,7 +3068,7 @@
                     "repeat_duration_unit": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/RepeatUnit"
+                                "$ref": "#/components/schemas/RepeatDurationUnitEnum"
                             }
                         ],
                         "readOnly": true
@@ -2857,6 +3177,7 @@
                     "sound_id",
                     "sound_mode",
                     "start_date",
+                    "start_with_later_offset",
                     "timeout_minutes",
                     "vibrate",
                     "vibration_pattern",
@@ -2877,6 +3198,9 @@
                     "advanced_group_timing": {
                         "type": "boolean"
                     },
+                    "hourly_alarm_recurrence": {
+                        "type": "boolean"
+                    },
                     "shared_sound_upload": {
                         "type": "boolean"
                     },
@@ -2892,6 +3216,7 @@
                 "required": [
                     "advanced_group_timing",
                     "expires_at",
+                    "hourly_alarm_recurrence",
                     "requires_play_entitlement",
                     "shared_sound_upload"
                 ]
@@ -3634,7 +3959,7 @@
                 "type": "string",
                 "description": "* `DAY_OF_MONTH` - Day Of Month\n* `DAY_OF_WEEK` - Day Of Week"
             },
-            "RepeatUnit": {
+            "RepeatDurationUnitEnum": {
                 "enum": [
                     "DAY",
                     "WEEK",
@@ -3643,6 +3968,17 @@
                 ],
                 "type": "string",
                 "description": "* `DAY` - Day\n* `WEEK` - Week\n* `MONTH` - Month\n* `YEAR` - Year"
+            },
+            "RepeatUnit": {
+                "enum": [
+                    "HOUR",
+                    "DAY",
+                    "WEEK",
+                    "MONTH",
+                    "YEAR"
+                ],
+                "type": "string",
+                "description": "* `HOUR` - Hour\n* `DAY` - Day\n* `WEEK` - Week\n* `MONTH` - Month\n* `YEAR` - Year"
             },
             "RoleEnum": {
                 "enum": [

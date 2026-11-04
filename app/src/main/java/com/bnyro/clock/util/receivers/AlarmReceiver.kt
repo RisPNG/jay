@@ -15,8 +15,6 @@ import com.bnyro.clock.util.TimeHelper
 import com.bnyro.clock.util.services.AlarmService
 import kotlinx.coroutines.runBlocking
 import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
 
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -51,10 +49,8 @@ class AlarmReceiver : BroadcastReceiver() {
             val deadlineAt = triggerTime + alarm.timeoutMinutes * 60_000L
             if (deliveredOccurrenceId == triggerTime.toString()) {
                 val occurrence = Instant.ofEpochMilli(triggerTime).atZone(timeZone)
-                val occurrenceDate = occurrence.toLocalDate()
-                if (!alarm.enabled || alarm.snoozedUntil != null || occurrence.toLocalTime() != LocalTime.of(hours, minutes) ||
-                    occurrenceDate < LocalDate.ofEpochDay(alarm.startDate) ||
-                    AlarmHelper.occurrenceOnOrAfter(alarm, occurrenceDate) != occurrenceDate ||
+                if (!alarm.enabled || alarm.snoozedUntil != null ||
+                    AlarmHelper.occurrenceOnOrAfter(alarm, occurrence)?.toInstant() != occurrence.toInstant() ||
                     (deliveredOccurrenceId != activeOccurrenceId && triggerTime <= activeOccurrenceId.toLong()) ||
                     (deliveredOccurrenceId == activeOccurrenceId && activeDeadline != -1L && activeDeadline != deadlineAt)
                 ) return

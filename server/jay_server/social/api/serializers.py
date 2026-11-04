@@ -146,11 +146,12 @@ class AlarmPayload(MemberCommand):
     days = serializers.ListField(child=serializers.IntegerField(min_value=0, max_value=6), max_length=7)
     vibrate = serializers.BooleanField()
     start_date = serializers.DateField()
+    start_with_later_offset = serializers.BooleanField(required=False)
     repeat_interval = serializers.IntegerField(min_value=1, max_value=999)
     repeat_unit = serializers.ChoiceField(choices=RepeatUnit.choices)
     repeat_anchor = serializers.ChoiceField(choices=RepeatAnchor.choices)
     repeat_duration = serializers.IntegerField(min_value=1, max_value=999, allow_null=True)
-    repeat_duration_unit = serializers.ChoiceField(choices=RepeatUnit.choices)
+    repeat_duration_unit = serializers.ChoiceField(choices=[choice for choice in RepeatUnit.choices if choice[0] != "HOUR"])
     end_date = serializers.DateField(allow_null=True)
     end_occurrences = serializers.IntegerField(min_value=1, max_value=999, allow_null=True)
     advanced = serializers.BooleanField()
@@ -169,6 +170,8 @@ class AlarmPayload(MemberCommand):
             raise serializers.ValidationError({"days": "Weekdays must be unique"})
         if data["end_date"] is not None and data["end_date"] < data["start_date"]:
             raise serializers.ValidationError({"end_date": "End date precedes start date"})
+        if data.get("start_with_later_offset", False) and data["repeat_unit"] != RepeatUnit.HOUR:
+            raise serializers.ValidationError({"start_with_later_offset": "Only hourly alarms support the later start offset"})
         return data
 
 

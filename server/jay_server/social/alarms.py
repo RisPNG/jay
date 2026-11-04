@@ -11,7 +11,7 @@ from django.utils import timezone
 from .api.representations import AlarmRepresentation, OccurrenceRepresentation, OutcomeRepresentation
 from .errors import DomainError
 from .models import AlarmActivity, AlarmOccurrence, GroupMembership
-from .recurrence import next_alarm_trigger
+from .recurrence import next_alarm_trigger, occurrence_cycle_index
 from .synchronization import publish_changes
 
 
@@ -29,6 +29,8 @@ def schedule_occurrences(alarm, identity_ids, after=None):
         return changes
     payload = model_to_dict(alarm)
     members = GroupMembership.objects.select_related("identity").filter(group=alarm.group, removed_at=None, identity_id__in=identity_ids, identity__retired_at=None)
+    if alarm.repeat_unit == "HOUR":
+        members = members.filter(identity__client_protocol__gte=3)
     for member in members:
         if alarm.end_occurrences == 1 and AlarmOccurrence.objects.filter(alarm=alarm, identity=member.identity, alarm_revision=alarm.revision, state__in=["dismissed", "ignored"]).exists():
             continue
@@ -37,9 +39,10 @@ def schedule_occurrences(alarm, identity_ids, after=None):
         if trigger is None:
             continue
         key = str(int(trigger.timestamp() * 1000))
+        cycle_index = occurrence_cycle_index(payload, zone, trigger)
         occurrence, created = AlarmOccurrence.objects.get_or_create(
             alarm=alarm, identity=member.identity, occurrence_key=key,
-            defaults={"group": alarm.group, "alarm_revision": alarm.revision, "cycle_date": trigger.astimezone(ZoneInfo(zone)).date(), "trigger_at": trigger, "deadline_at": trigger + timedelta(minutes=alarm.timeout_minutes)},
+            defaults={"group": alarm.group, "alarm_revision": alarm.revision, "cycle_date": trigger.astimezone(ZoneInfo(zone)).date(), "cycle_index": cycle_index, "trigger_at": trigger, "deadline_at": trigger + timedelta(minutes=alarm.timeout_minutes)},
         )
         if not created:
             if occurrence.state not in {"pending", "canceled"}:
@@ -50,6 +53,7 @@ def schedule_occurrences(alarm, identity_ids, after=None):
             occurrence.trigger_at = trigger
             occurrence.deadline_at = trigger + timedelta(minutes=alarm.timeout_minutes)
             occurrence.cycle_date = trigger.astimezone(ZoneInfo(zone)).date()
+            occurrence.cycle_index = cycle_index
             occurrence.state, occurrence.resolved_at, occurrence.snoozed_until, occurrence.snoozed_at = "pending", None, None, None
             occurrence.snooze_count = 0
             occurrence.save()
@@ -57,15 +61,25 @@ def schedule_occurrences(alarm, identity_ids, after=None):
     return changes
 
 
-def evaluate_alarm_cycle(alarm, cycle_date):
-    if alarm.deleted_at or not alarm.enabled or (alarm.last_evaluated_cycle_date and alarm.last_evaluated_cycle_date >= cycle_date):
+def evaluate_alarm_cycle(alarm, occurrence):
+    hourly = alarm.repeat_unit == "HOUR"
+    cycle = occurrence.cycle_index if hourly else occurrence.cycle_date
+    previous_cycle = alarm.last_evaluated_cycle_index if hourly else alarm.last_evaluated_cycle_date
+    if alarm.deleted_at or not alarm.enabled or (previous_cycle is not None and previous_cycle >= cycle):
         return []
-    expected = GroupMembership.objects.filter(group=alarm.group, removed_at=None, identity__retired_at=None).count()
-    occurrences = AlarmOccurrence.objects.filter(alarm=alarm, alarm_revision=alarm.revision, cycle_date=cycle_date).exclude(state="canceled")
+    members = GroupMembership.objects.filter(group=alarm.group, removed_at=None, identity__retired_at=None)
+    if hourly:
+        members = members.filter(identity__client_protocol__gte=3)
+    expected = members.count()
+    cycle_filter = {"cycle_index": cycle} if hourly else {"cycle_date": cycle}
+    occurrences = AlarmOccurrence.objects.filter(alarm=alarm, alarm_revision=alarm.revision, **cycle_filter).exclude(state="canceled")
     if occurrences.count() < expected or occurrences.filter(state="pending").exists():
         return []
     active = occurrences.filter(state__in=["snoozed", "dismissed"]).exists() or AlarmActivity.objects.filter(alarm=alarm, alarm_revision=alarm.revision, kind__in=["snoozed", "dismissed"], occurrence_key__in=occurrences.values("occurrence_key")).exists()
-    alarm.last_evaluated_cycle_date = cycle_date
+    if hourly:
+        alarm.last_evaluated_cycle_index = cycle
+    else:
+        alarm.last_evaluated_cycle_date = cycle
     alarm.inactive_cycle_streak = 0 if active else min(3, alarm.inactive_cycle_streak + 1)
     if alarm.inactive_cycle_streak == 3:
         alarm.deleted_at = timezone.now()
@@ -142,7 +156,8 @@ def record_alarm_response(alarm, identity, data):
         changes.append(("occurrence", str(occurrence.pk), "upsert", OccurrenceRepresentation(occurrence).data, identity.pk))
         changes.extend(schedule_occurrences(alarm, [identity.pk], occurrence.trigger_at + timedelta(milliseconds=1)))
         if alarm.group.shared_answers:
-            shared = AlarmOccurrence.objects.filter(alarm=alarm, alarm_revision=alarm.revision, cycle_date=occurrence.cycle_date, state="pending").exclude(identity=identity)
+            cycle_filter = {"cycle_index": occurrence.cycle_index} if alarm.repeat_unit == "HOUR" else {"cycle_date": occurrence.cycle_date}
+            shared = AlarmOccurrence.objects.filter(alarm=alarm, alarm_revision=alarm.revision, state="pending", **cycle_filter).exclude(identity=identity)
             for other in shared:
                 if activity.kind == "snoozed":
                     if not automatic_restart:
@@ -154,7 +169,7 @@ def record_alarm_response(alarm, identity, data):
                 other.save()
                 changes.append(("occurrence", str(other.pk), "upsert", OccurrenceRepresentation(other).data, other.identity_id))
                 changes.extend(schedule_occurrences(alarm, [other.identity_id], other.trigger_at + timedelta(milliseconds=1)))
-        changes.extend(evaluate_alarm_cycle(alarm, occurrence.cycle_date))
+        changes.extend(evaluate_alarm_cycle(alarm, occurrence))
     publish_changes(alarm.group.scope_id, changes, group=alarm.group, actor=identity, activity={
         "entity_type": "outcome", "entity_id": str(alarm.pk), "action": activity.kind,
         "entity_label": alarm.label, "entity_time": alarm.local_time_ms,

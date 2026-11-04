@@ -2,6 +2,7 @@ from datetime import timedelta
 from uuid import uuid4
 
 import pytest
+from django.core import signing
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
@@ -258,7 +259,11 @@ def test_alarm_restart_migration_preserves_legacy_defaults_and_occurrence_deadli
         old_alarm_version = versions.objects.create(scope_id=group.scope_id, revision=scope.head_revision, ordinal=0, kind="alarm", key=str(alarm.pk), action="upsert", representation={"id": str(alarm.pk)})
         initial_row = occurrences.objects.get(alarm_id=alarm.pk, occurrence_key="initial")
         old_occurrence_version = versions.objects.create(scope_id=group.scope_id, revision=scope.head_revision, ordinal=1, kind="occurrence", key=str(initial_row.pk), action="upsert", recipient_id="1" * 64, representation={"id": str(initial_row.pk), "state": "pending", "deadline_at": initial_row.deadline_at.isoformat()})
-        checkpoint = client.get(f"/v1/groups/{group.pk}/sync").data["next_cursor"]
+        membership = apps.get_model("social", "GroupMembership").objects.get(group_id=group.pk, identity_id="1" * 64, removed_at=None)
+        checkpoint = signing.dumps({
+            "identity": "1" * 64, "scope": str(scope.pk), "membership": str(membership.pk),
+            "mode": "checkpoint", "after": scope.head_revision,
+        }, salt="jay.sync", compress=True)
     finally:
         MigrationExecutor(connection).migrate(after)
     upgraded = SharedAlarm.objects.get(pk=alarm.pk)

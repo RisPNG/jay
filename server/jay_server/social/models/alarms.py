@@ -18,11 +18,12 @@ class SharedAlarm(SavedState):
     days = ArrayField(models.PositiveSmallIntegerField(), size=7)
     vibrate = models.BooleanField()
     start_date = models.DateField()
+    start_with_later_offset = models.BooleanField(default=False, db_default=False)
     repeat_interval = models.PositiveSmallIntegerField()
     repeat_unit = models.CharField(max_length=8, choices=RepeatUnit)
     repeat_anchor = models.CharField(max_length=16, choices=RepeatAnchor)
     repeat_duration = models.PositiveSmallIntegerField(null=True)
-    repeat_duration_unit = models.CharField(max_length=8, choices=RepeatUnit)
+    repeat_duration_unit = models.CharField(max_length=8, choices=[(unit.value, unit.label) for unit in RepeatUnit if unit != RepeatUnit.HOUR])
     end_date = models.DateField(null=True)
     end_occurrences = models.PositiveSmallIntegerField(null=True)
     advanced = models.BooleanField(default=False)
@@ -41,6 +42,7 @@ class SharedAlarm(SavedState):
     deleted_at = models.DateTimeField(null=True)
     inactive_cycle_streak = models.PositiveSmallIntegerField(default=0)
     last_evaluated_cycle_date = models.DateField(null=True)
+    last_evaluated_cycle_index = models.PositiveBigIntegerField(null=True)
 
     class Meta:
         constraints = [
@@ -55,7 +57,7 @@ class SharedAlarm(SavedState):
             models.CheckConstraint(condition=models.Q(missed_restart_minutes__range=(1, 1440)), name="alarm_restart_delay_valid"),
             models.CheckConstraint(condition=models.Q(days__contained_by=[0, 1, 2, 3, 4, 5, 6]), name="alarm_days_valid"),
             models.CheckConstraint(condition=models.Q(repeat_unit__in=RepeatUnit.values), name="alarm_repeat_unit_valid"),
-            models.CheckConstraint(condition=models.Q(repeat_duration_unit__in=RepeatUnit.values), name="alarm_duration_unit_valid"),
+            models.CheckConstraint(condition=models.Q(repeat_duration_unit__in=[unit for unit in RepeatUnit.values if unit != RepeatUnit.HOUR]), name="alarm_duration_unit_valid"),
             models.CheckConstraint(condition=models.Q(repeat_anchor__in=RepeatAnchor.values), name="alarm_anchor_valid"),
             models.CheckConstraint(condition=models.Q(sound_mode__in=SoundMode.values), name="alarm_sound_mode_valid"),
             models.CheckConstraint(condition=models.Q(end_date=None) | models.Q(end_date__gte=models.F("start_date")), name="alarm_date_range_valid"),
@@ -78,6 +80,7 @@ class AlarmOccurrence(models.Model):
     alarm_revision = models.PositiveIntegerField()
     occurrence_key = models.CharField(max_length=200)
     cycle_date = models.DateField()
+    cycle_index = models.PositiveBigIntegerField(null=True)
     trigger_at = models.DateTimeField()
     deadline_at = models.DateTimeField()
     snoozed_until = models.DateTimeField(null=True)
@@ -96,6 +99,7 @@ class AlarmOccurrence(models.Model):
         indexes = [
             models.Index(fields=["deadline_at", "group"], condition=models.Q(state="pending"), name="occurrence_due_idx"),
             models.Index(fields=["alarm", "alarm_revision", "cycle_date"], name="occurrence_cycle_idx"),
+            models.Index(fields=["alarm", "alarm_revision", "cycle_index"], condition=models.Q(cycle_index__isnull=False), name="occurrence_hour_cycle_idx"),
         ]
 
 

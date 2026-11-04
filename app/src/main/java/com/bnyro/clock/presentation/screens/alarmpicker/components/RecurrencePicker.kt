@@ -63,7 +63,9 @@ import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
 import com.bnyro.clock.presentation.components.SwitchItem
 import com.bnyro.clock.util.AlarmHelper
+import com.bnyro.clock.util.TimeHelper
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.TextStyle
@@ -82,7 +84,9 @@ enum class RecurrenceEnd {
 @Composable
 fun RecurrencePicker(
     advanced: Boolean,
+    time: Long,
     startDate: Long,
+    startWithLaterOffset: Boolean,
     repeatDuration: Int?,
     repeatDurationUnit: RepeatUnit,
     repeatInterval: Int,
@@ -92,6 +96,8 @@ fun RecurrencePicker(
     endDate: Long?,
     endOccurrences: Int?,
     enabled: Boolean = true,
+    timeZone: ZoneId = ZoneId.systemDefault(),
+    repeatUnits: List<RepeatUnit> = RepeatUnit.entries,
     onStartDateChange: (Long) -> Unit,
     onRepeatDurationChange: (duration: Int?, unit: RepeatUnit) -> Unit,
     onRepeatIntervalChange: (Int) -> Unit,
@@ -147,9 +153,10 @@ fun RecurrencePicker(
     }
 
     val editedRepetition = Alarm(
-        time = 0L,
+        time = time,
         days = chosenDays.toList(),
         startDate = startDate,
+        startWithLaterOffset = startWithLaterOffset,
         repeatInterval = repeatInterval,
         repeatUnit = repeatUnit,
         repeatAnchor = repeatAnchor,
@@ -186,7 +193,7 @@ fun RecurrencePicker(
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        text = if (startLocalDate == LocalDate.now()) {
+                        text = if (startLocalDate == LocalDate.now(timeZone)) {
                             stringResource(R.string.today)
                         } else {
                             startDateFormatter.format(startLocalDate)
@@ -196,95 +203,97 @@ fun RecurrencePicker(
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp, 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
+            AnimatedVisibility(visible = repeatUnit != RepeatUnit.HOUR) {
+                Row(
                     modifier = Modifier
-                        .padding(start = 8.dp, end = 16.dp)
-                        .size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Column {
-                    Text(
-                        text = stringResource(R.string.repeats_for),
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Row(
+                        .fillMaxWidth()
+                        .padding(8.dp, 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (repeatDuration != null) {
-                            OutlinedTextField(
-                                modifier = Modifier.width(88.dp),
-                                value = durationInput,
-                                enabled = enabled,
-                                onValueChange = { input ->
-                                    durationInput = input.filter(Char::isDigit).take(3)
-                                    chosenDuration = durationInput.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                                    onRepeatDurationChange(chosenDuration, repeatDurationUnit)
-                                },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                        }
-                        ExposedDropdownMenuBox(
-                            modifier = Modifier.weight(1f),
-                            expanded = showDurations,
-                            onExpandedChange = { if (enabled) showDurations = !showDurations }
+                            .padding(start = 8.dp, end = 16.dp)
+                            .size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Column {
+                        Text(
+                            text = stringResource(R.string.repeats_for),
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            OutlinedTextField(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                                value = repeatDuration
-                                    ?.let { pluralStringResource(repeatDurationUnit.value, it) }
-                                    ?: stringResource(R.string.always),
-                                onValueChange = {},
-                                readOnly = true,
-                                enabled = enabled,
-                                singleLine = true,
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(showDurations) }
-                            )
-                            ExposedDropdownMenu(
-                                expanded = showDurations,
-                                onDismissRequest = { showDurations = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text(text = stringResource(R.string.always)) },
-                                    onClick = {
-                                        onRepeatDurationChange(null, repeatDurationUnit)
-                                        showDurations = false
-                                    }
+                            if (repeatDuration != null) {
+                                OutlinedTextField(
+                                    modifier = Modifier.width(88.dp),
+                                    value = durationInput,
+                                    enabled = enabled,
+                                    onValueChange = { input ->
+                                        durationInput = input.filter(Char::isDigit).take(3)
+                                        chosenDuration = durationInput.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                                        onRepeatDurationChange(chosenDuration, repeatDurationUnit)
+                                    },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                 )
-                                RepeatUnit.entries.forEach { unit ->
+                                Spacer(modifier = Modifier.width(12.dp))
+                            }
+                            ExposedDropdownMenuBox(
+                                modifier = Modifier.weight(1f),
+                                expanded = showDurations,
+                                onExpandedChange = { if (enabled) showDurations = !showDurations }
+                            ) {
+                                OutlinedTextField(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                    value = repeatDuration
+                                        ?.let { pluralStringResource(repeatDurationUnit.value, it) }
+                                        ?: stringResource(R.string.always),
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    enabled = enabled,
+                                    singleLine = true,
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(showDurations) }
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = showDurations,
+                                    onDismissRequest = { showDurations = false }
+                                ) {
                                     DropdownMenuItem(
-                                        text = {
-                                            Text(text = pluralStringResource(unit.value, chosenDuration))
-                                        },
+                                        text = { Text(text = stringResource(R.string.always)) },
                                         onClick = {
-                                            onRepeatDurationChange(chosenDuration, unit)
+                                            onRepeatDurationChange(null, repeatDurationUnit)
                                             showDurations = false
                                         }
                                     )
+                                    RepeatUnit.entries.filter { it != RepeatUnit.HOUR }.forEach { unit ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(text = pluralStringResource(unit.value, chosenDuration))
+                                            },
+                                            onClick = {
+                                                onRepeatDurationChange(chosenDuration, unit)
+                                                showDurations = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                    AlarmHelper.getRepetitionLastOccurrence(editedRepetition)?.let {
-                        Text(
-                            modifier = Modifier.padding(top = 4.dp),
-                            text = stringResource(R.string.repeats_until, endDateFormatter.format(it)),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        AlarmHelper.getRepetitionLastOccurrence(editedRepetition, timeZone)?.let {
+                            Text(
+                                modifier = Modifier.padding(top = 4.dp),
+                                text = stringResource(R.string.repeats_until, endDateFormatter.format(it)),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 }
             }
@@ -346,7 +355,7 @@ fun RecurrencePicker(
                                 expanded = showUnits,
                                 onDismissRequest = { showUnits = false }
                             ) {
-                                RepeatUnit.entries.forEach { unit ->
+                                repeatUnits.forEach { unit ->
                                     DropdownMenuItem(
                                         text = {
                                             Text(text = pluralStringResource(unit.value, repeatInterval))
@@ -360,10 +369,17 @@ fun RecurrencePicker(
                             }
                         }
                     }
-                    AlarmHelper.getFollowingRepetitionOccurrence(editedRepetition)?.let {
+                    AlarmHelper.getFollowingRepetitionOccurrence(editedRepetition, timeZone)?.let {
                         Text(
                             modifier = Modifier.padding(top = 4.dp),
-                            text = stringResource(R.string.repeats_again_on, endDateFormatter.format(it)),
+                            text = stringResource(
+                                R.string.repeats_again_on,
+                                if (repeatUnit == RepeatUnit.HOUR) {
+                                    "${endDateFormatter.format(it)} ${TimeHelper.formatTime(context, it)}"
+                                } else {
+                                    endDateFormatter.format(it)
+                                }
+                            ),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -371,7 +387,7 @@ fun RecurrencePicker(
             }
 
             AnimatedVisibility(
-                visible = repeatUnit != RepeatUnit.DAY
+                visible = repeatUnit != RepeatUnit.DAY && repeatUnit != RepeatUnit.HOUR
             ) {
                 Column(modifier = Modifier.padding(start = SECTION_INDENT, end = 8.dp, bottom = 8.dp)) {
                     Text(

@@ -46,7 +46,7 @@ class SoundRepresentation(serializers.ModelSerializer):
 class AlarmRepresentation(serializers.ModelSerializer):
     class Meta:
         model = SharedAlarm
-        fields = ["id", "group_id", "revision", "local_time_ms", "label", "label_color", "enabled", "days", "vibrate", "start_date", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "advanced", "snooze_enabled", "snooze_minutes", "snooze_limit", "timeout_minutes", "missed_restart_enabled", "missed_restart_minutes", "vibration_pattern", "vibration_pattern_name", "sound_mode", "sound_id", "saved_at", "save_id"]
+        fields = ["id", "group_id", "revision", "local_time_ms", "label", "label_color", "enabled", "days", "vibrate", "start_date", "start_with_later_offset", "repeat_interval", "repeat_unit", "repeat_anchor", "repeat_duration", "repeat_duration_unit", "end_date", "end_occurrences", "advanced", "snooze_enabled", "snooze_minutes", "snooze_limit", "timeout_minutes", "missed_restart_enabled", "missed_restart_minutes", "vibration_pattern", "vibration_pattern_name", "sound_mode", "sound_id", "saved_at", "save_id"]
         read_only_fields = fields
 
 
@@ -87,6 +87,7 @@ class OutcomeRepresentation(serializers.ModelSerializer):
 
 class CapabilitiesRepresentation(serializers.Serializer):
     advanced_group_timing = serializers.BooleanField()
+    hourly_alarm_recurrence = serializers.BooleanField()
     shared_sound_upload = serializers.BooleanField()
     requires_play_entitlement = serializers.BooleanField()
     expires_at = serializers.DateTimeField(allow_null=True)

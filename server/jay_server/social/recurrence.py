@@ -1,6 +1,6 @@
 from calendar import monthrange
-from datetime import UTC, date, datetime, timedelta
-from itertools import chain
+from datetime import UTC, date, datetime, timedelta, tzinfo
+from itertools import chain, islice
 from typing import Iterator
 from zoneinfo import ZoneInfo
 
@@ -9,11 +9,22 @@ DAYS_PER_WEEK = 7
 MONTHS_PER_YEAR = 12
 
 
-def _add_months(day: date, months: int) -> date:
-    month_index = day.month - 1 + months
-    year = day.year + month_index // 12
+def _alarm_origin(alarm: dict, zone: tzinfo) -> datetime:
+    hours, remainder = divmod(alarm["local_time_ms"], 3_600_000)
+    start_date = alarm["start_date"]
+    start = datetime(start_date.year, start_date.month, start_date.day, hours, remainder // 60_000, tzinfo=zone)
+    if alarm.get("start_with_later_offset", False):
+        later = start.replace(fold=1)
+        if later.astimezone(UTC).astimezone(zone).replace(tzinfo=None) == start.replace(tzinfo=None):
+            return later
+    return start
+
+
+def _add_months(moment: datetime, months: int) -> datetime:
+    month_index = moment.month - 1 + months
+    year = moment.year + month_index // 12
     month = month_index % 12 + 1
-    return date(year, month, min(day.day, monthrange(year, month)[1]))
+    return moment.replace(year=year, month=month, day=min(moment.day, monthrange(year, month)[1]), fold=0)
 
 
 def _weekday_in_month(year: int, month: int, position: int, weekday: int) -> date | None:
@@ -22,28 +33,32 @@ def _weekday_in_month(year: int, month: int, position: int, weekday: int) -> dat
     return date(year, month, day) if day <= monthrange(year, month)[1] else None
 
 
-def _run_starts(alarm: dict, start: date, from_day: date) -> Iterator[date]:
-    """Yield the day each repetition begins on, from the last one starting on or before
-    from_day."""
+def _run_starts(alarm: dict, start: datetime, from_time: datetime) -> Iterator[datetime]:
     interval = alarm["repeat_interval"]
-    if alarm["repeat_unit"] == "DAY":
-        elapsed = (from_day - start).days // interval
-        run_start = start + timedelta(days=elapsed * interval)
+    if alarm["repeat_unit"] == "HOUR":
+        step = timedelta(hours=interval)
+        origin = start.astimezone(UTC)
+        elapsed = (from_time.astimezone(UTC) - origin) // step
+        run_start = origin + elapsed * step
+        while True:
+            yield run_start.astimezone(start.tzinfo)
+            run_start += step
+    elif alarm["repeat_unit"] == "DAY":
+        elapsed = (from_time.date() - start.date()).days // interval
+        run_start = start if elapsed == 0 else start + timedelta(days=elapsed * interval)
         while True:
             yield run_start
             run_start += timedelta(days=interval)
     elif alarm["repeat_unit"] == "WEEK":
-        elapsed = ((from_day - start).days // DAYS_PER_WEEK) // interval
-        run_start = start + timedelta(weeks=elapsed * interval)
+        elapsed = ((from_time.date() - start.date()).days // DAYS_PER_WEEK) // interval
+        run_start = start if elapsed == 0 else start + timedelta(weeks=elapsed * interval)
         while True:
             yield run_start
             run_start += timedelta(weeks=interval)
     else:
         months = interval * MONTHS_PER_YEAR if alarm["repeat_unit"] == "YEAR" else interval
         position = (start.day - 1) // DAYS_PER_WEEK + 1
-        elapsed = (
-            (from_day.year - start.year) * MONTHS_PER_YEAR + from_day.month - start.month
-        ) // months
+        elapsed = ((from_time.year - start.year) * MONTHS_PER_YEAR + from_time.month - start.month) // months
         cycle = elapsed
         while cycle > 0:
             month = _add_months(start.replace(day=1), cycle * months)
@@ -52,26 +67,23 @@ def _run_starts(alarm: dict, start: date, from_day: date) -> Iterator[date]:
                 if alarm["repeat_anchor"] == "DAY_OF_MONTH"
                 else _weekday_in_month(month.year, month.month, position, start.weekday())
             )
-            if day is not None and day <= from_day:
+            if day is not None and day <= from_time.date():
                 break
             cycle -= 1
         while True:
             month = _add_months(start.replace(day=1), cycle * months)
             if alarm["repeat_anchor"] == "DAY_OF_MONTH":
-                yield date(
-                    month.year,
-                    month.month,
-                    min(start.day, monthrange(month.year, month.month)[1]),
-                )
+                yield month.replace(day=min(start.day, monthrange(month.year, month.month)[1]), fold=start.fold if cycle == 0 else 0)
             else:
                 day = _weekday_in_month(month.year, month.month, position, start.weekday())
                 if day is not None:
-                    yield day
+                    yield month.replace(day=day.day, fold=start.fold if cycle == 0 else 0)
             cycle += 1
 
 
-def _run_end(alarm: dict, run_start: date) -> date:
-    """The day after the last one a repetition beginning at run_start can ring on."""
+def _run_end(alarm: dict, run_start: datetime) -> datetime:
+    if alarm["repeat_unit"] == "HOUR":
+        return (run_start.astimezone(UTC) + timedelta(hours=1)).astimezone(run_start.tzinfo)
     duration = alarm["repeat_duration"]
     if duration is None:
         if alarm["repeat_unit"] == "WEEK":
@@ -88,64 +100,58 @@ def _run_end(alarm: dict, run_start: date) -> date:
 
 
 def _rings_on(alarm: dict, day: date) -> bool:
-    return alarm["repeat_unit"] != "WEEK" or (day.weekday() + 1) % 7 in set(alarm["days"])
+    return alarm["repeat_unit"] != "WEEK" or (day.weekday() + 1) % DAYS_PER_WEEK in set(alarm["days"])
 
 
-def _rings_within_run(alarm: dict, run_start: date) -> bool:
-    day = run_start
-    end = _run_end(alarm, run_start)
-    while day < end:
-        if _rings_on(alarm, day):
+def _rings_within_run(alarm: dict, run_start: datetime) -> bool:
+    moment = run_start
+    end = _run_end(alarm, run_start).astimezone(UTC)
+    while moment.astimezone(UTC) < end:
+        if _rings_on(alarm, moment.date()):
             return True
-        day += timedelta(days=1)
+        moment += timedelta(days=1)
     return False
 
 
-def occurrence_on_or_after(alarm: dict, from_day: date) -> date | None:
-    """The first day on or after from_day the alarm rings on, or None when its repetition
-    never lets it ring. Every repetition starts a run lasting for the duration the alarm
-    repeats for, and it rings on each day of that run a weekly repetition also selects."""
-    start = alarm["start_date"]
-    from_day = max(from_day, start)
-    runs = _run_starts(alarm, start, from_day)
+def occurrences_on_or_after(alarm: dict, from_time: datetime) -> Iterator[datetime]:
+    start = _alarm_origin(alarm, from_time.tzinfo)
+    earliest = max(from_time.astimezone(UTC), start.astimezone(UTC))
+    runs = _run_starts(alarm, start, earliest.astimezone(from_time.tzinfo))
     first_run = next(runs)
     if not _rings_within_run(alarm, first_run):
-        return None
+        return
     for run_start in chain([first_run], runs):
-        day = max(from_day, run_start)
-        end = _run_end(alarm, run_start)
-        while day < end:
-            if _rings_on(alarm, day):
-                return day
-            day += timedelta(days=1)
+        day = max(earliest.astimezone(from_time.tzinfo).date(), run_start.date())
+        moment = run_start if day == run_start.date() else run_start.replace(year=day.year, month=day.month, day=day.day, fold=0)
+        end = _run_end(alarm, run_start).astimezone(UTC)
+        while moment.astimezone(UTC) < end:
+            instant = moment.astimezone(UTC)
+            if instant >= earliest and _rings_on(alarm, moment.date()):
+                yield instant
+                earliest = instant + timedelta(microseconds=1)
+            moment += timedelta(days=1)
 
 
-def _last_occurrence(alarm: dict, count: int) -> date | None:
-    day = occurrence_on_or_after(alarm, alarm["start_date"])
-    for _ in range(count - 1):
-        if day is None:
-            return None
-        day = occurrence_on_or_after(alarm, day + timedelta(days=1))
-    return day
+def occurrence_cycle_index(alarm: dict, time_zone: str, trigger: datetime) -> int | None:
+    if alarm["repeat_unit"] != "HOUR":
+        return None
+    zone = ZoneInfo(time_zone)
+    start = _alarm_origin(alarm, zone)
+    return (trigger.astimezone(UTC) - start.astimezone(UTC)) // timedelta(hours=alarm["repeat_interval"])
 
 
 def next_alarm_trigger(alarm: dict, time_zone: str, after: datetime) -> datetime | None:
-    """The moment the alarm rings next, or None when its repetition has nothing left."""
     zone = ZoneInfo(time_zone)
-    local_after = after.astimezone(zone)
-    hours, remainder = divmod(alarm["local_time_ms"], 3_600_000)
-    minutes = remainder // 60_000
-    earliest = local_after.date()
-    if (local_after.hour, local_after.minute) >= (hours, minutes):
-        earliest += timedelta(days=1)
-
-    day = occurrence_on_or_after(alarm, earliest)
-    if day is None:
+    earliest = (after.astimezone(UTC) + timedelta(microseconds=1)).astimezone(zone)
+    trigger = next(occurrences_on_or_after(alarm, earliest), None)
+    if trigger is None:
         return None
-    if alarm["end_date"] is not None and day > alarm["end_date"]:
+    if alarm["end_date"] is not None and trigger.astimezone(zone).date() > alarm["end_date"]:
         return None
     if alarm["end_occurrences"] is not None:
-        last = _last_occurrence(alarm, alarm["end_occurrences"])
-        if last is None or day > last:
+        first_day = datetime.combine(alarm["start_date"], datetime.min.time(), tzinfo=zone)
+        count = alarm["end_occurrences"]
+        last = next(islice(occurrences_on_or_after(alarm, first_day), count - 1, count), None)
+        if last is None or trigger > last:
             return None
-    return datetime(day.year, day.month, day.day, hours, minutes, tzinfo=zone).astimezone(UTC)
+    return trigger

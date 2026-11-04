@@ -3,11 +3,12 @@ import hmac
 from datetime import timedelta
 
 from django.utils import timezone
+from django.db import transaction
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.throttling import SimpleRateThrottle
 
-from .models import Identity
+from .models import DeliveryWork, Identity
 
 
 def authenticate_identity(authorization, identity_id):
@@ -24,9 +25,19 @@ def authenticate_identity(authorization, identity_id):
 
 class IdentityAuthentication(BaseAuthentication):
     def authenticate(self, request):
+        request.supports_hourly_alarms = request.headers.get("X-Jay-Protocol") == "3"
         credential = request.headers.get("X-Jay-Installation", "")
         installation = hashlib.sha256(credential.encode()).hexdigest() if credential else None
-        return authenticate_identity(request.headers.get("Authorization", ""), request.headers.get("X-Jay-Identity-ID", "")), installation
+        identity = authenticate_identity(request.headers.get("Authorization", ""), request.headers.get("X-Jay-Identity-ID", ""))
+        if request.supports_hourly_alarms and identity.client_protocol < 3:
+            with transaction.atomic():
+                if Identity.objects.filter(pk=identity.pk, client_protocol__lt=3).update(client_protocol=3):
+                    DeliveryWork.objects.get_or_create(
+                        deduplication_key=f"reschedule:protocol:{identity.pk}:3",
+                        defaults={"kind": "reschedule", "payload": {"identity_id": identity.pk}},
+                    )
+            identity.client_protocol = 3
+        return identity, installation
 
     def authenticate_header(self, request):
         return "Bearer"
