@@ -183,7 +183,7 @@ fun RecurrencePicker(
                     style = MaterialTheme.typography.titleLarge
                 )
                 Text(
-                    text = if (startLocalDate == LocalDate.now()) {
+                    text = if (startLocalDate == LocalDate.now(timeZone)) {
                         stringResource(R.string.today)
                     } else {
                         startDateFormatter.format(startLocalDate)
