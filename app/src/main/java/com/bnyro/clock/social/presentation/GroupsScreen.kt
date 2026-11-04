@@ -38,7 +38,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,15 +45,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.bnyro.clock.R
 import com.bnyro.clock.navigation.TopBarScaffold
 import com.bnyro.clock.presentation.components.DialogButton
@@ -69,6 +70,9 @@ import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.canEditAlarms
 import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.Preferences
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterIsInstance
 
 @Composable
 fun GroupsScreen(
@@ -272,21 +276,24 @@ fun GroupsScreen(
         val canRing = currentGroup?.canEditAlarms == true
         val ringInteractions = remember(group.id) { MutableInteractionSource() }
         val lifecycleOwner = LocalLifecycleOwner.current
-        DisposableEffect(group.id, lifecycleOwner, canRing) {
-            val observer = LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_STOP) socialModel.ringGroup(null)
-            }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose {
-                lifecycleOwner.lifecycle.removeObserver(observer)
-                socialModel.ringGroup(null)
-            }
-        }
-        LaunchedEffect(ringInteractions, canRing) {
-            ringInteractions.interactions.collect { interaction ->
-                when (interaction) {
-                    is PressInteraction.Press -> if (canRing) socialModel.ringGroup(group.id)
-                    is PressInteraction.Release, is PressInteraction.Cancel -> socialModel.ringGroup(null)
+        val hapticFeedback = LocalHapticFeedback.current
+        LaunchedEffect(group.id, lifecycleOwner, canRing, ringInteractions, hapticFeedback) {
+            lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                try {
+                    ringInteractions.interactions.filterIsInstance<PressInteraction>().collectLatest { interaction ->
+                        when (interaction) {
+                            is PressInteraction.Press -> if (canRing) {
+                                socialModel.ringGroup(group.id)
+                                while (true) {
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                                    delay(100L)
+                                }
+                            }
+                            is PressInteraction.Release, is PressInteraction.Cancel -> socialModel.ringGroup(null)
+                        }
+                    }
+                } finally {
+                    socialModel.ringGroup(null)
                 }
             }
         }
