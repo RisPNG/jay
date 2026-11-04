@@ -13,9 +13,9 @@ import java.time.LocalDate
  * @property days The days of the week to ring the alarm on weekly repeats. Sunday-0, Monday-1 ,... ,Saturday-6
  * @property snoozeMinutes How long the snooze should last in minutes (default 15).
  * @property startDate The first day the alarm can ring, as an epoch day.
+ * @property startWithLaterOffset Whether the first ring uses the later offset when its local time occurs twice after a daylight saving transition.
  * @property repeatInterval How many [repeatUnit]s lie between the starts of two repetitions.
- * @property repeatDuration How many [repeatDurationUnit]s a repetition keeps ringing for, or null
- * to ring on its first day alone.
+ * @property repeatDuration How many [repeatDurationUnit]s a calendar repetition keeps ringing for, or null for its default run. Hourly repetitions ring once at each interval.
  * @property endDate The last day the alarm can ring, as an epoch day, or null if it never ends.
  * @property endOccurrences How often the alarm rings before it turns off, or null if it never ends.
  * @property advanced Whether the alarm was written in the editor that can describe a whole
@@ -46,6 +46,7 @@ data class Alarm(
     @ColumnInfo(defaultValue = "Default") var vibrationPatternName: String = "Default",
     @ColumnInfo(defaultValue = "NULL") var dismissedAt: Long? = null,
     @ColumnInfo(defaultValue = "0") var startDate: Long = LocalDate.now().toEpochDay(),
+    @ColumnInfo(defaultValue = "0") var startWithLaterOffset: Boolean = false,
     @ColumnInfo(defaultValue = "1") var repeatInterval: Int = 1,
     @ColumnInfo(defaultValue = "WEEK") var repeatUnit: RepeatUnit = RepeatUnit.WEEK,
     @ColumnInfo(defaultValue = "DAY_OF_MONTH") var repeatAnchor: RepeatAnchor = RepeatAnchor.DAY_OF_MONTH,

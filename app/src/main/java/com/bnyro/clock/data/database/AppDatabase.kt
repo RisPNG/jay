@@ -20,7 +20,7 @@ import com.bnyro.clock.util.Preferences
 
 @Database(
     entities = [TimeZone::class, Alarm::class],
-    version = 19,
+    version = 20,
     autoMigrations = [
         AutoMigration(
             from = 2,
@@ -35,7 +35,8 @@ import com.bnyro.clock.util.Preferences
         AutoMigration(from = 10, to = 11),
         AutoMigration(from = 13, to = 14),
         AutoMigration(from = 14, to = 15),
-        AutoMigration(from = 18, to = 19)
+        AutoMigration(from = 18, to = 19),
+        AutoMigration(from = 19, to = 20)
     ]
 )
 @TypeConverters(Converters::class)

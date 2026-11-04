@@ -18,10 +18,15 @@ import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.receivers.AlarmReceiver
 import com.bnyro.clock.util.services.AlarmService
+import java.io.File
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -313,10 +318,11 @@ class AlarmSnoozeLimitTest {
             )
             pending.id = original.alarmsDao().insert(pending)
             val sqlite = original.openHelper.writableDatabase
-            val legacySchema = sqlite.query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'alarms'").use {
-                it.moveToFirst()
-                it.getString(0).replace(Regex(", `(snoozeLimit|snoozeCount)` INTEGER NOT NULL DEFAULT [0-9]+"), "")
-            }
+            val legacySchema = Json.parseToJsonElement(
+                File("schemas/${AppDatabase::class.java.name}/18.json").readText()
+            ).jsonObject.getValue("database").jsonObject.getValue("entities").jsonArray
+                .first { it.jsonObject.getValue("tableName").jsonPrimitive.content == "alarms" }
+                .jsonObject.getValue("createSql").jsonPrimitive.content.replace("\${TABLE_NAME}", "alarms")
             sqlite.execSQL("ALTER TABLE alarms RENAME TO alarms_before_snooze_limit")
             sqlite.execSQL(legacySchema)
             val columns = sqlite.query("PRAGMA table_info(alarms)").use { rows ->
