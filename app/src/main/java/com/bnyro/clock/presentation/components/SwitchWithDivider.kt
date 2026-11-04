@@ -32,14 +32,22 @@ fun SwitchWithDivider(
     description: String? = null,
     icon: ImageVector? = null,
     isChecked: Boolean = true,
+    enabled: Boolean = true,
+    selectionEnabled: Boolean = enabled,
     onClick: (() -> Unit) = {},
     onChecked: (Boolean) -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.clickable(
+            enabled = selectionEnabled,
             onClick = onClick
         ),
-        color = Color.Transparent
+        color = Color.Transparent,
+        contentColor = if (enabled) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
     ) {
         Row(
             modifier = Modifier
@@ -80,6 +88,7 @@ fun SwitchWithDivider(
             Switch(
                 checked = isChecked,
                 onCheckedChange = onChecked,
+                enabled = enabled,
                 modifier = Modifier
                     .padding(horizontal = 6.dp)
                     .semantics {

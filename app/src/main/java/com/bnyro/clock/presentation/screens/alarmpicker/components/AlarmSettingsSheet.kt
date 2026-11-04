@@ -2,7 +2,6 @@ package com.bnyro.clock.presentation.screens.alarmpicker.components
 
 import com.bnyro.clock.ui.theme.resolveLabelColor
 import android.text.format.DateFormat
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -108,7 +106,8 @@ fun AlarmPicker(
 
     var snoozeMinutes by remember { mutableIntStateOf(currentAlarm.snoozeMinutes) }
     var snoozeEnabled by remember { mutableStateOf(currentAlarm.snoozeEnabled) }
-    var snoozeLimit by remember { mutableIntStateOf(currentAlarm.snoozeLimit) }
+    var snoozeLimitEnabled by remember { mutableStateOf(currentAlarm.snoozeLimit > 0) }
+    var snoozeLimit by remember { mutableIntStateOf(currentAlarm.snoozeLimit.coerceAtLeast(1)) }
     var soundEnabled by remember { mutableStateOf(currentAlarm.soundEnabled) }
 
     val initialTime = remember { TimeHelper.millisToTime(currentAlarm.time) }
@@ -261,31 +260,20 @@ fun AlarmPicker(
                         snoozeEnabled = it
                     }
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = snoozeEnabled) { showSnoozeLimitDialog = true }
-                        .padding(8.dp, 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Snooze,
-                        contentDescription = null,
-                        modifier = Modifier.padding(start = 8.dp, end = 16.dp).size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.snooze_limit),
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            text = if (snoozeLimit == 0) stringResource(R.string.snooze_unlimited)
-                                else pluralStringResource(R.plurals.snooze_limit_count, snoozeLimit, snoozeLimit),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
+                SwitchWithDivider(
+                    title = stringResource(R.string.snooze_limit),
+                    description = if (snoozeLimitEnabled) {
+                        pluralStringResource(R.plurals.snooze_limit_count, snoozeLimit, snoozeLimit)
+                    } else {
+                        stringResource(R.string.snooze_unlimited)
+                    },
+                    isChecked = snoozeLimitEnabled,
+                    enabled = snoozeEnabled,
+                    selectionEnabled = snoozeEnabled && snoozeLimitEnabled,
+                    icon = Icons.Rounded.Snooze,
+                    onClick = { showSnoozeLimitDialog = true },
+                    onChecked = { snoozeLimitEnabled = it }
+                )
             }
         }
 
@@ -321,7 +309,7 @@ fun AlarmPicker(
                         soundUri = soundUri,
                         snoozeEnabled = snoozeEnabled,
                         snoozeMinutes = snoozeMinutes,
-                        snoozeLimit = snoozeLimit,
+                        snoozeLimit = if (snoozeLimitEnabled) snoozeLimit else 0,
                         soundEnabled = soundEnabled,
                         vibrationPattern = vibrationPattern,
                         vibrationPatternName = vibrationPatternName,
@@ -370,7 +358,8 @@ fun AlarmPicker(
             title = stringResource(R.string.snooze_limit),
             unit = stringResource(R.string.snoozes_unit),
             value = snoozeLimit,
-            maxValue = 101,
+            maxValue = 100,
+            offset = 1,
             label = { it.toString() },
             onValueSet = {
                 snoozeLimit = it
