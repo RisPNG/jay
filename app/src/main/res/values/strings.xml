@@ -142,7 +142,8 @@
     <string name="seconds">Seconds</string>
     <string name="snooze">Snooze</string>
     <string name="snooze_limit">Snooze limit</string>
-    <string name="snooze_unlimited">Indefinitely</string>
+    <string name="snooze_unlimited">Unlimited</string>
+    <string name="snooze_limit_info">Limit manual snoozes for each alarm occurrence. Turn this off for unlimited snoozes. The count resets for the next occurrence.</string>
     <string name="snoozes_unit">snoozes</string>
     <plurals name="snooze_limit_count">
         <item quantity="one">%d snooze</item>
