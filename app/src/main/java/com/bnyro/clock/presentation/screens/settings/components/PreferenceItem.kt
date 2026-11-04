@@ -32,11 +32,12 @@ fun PreferenceItem(
             info?.let {
                 InfoButton(
                     title = title,
-                    explanation = it,
                     modifier = Modifier.height(with(LocalDensity.current) {
                         MaterialTheme.typography.bodyLarge.lineHeight.toDp()
                     })
-                )
+                ) {
+                    Text(text = it)
+                }
             }
         }
         if (summary != null) {
