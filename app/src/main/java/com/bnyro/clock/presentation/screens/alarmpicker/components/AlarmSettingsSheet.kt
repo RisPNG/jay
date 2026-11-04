@@ -220,7 +220,10 @@ fun AlarmPicker(
                     },
                     onRepeatIntervalChange = { repeatInterval = it },
                     onRepeatUnitChange = {
-                        repeatUnit = it
+                        if (repeatUnit != it) {
+                            repeatUnit = it
+                            startWithLaterOffset = false
+                        }
                         if (it == RepeatUnit.HOUR) repeatDuration = null
                     },
                     onRepeatAnchorChange = { repeatAnchor = it },
