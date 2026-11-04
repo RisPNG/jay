@@ -278,6 +278,7 @@ fun SettingsScreen(
 
             ButtonGroupPref(
                 title = stringResource(R.string.alarm_picker_style),
+                info = stringResource(R.string.alarm_picker_style_info),
                 options = PickerStyle.entries.map {
                     stringResource(
                         when (it) {
@@ -318,6 +319,7 @@ fun SettingsScreen(
                     alarmTimeoutMinutes,
                     alarmTimeoutMinutes
                 ),
+                info = stringResource(R.string.alarm_timeout_info),
                 imageVector = Icons.Rounded.Timer
             ) {
                 showAlarmTimeoutDialog = true
@@ -334,6 +336,7 @@ fun SettingsScreen(
             }
             IconPreference(
                 title = stringResource(R.string.upcoming_alarm),
+                info = stringResource(R.string.upcoming_alarm_info),
                 summary = pluralStringResource(
                     R.plurals.duration_minutes,
                     upcomingAlarmDurationMinutes,
@@ -390,6 +393,7 @@ fun SettingsScreen(
 
             ButtonGroupPref(
                 title = stringResource(R.string.timer_picker_style),
+                info = stringResource(R.string.timer_picker_style_info),
                 options = PickerStyle.entries.map {
                     stringResource(
                         when (it) {
@@ -473,6 +477,7 @@ fun SettingsScreen(
                     timerTimeoutMinutes,
                     timerTimeoutMinutes
                 ),
+                info = stringResource(R.string.timer_timeout_info),
                 imageVector = Icons.Rounded.Timer
             ) {
                 showTimerTimeoutDialog = true
