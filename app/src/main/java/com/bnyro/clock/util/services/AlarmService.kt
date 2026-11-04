@@ -131,6 +131,11 @@ class AlarmService : Service() {
             Preferences.alarmTimeoutMinutesKey,
             ALARM_TIMEOUT_MINUTES
         )
+        val formattedRingTime = TimeHelper.formatTime(
+            this,
+            java.time.Instant.ofEpochMilli(currentRingTime!!)
+                .atZone(java.time.ZoneId.systemDefault())
+        )
         timeoutHandler.postDelayed({
             if (Permission.NotificationPermission.hasPermission(this@AlarmService)) {
                 val contentIntent = PendingIntent.getActivity(
@@ -154,11 +159,11 @@ class AlarmService : Service() {
                                 getString(
                                     R.string.named_alarm_missed,
                                     it,
-                                    TimeHelper.millisToFormatted(this@AlarmService, alarm.time)
+                                    formattedRingTime
                                 )
                             } ?: getString(
                                 R.string.alarm_missed,
-                                TimeHelper.millisToFormatted(this@AlarmService, alarm.time)
+                                formattedRingTime
                             )
                         )
                         .setContentText(

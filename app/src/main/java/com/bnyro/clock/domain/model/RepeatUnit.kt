@@ -4,6 +4,7 @@ import androidx.annotation.PluralsRes
 import com.bnyro.clock.R
 
 enum class RepeatUnit(@PluralsRes val value: Int, @PluralsRes val summary: Int) {
+    HOUR(R.plurals.repeat_unit_hours, R.plurals.every_hours),
     DAY(R.plurals.repeat_unit_days, R.plurals.every_days),
     WEEK(R.plurals.repeat_unit_weeks, R.plurals.every_weeks),
     MONTH(R.plurals.repeat_unit_months, R.plurals.every_months),

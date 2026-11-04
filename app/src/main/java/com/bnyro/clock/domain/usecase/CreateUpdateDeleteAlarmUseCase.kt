@@ -2,33 +2,46 @@ package com.bnyro.clock.domain.usecase
 
 import android.content.Context
 import com.bnyro.clock.domain.model.Alarm
+import com.bnyro.clock.domain.model.RepeatUnit
 import com.bnyro.clock.domain.repository.AlarmRepository
 import com.bnyro.clock.util.AlarmHelper
+import java.time.Clock
 import java.time.LocalDate
+import java.time.ZoneId
 
 class CreateUpdateDeleteAlarmUseCase(
     private val context: Context,
     private val alarmRepository: AlarmRepository
 ) {
-    suspend fun createAlarm(alarm: Alarm) {
-        prepareForScheduling(alarm)
+    suspend fun createAlarm(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()) {
+        prepareForScheduling(alarm, timeZone)
         val newId = alarmRepository.addAlarm(alarm)
         val alarmWithId = alarm.copy(id = newId)
-        AlarmHelper.enqueue(context, alarmWithId)
+        AlarmHelper.enqueue(context, alarmWithId, timeZone = timeZone)
     }
 
-    suspend fun updateAlarm(alarm: Alarm) {
-        prepareForScheduling(alarm)
+    suspend fun updateAlarm(alarm: Alarm, timeZone: ZoneId = ZoneId.systemDefault()) {
+        prepareForScheduling(alarm, timeZone)
         alarmRepository.updateAlarm(alarm)
-        AlarmHelper.enqueue(context, alarm)
+        AlarmHelper.enqueue(context, alarm, timeZone = timeZone)
     }
 
-    fun prepareForScheduling(alarm: Alarm) {
+    fun prepareForScheduling(
+        alarm: Alarm,
+        timeZone: ZoneId = ZoneId.systemDefault(),
+        clock: Clock = Clock.system(timeZone)
+    ) {
         alarm.snoozedUntil = null
         alarm.dismissedAt = null
-        if (!alarm.advanced) alarm.startDate = LocalDate.now().toEpochDay()
-        alarm.startDate = AlarmHelper.getNextRepetitionStart(alarm)?.toEpochDay() ?: alarm.startDate
-        if (AlarmHelper.hasRecurrenceEnded(alarm)) alarm.enabled = false
+        if (!alarm.advanced) alarm.startDate = LocalDate.now(clock.withZone(timeZone)).toEpochDay()
+        AlarmHelper.getNextRepetitionStart(alarm, timeZone, clock)?.let { start ->
+            alarm.startDate = start.toLocalDate().toEpochDay()
+            alarm.startWithLaterOffset = start.offset != start.withEarlierOffsetAtOverlap().offset
+            if (alarm.repeatUnit == RepeatUnit.HOUR) {
+                alarm.time = start.hour * 3_600_000L + start.minute * 60_000L
+            }
+        }
+        if (AlarmHelper.hasRecurrenceEnded(alarm, timeZone, clock)) alarm.enabled = false
     }
 
     suspend fun dismissUpcomingAlarm(alarm: Alarm) {

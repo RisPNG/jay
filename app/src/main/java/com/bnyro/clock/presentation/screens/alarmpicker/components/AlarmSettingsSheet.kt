@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.PickerStyle
+import com.bnyro.clock.domain.model.RepeatUnit
 import com.bnyro.clock.presentation.components.ClockTimePicker
 import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
@@ -95,6 +96,7 @@ fun AlarmPicker(
     var soundUri by remember { mutableStateOf(currentAlarm.soundUri) }
 
     var startDate by remember { mutableLongStateOf(currentAlarm.startDate) }
+    var startWithLaterOffset by remember { mutableStateOf(currentAlarm.startWithLaterOffset) }
     var repeatDuration by remember { mutableStateOf(currentAlarm.repeatDuration) }
     var repeatDurationUnit by remember { mutableStateOf(currentAlarm.repeatDurationUnit) }
     var repeatInterval by remember { mutableIntStateOf(currentAlarm.repeatInterval) }
@@ -140,24 +142,54 @@ fun AlarmPicker(
                 PickerStyle.WHEEL -> ScrollAlarmTimePicker(
                     initialHours = hours,
                     initialMinutes = minutes,
-                    onHoursChanged = { hours = it },
-                    onMinutesChanged = { minutes = it }
+                    onHoursChanged = {
+                        if (hours != it) {
+                            hours = it
+                            startWithLaterOffset = false
+                        }
+                    },
+                    onMinutesChanged = {
+                        if (minutes != it) {
+                            minutes = it
+                            startWithLaterOffset = false
+                        }
+                    }
                 )
 
                 PickerStyle.NUMBER_PAD -> AlarmTimePicker(
                     initialHours = hours,
                     initialMinutes = minutes,
                     isEditing = currentAlarm.id != 0L,
-                    onHoursChanged = { hours = it },
-                    onMinutesChanged = { minutes = it }
+                    onHoursChanged = {
+                        if (hours != it) {
+                            hours = it
+                            startWithLaterOffset = false
+                        }
+                    },
+                    onMinutesChanged = {
+                        if (minutes != it) {
+                            minutes = it
+                            startWithLaterOffset = false
+                        }
+                    }
                 )
 
                 PickerStyle.CLOCK -> ClockTimePicker(
                     initialHours = hours,
                     initialMinutes = minutes,
                     is24Hour = DateFormat.is24HourFormat(context),
-                    onHoursChanged = { hours = it },
-                    onMinutesChanged = { minutes = it }
+                    onHoursChanged = {
+                        if (hours != it) {
+                            hours = it
+                            startWithLaterOffset = false
+                        }
+                    },
+                    onMinutesChanged = {
+                        if (minutes != it) {
+                            minutes = it
+                            startWithLaterOffset = false
+                        }
+                    }
                 )
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -165,7 +197,9 @@ fun AlarmPicker(
             Column {
                 RecurrencePicker(
                     advanced = advanced,
+                    time = (hours * 60 + minutes) * 60_000L,
                     startDate = startDate,
+                    startWithLaterOffset = startWithLaterOffset,
                     repeatDuration = repeatDuration,
                     repeatDurationUnit = repeatDurationUnit,
                     repeatInterval = repeatInterval,
@@ -174,13 +208,21 @@ fun AlarmPicker(
                     chosenDays = chosenDays,
                     endDate = endDate,
                     endOccurrences = endOccurrences,
-                    onStartDateChange = { startDate = it },
+                    onStartDateChange = {
+                        if (startDate != it) {
+                            startDate = it
+                            startWithLaterOffset = false
+                        }
+                    },
                     onRepeatDurationChange = { duration, unit ->
                         repeatDuration = duration
                         repeatDurationUnit = unit
                     },
                     onRepeatIntervalChange = { repeatInterval = it },
-                    onRepeatUnitChange = { repeatUnit = it },
+                    onRepeatUnitChange = {
+                        repeatUnit = it
+                        if (it == RepeatUnit.HOUR) repeatDuration = null
+                    },
                     onRepeatAnchorChange = { repeatAnchor = it },
                     onEndChange = { newEndDate, newEndOccurrences ->
                         endDate = newEndDate
@@ -296,6 +338,7 @@ fun AlarmPicker(
                         vibrationPattern = vibrationPattern,
                         vibrationPatternName = vibrationPatternName,
                         startDate = startDate,
+                        startWithLaterOffset = startWithLaterOffset,
                         repeatDuration = repeatDuration,
                         repeatDurationUnit = repeatDurationUnit,
                         repeatInterval = repeatInterval,
