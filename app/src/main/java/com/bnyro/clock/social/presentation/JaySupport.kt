@@ -58,7 +58,7 @@ fun JaySupportDialog() {
                 }
             },
             dismissButton = {
-                DialogButton(R.string.jay_support_not_now, DialogButtonStyle.SECONDARY) {
+                DialogButton(R.string.jay_support_never_show_again, DialogButtonStyle.SECONDARY) {
                     showDialog = false
                 }
             }

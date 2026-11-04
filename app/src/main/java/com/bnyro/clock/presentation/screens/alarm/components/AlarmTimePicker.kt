@@ -29,7 +29,48 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bnyro.clock.domain.model.NumberKeypadOperation
+import com.bnyro.clock.domain.model.PickerStyle
+import com.bnyro.clock.presentation.components.ClockTimePicker
 import com.bnyro.clock.presentation.screens.timer.components.NumberKeypad
+
+@Composable
+fun AlarmPickerSelector(
+    pickerStyle: PickerStyle,
+    initialHours: Int,
+    initialMinutes: Int,
+    isEditing: Boolean,
+    useVerticalLayout: Boolean = false,
+    enabled: Boolean = true,
+    onHoursChanged: (Int) -> Unit,
+    onMinutesChanged: (Int) -> Unit
+) {
+    when (pickerStyle) {
+        PickerStyle.WHEEL -> ScrollAlarmTimePicker(
+            initialHours = initialHours,
+            initialMinutes = initialMinutes,
+            enabled = enabled,
+            onHoursChanged = onHoursChanged,
+            onMinutesChanged = onMinutesChanged
+        )
+        PickerStyle.NUMBER_PAD -> AlarmTimePicker(
+            initialHours = initialHours,
+            initialMinutes = initialMinutes,
+            isEditing = isEditing,
+            enabled = enabled,
+            onHoursChanged = onHoursChanged,
+            onMinutesChanged = onMinutesChanged
+        )
+        PickerStyle.CLOCK -> ClockTimePicker(
+            initialHours = initialHours,
+            initialMinutes = initialMinutes,
+            enabled = enabled,
+            is24Hour = DateFormat.is24HourFormat(LocalContext.current),
+            useVerticalLayout = useVerticalLayout,
+            onHoursChanged = onHoursChanged,
+            onMinutesChanged = onMinutesChanged
+        )
+    }
+}
 
 @Composable
 fun AlarmTimePicker(
