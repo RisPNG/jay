@@ -50,6 +50,7 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -62,6 +63,7 @@ import com.bnyro.clock.presentation.components.ClockTimePicker
 import com.bnyro.clock.presentation.components.LabelColorPreference
 import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
+import com.bnyro.clock.presentation.components.InfoButton
 import com.bnyro.clock.presentation.components.ScrollPickerDialog
 import com.bnyro.clock.presentation.components.SwitchWithDivider
 import com.bnyro.clock.presentation.features.RingtonePickerDialog
@@ -311,10 +313,20 @@ fun AlarmPicker(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.timeout_after),
-                                style = MaterialTheme.typography.titleLarge
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = stringResource(R.string.timeout_after),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                InfoButton(
+                                    title = stringResource(R.string.timeout_after),
+                                    explanation = stringResource(R.string.alarm_timeout_info),
+                                    modifier = Modifier.height(with(LocalDensity.current) {
+                                        MaterialTheme.typography.titleLarge.lineHeight.toDp()
+                                    })
+                                )
+                            }
                             Text(
                                 text = pluralStringResource(
                                     R.plurals.duration_minutes,
@@ -382,6 +394,7 @@ fun AlarmPicker(
                 )
                 SwitchWithDivider(
                     title = stringResource(R.string.snooze_limit),
+                    info = stringResource(R.string.snooze_limit_info),
                     description = if (snoozeLimitEnabled) {
                         pluralStringResource(R.plurals.snooze_limit_count, snoozeLimit, snoozeLimit)
                     } else {
