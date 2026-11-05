@@ -65,7 +65,6 @@ object AlarmHelper {
         return minutes * 60 * 1000L
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
     fun enqueue(
         context: Context,
         alarm: Alarm,
@@ -86,7 +85,6 @@ object AlarmHelper {
         schedule(context, alarm, getAlarmTime(alarm, skipToday, timeZone) ?: return)
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
     @SuppressLint("ScheduleExactAlarm")
     private fun schedule(context: Context, alarm: Alarm, triggerTime: Long) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -375,7 +373,6 @@ object AlarmHelper {
         return occurrence
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
     fun snooze(context: Context, oldAlarm: Alarm, ringTime: Long, snoozeMinutes: Int): Long {
         val now = System.currentTimeMillis()
         val calendar = Calendar.getInstance()
