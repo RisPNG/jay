@@ -384,11 +384,18 @@ fun AlarmPicker(
                         }
                     }
                 )
+                val vibrationPatternNameDisplay =
+    if (vibrationPatternName == "Default") {
+        stringResource(R.string.default_vibration_pattern)
+    } else {
+        vibrationPatternName
+    }
+
                 SwitchWithDivider(
                     title = stringResource(R.string.vibrate),
                     description = stringResource(
                         id = R.string.vibration_pattern,
-                        vibrationPatternName
+                        vibrationPatternNameDisplay
                     ),
                     isChecked = vibrationEnabled,
                     enabled = canSave,
