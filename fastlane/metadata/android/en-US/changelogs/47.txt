@@ -1,0 +1,7 @@
+- Redesign ringing screens with circular swipe dismissal and haptic feedback.
+- Add hourly alarm repeats and snooze-count limits.
+- Hold to ring connected group members with continuous local vibration.
+- Sort saved timers and prioritise the next timer notification.
+- Improve option help, picker previews, accessibility, and translations.
+- Fix short-timer alerts, overlapping rings, and resumed timers.
+- Keep API support for 1.2.5. Update all group devices before using shared snooze limits.
