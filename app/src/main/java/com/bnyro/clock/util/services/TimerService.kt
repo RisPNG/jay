@@ -382,34 +382,7 @@ class TimerService : Service() {
                 return START_STICKY
             }
 
-            cancelAlarm(obj)
-            obj.currentPosition.value = 0
-            obj.state.value = WatchState.PAUSED
-
-            if (obj.repeatEnabled) {
-                val now = System.currentTimeMillis()
-                val elapsedRepeats = ((now - expiresAt).coerceAtLeast(0) / obj.repeatDurationMillis).toInt()
-                val nextIndex = obj.repeatIndex + elapsedRepeats + 1
-                if (obj.repeatCount == 0 || nextIndex <= obj.repeatCount) {
-                    val nextExpiry = expiresAt + (elapsedRepeats + 1) * obj.repeatDurationMillis.toLong()
-                    val successor = TimerDescriptor(
-                        id = (timerObjects.maxOfOrNull { it.id } ?: 0) + 1,
-                        settings = obj.settings.copy(seconds = obj.repeatDurationMillis / 1000)
-                    ).asScheduledObject()
-                    successor.repeatIndex = nextIndex
-                    successor.expiresAt = nextExpiry
-                    obj.hasSuccessor = true
-                    enqueueNew(successor)
-                }
-            }
-
-            startRinging(obj)
-
-            if (timerObjects.none { t -> t.state.value == WatchState.RUNNING }) {
-                releaseWakeLock()
-            }
-
-            invokeChangeListener()
+            expire(obj)
 
             return START_STICKY
         }
@@ -427,6 +400,37 @@ class TimerService : Service() {
         scheduledObject.state.value = WatchState.RUNNING
         enqueueNew(scheduledObject)
         return START_STICKY
+    }
+
+    private fun expire(timerObject: TimerObject) {
+        cancelAlarm(timerObject)
+        timerObject.currentPosition.value = 0
+        timerObject.state.value = WatchState.PAUSED
+
+        if (timerObject.repeatEnabled) {
+            val now = System.currentTimeMillis()
+            val elapsedRepeats = ((now - timerObject.expiresAt).coerceAtLeast(0) / timerObject.repeatDurationMillis).toInt()
+            val nextIndex = timerObject.repeatIndex + elapsedRepeats + 1
+            if (timerObject.repeatCount == 0 || nextIndex <= timerObject.repeatCount) {
+                val nextExpiry = timerObject.expiresAt + (elapsedRepeats + 1) * timerObject.repeatDurationMillis.toLong()
+                val successor = TimerDescriptor(
+                    id = (timerObjects.maxOfOrNull { it.id } ?: 0) + 1,
+                    settings = timerObject.settings.copy(seconds = timerObject.repeatDurationMillis / 1000)
+                ).asScheduledObject()
+                successor.repeatIndex = nextIndex
+                successor.expiresAt = nextExpiry
+                timerObject.hasSuccessor = true
+                enqueueNew(successor)
+            }
+        }
+
+        startRinging(timerObject)
+
+        if (timerObjects.none { it.state.value == WatchState.RUNNING }) {
+            releaseWakeLock()
+        }
+
+        invokeChangeListener()
     }
 
     private fun getNotification(timerObject: TimerObject): Notification {
@@ -467,13 +471,15 @@ class TimerService : Service() {
     private fun updateState() {
         val now = SystemClock.elapsedRealtime()
 
-        timerObjects.forEach {
+        timerObjects.toList().forEach {
             if (it.state.value == WatchState.RUNNING) {
                 val before = it.secondsLeft
                 it.currentPosition.value =
                     (it.elapsedRealtimeDeadline - now).coerceAtLeast(0).toInt()
 
-                if (before != it.secondsLeft) {
+                if (it.currentPosition.value == 0) {
+                    expire(it)
+                } else if (before != it.secondsLeft) {
                     updateNotification(it)
                 }
             }
