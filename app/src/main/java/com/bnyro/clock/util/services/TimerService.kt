@@ -448,50 +448,7 @@ class TimerService : Service() {
                 return START_STICKY
             }
 
-            cancelAlarm(obj)
-            obj.currentPosition.value = 0
-            obj.state.value = WatchState.PAUSED
-
-            if (obj.repeatEnabled) {
-                val now = System.currentTimeMillis()
-                var elapsedRepeats = ((now - expiresAt).coerceAtLeast(0) / obj.repeatDurationMillis).toInt()
-                var nextIndex = obj.repeatIndex + elapsedRepeats + 1
-                while (nextIndex in obj.sharedAnsweredIndices) {
-                    nextIndex++
-                    elapsedRepeats++
-                }
-                if (obj.repeatCount == 0 || nextIndex <= obj.repeatCount) {
-                    val nextExpiry = expiresAt + (elapsedRepeats + 1) * obj.repeatDurationMillis.toLong()
-                    val existingSuccessor = obj.sharedTimerId?.let { sharedId ->
-                        timerObjects.firstOrNull {
-                            it.sharedTimerId == sharedId && it.sharedMembershipId == obj.sharedMembershipId &&
-                                it.sharedRunId == obj.sharedRunId && it.repeatIndex == nextIndex
-                        }
-                    }
-                    obj.hasSuccessor = true
-                    if (existingSuccessor == null) {
-                        val successor = obj.copy(
-                            id = (timerObjects.maxOfOrNull { it.id } ?: 0) + 1,
-                            label = mutableStateOf(obj.label.value),
-                            labelColor = mutableStateOf(obj.labelColor.value),
-                            currentPosition = mutableStateOf(obj.repeatDurationMillis),
-                            initialPosition = mutableStateOf(obj.repeatDurationMillis),
-                            state = mutableStateOf(WatchState.RUNNING),
-                            repeatIndex = nextIndex, hasSuccessor = false,
-                            expiresAt = nextExpiry, elapsedRealtimeDeadline = 0L
-                        )
-                        enqueueNew(successor)
-                    }
-                }
-            }
-
-            startRinging(obj)
-
-            if (timerObjects.none { t -> t.state.value == WatchState.RUNNING }) {
-                releaseWakeLock()
-            }
-
-            invokeChangeListener()
+            expire(obj)
 
             return START_STICKY
         }
@@ -509,6 +466,53 @@ class TimerService : Service() {
         scheduledObject.state.value = WatchState.RUNNING
         enqueueNew(scheduledObject)
         return START_STICKY
+    }
+
+    private fun expire(timerObject: TimerObject) {
+        cancelAlarm(timerObject)
+        timerObject.currentPosition.value = 0
+        timerObject.state.value = WatchState.PAUSED
+
+        if (timerObject.repeatEnabled) {
+            val now = System.currentTimeMillis()
+            var elapsedRepeats = ((now - timerObject.expiresAt).coerceAtLeast(0) / timerObject.repeatDurationMillis).toInt()
+            var nextIndex = timerObject.repeatIndex + elapsedRepeats + 1
+            while (nextIndex in timerObject.sharedAnsweredIndices) {
+                nextIndex++
+                elapsedRepeats++
+            }
+            if (timerObject.repeatCount == 0 || nextIndex <= timerObject.repeatCount) {
+                val nextExpiry = timerObject.expiresAt + (elapsedRepeats + 1) * timerObject.repeatDurationMillis.toLong()
+                val existingSuccessor = timerObject.sharedTimerId?.let { sharedId ->
+                    timerObjects.firstOrNull {
+                        it.sharedTimerId == sharedId && it.sharedMembershipId == timerObject.sharedMembershipId &&
+                            it.sharedRunId == timerObject.sharedRunId && it.repeatIndex == nextIndex
+                    }
+                }
+                timerObject.hasSuccessor = true
+                if (existingSuccessor == null) {
+                    val successor = timerObject.copy(
+                        id = (timerObjects.maxOfOrNull { it.id } ?: 0) + 1,
+                        label = mutableStateOf(timerObject.label.value),
+                        labelColor = mutableStateOf(timerObject.labelColor.value),
+                        currentPosition = mutableStateOf(timerObject.repeatDurationMillis),
+                        initialPosition = mutableStateOf(timerObject.repeatDurationMillis),
+                        state = mutableStateOf(WatchState.RUNNING),
+                        repeatIndex = nextIndex, hasSuccessor = false,
+                        expiresAt = nextExpiry, elapsedRealtimeDeadline = 0L
+                    )
+                    enqueueNew(successor)
+                }
+            }
+        }
+
+        startRinging(timerObject)
+
+        if (timerObjects.none { t -> t.state.value == WatchState.RUNNING }) {
+            releaseWakeLock()
+        }
+
+        invokeChangeListener()
     }
 
     private fun getNotification(timerObject: TimerObject): Notification {
@@ -554,13 +558,15 @@ class TimerService : Service() {
     private fun updateState() {
         val now = SystemClock.elapsedRealtime()
 
-        timerObjects.forEach {
+        timerObjects.toList().forEach {
             if (it.state.value == WatchState.RUNNING) {
                 val before = it.secondsLeft
                 it.currentPosition.value =
                     (it.elapsedRealtimeDeadline - now).coerceAtLeast(0).toInt()
 
-                if (before != it.secondsLeft) {
+                if (it.currentPosition.value == 0) {
+                    expire(it)
+                } else if (before != it.secondsLeft) {
                     updateNotification(it)
                 }
             }

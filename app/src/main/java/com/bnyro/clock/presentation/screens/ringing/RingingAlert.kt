@@ -429,7 +429,6 @@ private fun RingingDismiss(onDismiss: () -> Unit) {
                 .size(diameter + handleDiameter)
                 .pointerInput(travelDistance, haptics) {
                     var dragOrigin = Offset.Zero
-                    var thresholdHapticSent = false
                     try {
                         detectDragGestures(
                             orientationLock = null,
@@ -440,7 +439,6 @@ private fun RingingDismiss(onDismiss: () -> Unit) {
                                     dragOrigin = down.position - currentHandleOffset
                                     dragOffset = currentHandleOffset
                                     dismissReady = false
-                                    thresholdHapticSent = false
                                 }
                             },
                             onDragEnd = {
@@ -467,11 +465,11 @@ private fun RingingDismiss(onDismiss: () -> Unit) {
                                 } else {
                                     offset
                                 }
-                                dismissReady = distance >= if (dismissReady) travelDistance * 0.8f else dismissDistance
-                                if (dismissReady && !thresholdHapticSent) {
+                                val nextDismissReady = distance >= dismissDistance
+                                if (nextDismissReady && !dismissReady) {
                                     haptics.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
-                                    thresholdHapticSent = true
                                 }
+                                dismissReady = nextDismissReady
                             }
                         }
                     } finally {
