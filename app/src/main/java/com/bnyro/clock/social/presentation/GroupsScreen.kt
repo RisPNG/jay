@@ -1,6 +1,13 @@
 package com.bnyro.clock.social.presentation
 
+import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.os.Build
+import android.os.VibrationAttributes
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -45,9 +52,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,7 +76,7 @@ import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.canEditAlarms
 import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.Preferences
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterIsInstance
 
@@ -276,17 +282,41 @@ fun GroupsScreen(
         val canRing = currentGroup?.canEditAlarms == true
         val ringInteractions = remember(group.id) { MutableInteractionSource() }
         val lifecycleOwner = LocalLifecycleOwner.current
-        val hapticFeedback = LocalHapticFeedback.current
-        LaunchedEffect(group.id, lifecycleOwner, canRing, ringInteractions, hapticFeedback) {
+        val view = LocalView.current
+        val vibrator = remember(context) { context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator }
+        LaunchedEffect(group.id, lifecycleOwner, canRing, ringInteractions, view, vibrator) {
             lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 try {
                     ringInteractions.interactions.filterIsInstance<PressInteraction>().collectLatest { interaction ->
                         when (interaction) {
                             is PressInteraction.Press -> if (canRing) {
                                 socialModel.ringGroup(group.id)
-                                while (true) {
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
-                                    delay(100L)
+                                val feedbackEnabled = view.isHapticFeedbackEnabled && (
+                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ||
+                                        Settings.System.getInt(context.contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) != 0
+                                    )
+                                try {
+                                    if (feedbackEnabled) {
+                                        val pattern = longArrayOf(0L, 1000L)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            vibrator.vibrate(
+                                                VibrationEffect.createWaveform(pattern, 0),
+                                                VibrationAttributes.Builder().setUsage(VibrationAttributes.USAGE_TOUCH).build()
+                                            )
+                                        } else {
+                                            val attributes = AudioAttributes.Builder()
+                                                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).build()
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0), attributes)
+                                            } else {
+                                                @Suppress("DEPRECATION")
+                                                vibrator.vibrate(pattern, 0, attributes)
+                                            }
+                                        }
+                                    }
+                                    awaitCancellation()
+                                } finally {
+                                    if (feedbackEnabled) vibrator.cancel()
                                 }
                             }
                             is PressInteraction.Release, is PressInteraction.Cancel -> socialModel.ringGroup(null)
