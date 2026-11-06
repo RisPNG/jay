@@ -14,8 +14,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -329,31 +332,77 @@ class RingingScreensTest {
     fun longSwipesInEachDirectionDismissExactlyOnce() {
         var attempt by mutableIntStateOf(0)
         val dismissals = IntArray(4)
+        val haptics = mutableListOf<HapticFeedbackType>()
+        val hapticFeedback = object : HapticFeedback {
+            override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) {
+                haptics += hapticFeedbackType
+            }
+        }
         composeRule.setContent {
-            key(attempt) {
-                val currentAttempt = attempt
-                AlarmAlertScreen(
-                    onDismiss = { dismissals[currentAttempt]++ },
-                    onSnooze = {},
-                    snoozeEnabled = false,
-                    snoozeTime = 10,
-                    ringingSince = System.currentTimeMillis() - 60_000
-                )
+            CompositionLocalProvider(LocalHapticFeedback provides hapticFeedback) {
+                key(attempt) {
+                    val currentAttempt = attempt
+                    AlarmAlertScreen(
+                        onDismiss = { dismissals[currentAttempt]++ },
+                        onSnooze = {},
+                        snoozeEnabled = false,
+                        snoozeTime = 10,
+                        ringingSince = System.currentTimeMillis() - 60_000
+                    )
+                }
             }
         }
 
         listOf(Offset(1f, 0f), Offset(-1f, 0f), Offset(0f, 1f), Offset(0f, -1f))
             .forEachIndexed { index, direction ->
-                composeRule.runOnIdle { attempt = index }
+                composeRule.runOnIdle {
+                    attempt = index
+                    haptics.clear()
+                }
                 val handle = composeRule
                     .onNodeWithContentDescription(context.getString(R.string.dismiss))
                     .fetchSemanticsNode().boundsInRoot
                 val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
                 val distance = minOf(root.width, root.height) * 0.45f
                 composeRule.onRoot().performTouchInput {
-                    swipe(handle.center, handle.center + direction * distance, 500)
+                    down(handle.center)
+                    moveTo(handle.center + direction * distance, delayMillis = 500)
                 }
-                composeRule.runOnIdle { assertEquals(1, dismissals[index]) }
+                composeRule.runOnIdle {
+                    assertEquals(listOf(HapticFeedbackType.GestureThresholdActivate), haptics)
+                    assertEquals(0, dismissals[index])
+                }
+                composeRule.onRoot().performTouchInput {
+                    moveTo(handle.center + direction * (distance * 1.1f), delayMillis = 100)
+                }
+                composeRule.runOnIdle {
+                    assertEquals(listOf(HapticFeedbackType.GestureThresholdActivate), haptics)
+                }
+                val maximumOffset = composeRule
+                    .onNodeWithContentDescription(context.getString(R.string.dismiss))
+                    .fetchSemanticsNode().boundsInRoot.center - handle.center
+                assertTrue(maximumOffset.getDistance() > 0f)
+                composeRule.onRoot().performTouchInput {
+                    moveTo(handle.center + maximumOffset * 0.85f, delayMillis = 100)
+                }
+                composeRule.runOnIdle {
+                    assertEquals(listOf(HapticFeedbackType.GestureThresholdActivate), haptics)
+                    assertEquals(0, dismissals[index])
+                }
+                composeRule.onRoot().performTouchInput {
+                    moveTo(handle.center + direction * distance, delayMillis = 100)
+                }
+                composeRule.runOnIdle {
+                    assertEquals(List(2) { HapticFeedbackType.GestureThresholdActivate }, haptics)
+                    assertEquals(0, dismissals[index])
+                }
+                composeRule.onRoot().performTouchInput {
+                    up()
+                }
+                composeRule.runOnIdle {
+                    assertEquals(List(2) { HapticFeedbackType.GestureThresholdActivate }, haptics)
+                    assertEquals(1, dismissals[index])
+                }
             }
     }
 
