@@ -25,6 +25,8 @@ class TimerAlertActivity : RingingActivity() {
 
     override val volumeButtonActionDefault = VolumeButtonAction.DISMISS
 
+    override val snoozeAvailable get() = incrementSeconds > 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
@@ -32,7 +34,7 @@ class TimerAlertActivity : RingingActivity() {
         setContent {
             TimerAlertScreen(
                 onDismiss = this@TimerAlertActivity::dismiss,
-                onSnooze = this@TimerAlertActivity::snooze,
+                onSnooze = { seconds -> answerWith(TimerService.ACTION_ADD_TIME, seconds) },
                 onReset = this@TimerAlertActivity::reset,
                 label = label,
                 ringingSince = ringingSince,
@@ -47,9 +49,11 @@ class TimerAlertActivity : RingingActivity() {
 
     private fun reset() = answerWith(TimerService.TIMER_RESTART)
 
-    private fun answerWith(action: String) {
-        sendBroadcast(TimerService.updateStateIntent(action, timerId)
-            .putExtra(TimerService.RINGING_SINCE_EXTRA_KEY, ringingSince))
+    private fun answerWith(action: String, seconds: Int? = null) {
+        sendBroadcast(TimerService.updateStateIntent(action, timerId).apply {
+            putExtra(TimerService.RINGING_SINCE_EXTRA_KEY, ringingSince)
+            seconds?.let { putExtra(TimerService.INCREMENT_EXTRA_KEY, it) }
+        })
     }
 
     override fun closesThisAlert(intent: Intent) =
