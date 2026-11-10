@@ -216,7 +216,7 @@ fun SettingsScreen(
 
 
             ButtonGroupPref(
-                title = "Name",
+                title = stringResource(R.string.name),
                 options = SettingsModel.AppName.entries.map {
                     if (it == SettingsModel.AppName.DEFAULT) "Jay" else "Clock"
                 },
