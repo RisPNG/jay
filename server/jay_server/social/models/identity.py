@@ -29,6 +29,7 @@ class Identity(SavedState):
 class PushSubscription(models.Model):
     token = models.CharField(primary_key=True, max_length=4096)
     identity = models.ForeignKey(Identity, on_delete=models.CASCADE, related_name="push_subscriptions")
+    group_ring_enabled = models.BooleanField(default=False, db_default=False)
     updated_at = models.DateTimeField(default=timezone.now)
 
 

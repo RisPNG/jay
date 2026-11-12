@@ -204,6 +204,15 @@
         </service>
 
         <service
+                android:name=".social.data.GroupRingService"
+                android:exported="false"
+                android:foregroundServiceType="specialUse">
+            <property
+                    android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                    android:value="group ring while another member holds the ring button" />
+        </service>
+
+        <service
                 android:name=".social.data.SocialPushMessagingService"
                 android:exported="false">
             <intent-filter>

@@ -5,20 +5,22 @@ from uuid import uuid4
 from contextlib import suppress
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from channels.consumer import AsyncConsumer
 from channels.db import database_sync_to_async
 from channels.exceptions import StopConsumer
 from django.conf import settings
-from django.db import DatabaseError, connection
+from django.db import DatabaseError, connection, transaction
 from django.http.request import split_domain_port, validate_host
+from django.utils import timezone
 from psycopg import AsyncConnection
 from rest_framework.exceptions import APIException
 
 from .authentication import authenticate_identity
 from .access import require_membership
 from .errors import DomainError
-from .models import Group, GroupMembership
+from .models import DeliveryWork, Group, GroupMembership
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +45,9 @@ def authorize_stream(authorization, identity_id):
     return identity.pk, str(identity.scope_id), scopes
 
 
-def publish_group_ring(authorization, identity_id, group_id, session_id, scope_id=None):
+@transaction.atomic
+def publish_group_ring(authorization, identity_id, group_id, session_id, scope_id=None, wake=False):
+    expires_at = timezone.now() + timedelta(seconds=5)
     if scope_id is None:
         identity = authenticate_identity(authorization, identity_id)
         group = Group.objects.filter(pk=group_id, deleted_at=None).first()
@@ -55,6 +59,15 @@ def publish_group_ring(authorization, identity_id, group_id, session_id, scope_i
     else:
         active = False
     payload = {"scope_id": scope_id, "group_id": str(group_id), "session_id": session_id, "active": active, "lease_seconds": 5}
+    if active:
+        payload.update(actor_id=identity.pk, actor_label=identity.name, group_label=group.name, expires_at=expires_at.isoformat())
+        if wake and settings.FIREBASE_CREDENTIALS_JSON:
+            DeliveryWork.objects.create(kind="push", deduplication_key=f"ring:{session_id}", payload={
+                "kind": "ring", "scope_id": scope_id, "group_id": str(group_id), "session_id": session_id,
+                "actor_id": identity.pk, "expires_at": expires_at.isoformat(),
+            })
+    else:
+        DeliveryWork.objects.filter(deduplication_key=f"ring:{session_id}").delete()
     with connection.cursor() as cursor:
         cursor.execute("SELECT pg_notify('jay_rings', %s)", [json.dumps(payload, separators=(",", ":"))])
     return scope_id
@@ -246,7 +259,7 @@ class GroupRingConsumer(AsyncConsumer):
         self.broker.ringers[self.session_id] = None
         try:
             self.broker.authenticating += 1
-            self.scope_id = await database_sync_to_async(publish_group_ring, thread_sensitive=False, executor=self.broker.executor)(self.authorization, self.identity_id, self.group_id, self.session_id)
+            self.scope_id = await database_sync_to_async(publish_group_ring, thread_sensitive=False, executor=self.broker.executor)(self.authorization, self.identity_id, self.group_id, self.session_id, wake=True)
         except (APIException, DatabaseError) as error:
             self.broker.ringers.pop(self.session_id, None)
             status = error.status_code if isinstance(error, APIException) else 503

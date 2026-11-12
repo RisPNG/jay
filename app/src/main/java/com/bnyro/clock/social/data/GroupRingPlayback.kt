@@ -13,36 +13,51 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
+import java.time.Instant
 
-class GroupRingPlayback(private val context: Context) : RingingSession {
+class GroupRingPlayback(
+    private val context: Context,
+    private val onChanged: (List<JsonObject>) -> Unit = {}
+) : RingingSession {
     override val soundEnabled = true
     override val vibrate = false
     override val timeoutMillis = 0L
     override val isAlarm = false
 
     private val handler = Handler(Looper.getMainLooper())
-    private val leases = mutableMapOf<String, Long>()
+    private val leases = linkedMapOf<String, Pair<Long, JsonObject>>()
     private var player: MediaPlayer? = null
     private val expiry = object : Runnable {
         override fun run() {
             val now = SystemClock.elapsedRealtime()
-            leases.entries.removeAll { it.value <= now }
+            leases.entries.removeAll { it.value.first <= now }
             if (leases.isEmpty()) {
                 RingingCoordinator.stop(this@GroupRingPlayback)
             } else {
-                handler.postDelayed(this, leases.values.min() - now)
+                handler.postDelayed(this, leases.values.minOf { it.first } - now)
             }
+            onChanged(leases.values.map { it.second })
         }
     }
 
     fun receive(event: JsonObject?) {
         handler.removeCallbacks(expiry)
+        val elapsed = SystemClock.elapsedRealtime()
+        leases.entries.removeAll { it.value.first <= elapsed }
         if (event == null) {
             leases.clear()
         } else {
             val session = requireNotNull(event["session_id"]).jsonPrimitive.content
             if (requireNotNull(event["active"]).jsonPrimitive.boolean) {
-                leases[session] = SystemClock.elapsedRealtime() + requireNotNull(event["lease_seconds"]).jsonPrimitive.long * 1_000
+                val leaseMillis = requireNotNull(event["lease_seconds"]).jsonPrimitive.long * 1_000
+                val remaining = event["expires_at"]?.jsonPrimitive?.content?.let { expiresAt ->
+                    val now = event["server_time"]?.jsonPrimitive?.content?.let { Instant.parse(it).toEpochMilli() }
+                        ?: System.currentTimeMillis()
+                    (Instant.parse(expiresAt).toEpochMilli() - now).coerceAtMost(leaseMillis)
+                } ?: leaseMillis
+                if (remaining > 0) {
+                    leases[session] = (elapsed + remaining) to event
+                }
             } else {
                 leases.remove(session)
             }
@@ -51,8 +66,9 @@ class GroupRingPlayback(private val context: Context) : RingingSession {
             RingingCoordinator.stop(this)
         } else {
             RingingCoordinator.start(this)
-            handler.postDelayed(expiry, leases.values.min() - SystemClock.elapsedRealtime())
+            handler.postDelayed(expiry, leases.values.minOf { it.first } - SystemClock.elapsedRealtime())
         }
+        onChanged(leases.values.map { it.second })
     }
 
     override fun onSelected() {

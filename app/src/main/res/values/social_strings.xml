@@ -135,4 +135,7 @@
     <string name="deselect_all">Deselect all</string>
     <string name="selected_alarms_edit_denied">You do not have permission to change one or more selected shared alarms. Deselect the alarms with an error-colored ring to continue.</string>
     <string name="toggle_shared_alarms_confirmation">Turn each selected alarm on if it is off, or off if it is on? Shared alarms will change for all group members.</string>
+    <string name="group_ring_notification_title">Group ring</string>
+    <string name="group_ring_notification_text">%1$s is ringing %2$s</string>
+    <string name="group_ring_waiting">Checking group ring</string>
 </resources>

@@ -198,6 +198,7 @@ class SocialApi(
                         currentCoroutineContext().ensureActive()
                         val line = reader.readLine() ?: break
                         currentCoroutineContext().ensureActive()
+                        if (!shouldContinue()) break
                         if (line.startsWith("event: ")) event = line.removePrefix("event: ")
                         if (line.startsWith("data: ")) {
                             val hint = Json.parseToJsonElement(line.removePrefix("data: ")).jsonObject
@@ -267,6 +268,7 @@ class SocialApi(
             connection.readTimeout = 30_000
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("X-Jay-Protocol", "3")
+            connection.setRequestProperty("X-Jay-Group-Ring", "1")
             operationId?.let { connection.setRequestProperty("Idempotency-Key", it) }
             if (authenticated) {
                 connection.setRequestProperty("Authorization", "Bearer ${identity.token}")

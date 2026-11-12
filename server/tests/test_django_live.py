@@ -1,14 +1,17 @@
 import asyncio
 import json
+from datetime import datetime
+from uuid import uuid4
 
 import pytest
 from asgiref.testing import ApplicationCommunicator
 from channels.db import database_sync_to_async
 from django.db import DatabaseError, transaction
+from django.utils import timezone
 
 from jay_server.asgi import Application
-from jay_server.social.live import EventConsumer, GroupRingConsumer, LiveBroker
-from jay_server.social.models import GroupMembership
+from jay_server.social.live import EventConsumer, GroupRingConsumer, LiveBroker, publish_group_ring
+from jay_server.social.models import DeliveryWork, GroupMembership
 from jay_server.social.synchronization import publish_changes
 
 
@@ -174,19 +177,21 @@ async def receive_ring(stream, active):
                     return event, body
 
 
-def test_group_ring_reaches_connected_members_and_stops_on_release(client, group, member):
+@pytest.mark.parametrize("protocol", [None, "2", "3"])
+def test_group_ring_reaches_connected_members_and_stops_on_release(client, group, member, protocol):
     async def scenario():
         sender_application = Application()
         receiver_broker, sender_broker = LiveBroker(), sender_application.broker
         await receiver_broker.start()
         await sender_broker.start()
+        protocol_headers = [(b"x-jay-protocol", protocol.encode())] if protocol is not None else []
         stream = ApplicationCommunicator(EventConsumer.as_asgi(), {
             "type": "http", "method": "GET", "path": "/v1/events", "jay.broker": receiver_broker,
-            "headers": [(b"host", b"testserver"), (b"authorization", ("Bearer " + "secret" * 10).encode()), (b"x-jay-identity-id", b"1" * 64)],
+            "headers": [(b"host", b"testserver"), (b"authorization", ("Bearer " + "secret" * 10).encode()), (b"x-jay-identity-id", b"1" * 64), *protocol_headers],
         })
         hold = ApplicationCommunicator(sender_application, {
             "type": "http", "method": "POST", "path": f"/v1/groups/{group.pk}/ring",
-            "headers": [(b"host", b"testserver"), (b"authorization", ("Bearer " + "another-secret" * 5).encode()), (b"x-jay-identity-id", b"2" * 64)],
+            "headers": [(b"host", b"testserver"), (b"authorization", ("Bearer " + "another-secret" * 5).encode()), (b"x-jay-identity-id", b"2" * 64), *protocol_headers],
         })
         try:
             await asyncio.wait_for(receiver_broker.ready.wait(), timeout=5)
@@ -200,6 +205,10 @@ def test_group_ring_reaches_connected_members_and_stops_on_release(client, group
             started, body = await receive_ring(stream, True)
             assert started["group_id"] == str(group.pk)
             assert started["lease_seconds"] == 5
+            assert started["actor_id"] == "2" * 64
+            assert started["actor_label"] == "Bob"
+            assert started["group_label"] == group.name
+            assert timezone.now() < datetime.fromisoformat(started["expires_at"])
             assert "event: sync" not in body
             renewed, _ = await receive_ring(stream, True)
             assert renewed["session_id"] == started["session_id"]
@@ -215,6 +224,61 @@ def test_group_ring_reaches_connected_members_and_stops_on_release(client, group
             stream.stop()
             await sender_broker.stop()
             await receiver_broker.stop()
+
+    asyncio.run(scenario())
+
+
+def test_group_ring_wake_is_queued_once_and_removed_on_release(client, group, settings):
+    settings.FIREBASE_CREDENTIALS_JSON = "configured"
+    session_id = str(uuid4())
+    authorization, identity_id = "Bearer " + "secret" * 10, "1" * 64
+    scope_id = publish_group_ring(authorization, identity_id, group.pk, session_id, wake=True)
+    work = DeliveryWork.objects.get(deduplication_key=f"ring:{session_id}")
+    assert work.kind == "push"
+    assert work.payload == {
+        "kind": "ring", "scope_id": str(group.scope_id), "group_id": str(group.pk),
+        "session_id": session_id, "actor_id": identity_id, "expires_at": work.payload["expires_at"],
+    }
+    assert 0 < (datetime.fromisoformat(work.payload["expires_at"]) - timezone.now()).total_seconds() <= 5
+    publish_group_ring(authorization, identity_id, group.pk, session_id)
+    assert list(DeliveryWork.objects.filter(deduplication_key=f"ring:{session_id}").values_list("payload", flat=True)) == [work.payload]
+    publish_group_ring(authorization, identity_id, group.pk, session_id, scope_id)
+    assert not DeliveryWork.objects.filter(pk=work.pk).exists()
+
+
+def test_group_ring_renewal_reaches_a_member_connecting_after_the_hold_starts(client, group, member):
+    async def scenario():
+        application = Application()
+        broker = application.broker
+        await broker.start()
+        hold = ApplicationCommunicator(application, {
+            "type": "http", "method": "POST", "path": f"/v1/groups/{group.pk}/ring",
+            "headers": [(b"host", b"testserver"), (b"authorization", ("Bearer " + "another-secret" * 5).encode()), (b"x-jay-identity-id", b"2" * 64)],
+        })
+        stream = ApplicationCommunicator(application, {
+            "type": "http", "method": "GET", "path": "/v1/events",
+            "headers": [(b"host", b"testserver"), (b"authorization", ("Bearer " + "secret" * 10).encode()), (b"x-jay-identity-id", b"1" * 64)],
+        })
+        try:
+            await asyncio.wait_for(broker.ready.wait(), timeout=5)
+            await hold.send_input({"type": "http.request", "body": b""})
+            assert (await hold.receive_output(timeout=5))["status"] == 200
+            await hold.receive_output(timeout=5)
+            await stream.send_input({"type": "http.request", "body": b""})
+            assert (await stream.receive_output(timeout=5))["status"] == 200
+            ring, _ = await receive_ring(stream, True)
+            assert ring["group_id"] == str(group.pk)
+            assert ring["actor_label"] == "Bob"
+            await hold.send_input({"type": "http.disconnect"})
+            await hold.wait(timeout=5)
+            stopped, _ = await receive_ring(stream, False)
+            assert stopped["session_id"] == ring["session_id"]
+            await stream.send_input({"type": "http.disconnect"})
+            await stream.wait(timeout=5)
+        finally:
+            hold.stop()
+            stream.stop()
+            await broker.stop()
 
     asyncio.run(scenario())
 

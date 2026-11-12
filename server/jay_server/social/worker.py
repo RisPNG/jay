@@ -6,14 +6,15 @@ import signal
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 from channels.db import database_sync_to_async
 from django.conf import settings
 from django.db import close_old_connections, transaction
 from django.db.models import Case, DateTimeField, DurationField, Exists, ExpressionWrapper, F, OuterRef, Q, Value, When
-from django.db.models.functions import Greatest
+from django.db.models.fields.json import KT
+from django.db.models.functions import Cast, Greatest
 from django.utils import timezone
 
 from .access import identity_capabilities, require_membership
@@ -33,7 +34,13 @@ logger = logging.getLogger(__name__)
 def claim_work(kind, owner):
     with transaction.atomic():
         now = timezone.now()
-        work = DeliveryWork.objects.select_for_update(skip_locked=True).filter(kind=kind, available_at__lte=now, failed_at=None).filter(Q(lease_until=None) | Q(lease_until__lt=now)).order_by("available_at", "id").first()
+        if kind == "push":
+            DeliveryWork.objects.filter(kind="push", payload__kind="ring").alias(
+                ring_expires_at=Cast(KT("payload__expires_at"), DateTimeField()),
+            ).filter(ring_expires_at__lte=now).delete()
+        work = DeliveryWork.objects.select_for_update(skip_locked=True).filter(kind=kind, available_at__lte=now, failed_at=None).filter(Q(lease_until=None) | Q(lease_until__lt=now)).order_by(
+            Case(When(payload__kind="ring", then=0), default=1), "available_at", "id",
+        ).first()
         if work is None:
             return None
         work.lease_owner, work.lease_until = owner, now + timedelta(seconds=60)
@@ -48,15 +55,23 @@ def finish_work(work, owner, complete=True, error=None):
         current = owned.select_for_update().first()
         if current is None:
             return
+        ring_deadline = datetime.fromisoformat(current.payload["expires_at"]) if current.payload.get("kind") == "ring" else None
+        if ring_deadline is not None and ring_deadline <= timezone.now():
+            owned.delete()
+            return
         if work.kind == "push" and current.payload.get("revision") != work.payload.get("revision"):
             owned.update(lease_owner=None, lease_until=None, available_at=timezone.now(), failed_at=None)
             return
         if error is not None:
             terminal = work.created_at < timezone.now() - timedelta(hours=24)
             code = error.domain_code if isinstance(error, DomainError) else type(error).__name__
+            retry_at = timezone.now() + timedelta(seconds=min(300, 2 ** min(work.attempts - 1, 9)) * random.uniform(0.8, 1.2))
+            if ring_deadline is not None and retry_at >= ring_deadline:
+                owned.delete()
+                return
             owned.update(
                 lease_owner=None, lease_until=None, error_code=code,
-                available_at=timezone.now() + timedelta(seconds=min(300, 2 ** min(work.attempts - 1, 9)) * random.uniform(0.8, 1.2)),
+                available_at=retry_at,
                 failed_at=timezone.now() if terminal else None,
             )
             logger.warning("worker_attempt_failed kind=%s work_id=%s code=%s terminal=%s", work.kind, work.pk, code, terminal)
@@ -335,16 +350,27 @@ def maintain_state():
 
 
 def push_recipients(work):
+    if work.payload.get("kind") == "ring":
+        if datetime.fromisoformat(work.payload["expires_at"]) <= timezone.now() or not DeliveryWork.objects.filter(pk=work.pk, lease_owner=work.lease_owner).exists():
+            return []
+        actor = GroupMembership.objects.select_related("group").filter(
+            group_id=work.payload["group_id"], identity_id=work.payload["actor_id"],
+            removed_at=None, identity__retired_at=None, group__deleted_at=None,
+        ).first()
+        if actor is None or (actor.group.alarm_permission == "leaders" and actor.role != "leader"):
+            return []
     subscriptions = PushSubscription.objects.filter(identity__retired_at=None).order_by("token")
+    if work.payload.get("kind") == "ring":
+        subscriptions = subscriptions.filter(group_ring_enabled=True)
     if work.payload.get("identity_id"):
         subscriptions = subscriptions.filter(identity_id=work.payload["identity_id"])
     else:
-        subscriptions = subscriptions.filter(identity__memberships__group_id=work.payload["group_id"], identity__memberships__removed_at=None)
+        subscriptions = subscriptions.filter(identity__memberships__group_id=work.payload["group_id"], identity__memberships__removed_at=None, identity__memberships__group__deleted_at=None)
         if work.payload.get("excluding"):
             subscriptions = subscriptions.exclude(identity_id=work.payload["excluding"])
     if work.payload.get("after_token"):
         subscriptions = subscriptions.filter(token__gt=work.payload["after_token"])
-    return list(subscriptions.values_list("token", flat=True)[:101])
+    return list(subscriptions.values_list("token", "identity_id")[:101])
 
 
 class Worker:
@@ -446,27 +472,38 @@ class Worker:
                     client = await asyncio.get_running_loop().run_in_executor(self.deletion_executor, object_storage_client)
                     await asyncio.get_running_loop().run_in_executor(self.deletion_executor, lambda: client.delete_object(Bucket=settings.B2_BUCKET_NAME, Key=work.payload["object_key"]))
                 elif settings.FIREBASE_CREDENTIALS_JSON:
-                    import firebase_admin
-                    from firebase_admin import credentials, messaging
+                    recipients = await database_sync_to_async(push_recipients, thread_sensitive=False, executor=self.database_executor)(work)
+                    if recipients:
+                        import firebase_admin
+                        from firebase_admin import credentials, messaging
 
-                    try:
-                        firebase_admin.get_app()
-                    except ValueError:
-                        firebase_admin.initialize_app(credentials.Certificate(json.loads(settings.FIREBASE_CREDENTIALS_JSON)), options={"httpTimeout": 20})
-                    tokens = await database_sync_to_async(push_recipients, thread_sensitive=False, executor=self.database_executor)(work)
-                    if tokens:
-                        response = await asyncio.wait_for(messaging.send_each_async([messaging.Message(token=token, data={"kind": "sync", "scope_id": work.payload["scope_id"]}, android=messaging.AndroidConfig(priority="high")) for token in tokens[:100]]), timeout=20)
+                        try:
+                            firebase_admin.get_app()
+                        except ValueError:
+                            firebase_admin.initialize_app(credentials.Certificate(json.loads(settings.FIREBASE_CREDENTIALS_JSON)), options={"httpTimeout": 20})
+                        ring = work.payload.get("kind") == "ring"
+                        remaining = (datetime.fromisoformat(work.payload["expires_at"]) - timezone.now()).total_seconds() if ring else 20
+                        if remaining <= 0:
+                            await database_sync_to_async(finish_work, thread_sensitive=False, executor=self.database_executor)(work, self.owner)
+                            continue
+                        data = {
+                            "kind": "ring", "session_id": work.payload["session_id"], "group_id": work.payload["group_id"],
+                            "server_url": settings.PUBLIC_URL, "expires_at": work.payload["expires_at"],
+                        } if ring else {"kind": "sync", "scope_id": work.payload["scope_id"]}
+                        android = messaging.AndroidConfig(priority="high", ttl=0 if ring else None)
+                        messages = [messaging.Message(token=token, data={**data, "identity_id": identity_id} if ring else data, android=android) for token, identity_id in recipients[:100]]
+                        response = await asyncio.wait_for(messaging.send_each_async(messages), timeout=min(20, remaining))
                         retry = False
-                        for token, result in zip(tokens[:100], response.responses):
+                        for (token, identity_id), result in zip(recipients[:100], response.responses):
                             if result.exception:
                                 if isinstance(result.exception, messaging.UnregisteredError):
-                                    await database_sync_to_async(PushSubscription.objects.filter(token=token).delete, thread_sensitive=False, executor=self.database_executor)()
+                                    await database_sync_to_async(PushSubscription.objects.filter(token=token, identity_id=identity_id).delete, thread_sensitive=False, executor=self.database_executor)()
                                 else:
                                     retry = True
                         if retry:
                             raise DomainError("push_unavailable", "A push delivery needs retry", 503)
-                        if len(tokens) > 100:
-                            work.payload["after_token"] = tokens[99]
+                        if len(recipients) > 100:
+                            work.payload["after_token"] = recipients[99][0]
                             complete = False
             except Exception as error:
                 await database_sync_to_async(finish_work, thread_sensitive=False, executor=self.database_executor)(work, self.owner, error=error)

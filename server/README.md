@@ -4,7 +4,7 @@ The server keeps the group side of Jay in sync: identities, memberships, shared 
 
 It also tracks when each member is expected to answer an alarm. If no dismissal or snooze arrives before the ringing deadline, the server records an ignored outcome, including when the device is offline. With **Answer as one**, a member's dismissal or missed response resolves the group's corresponding occurrences, while a snooze moves every member's next ring and response deadline to the same time. Devices using the same imported profile are one member and always answer together.
 
-While Jay is open, authenticated server-sent events tell it when something changes. Firebase and periodic synchronisation help it catch up in the background.
+While Jay is open, authenticated server-sent events tell it when something changes. Firebase and periodic synchronisation help it catch up in the background. Hold to ring also uses Firebase to wake updated apps in the background; a fresh live lease starts the sound and an informational notification, and release or lease expiry clears both.
 
 ## Local development
 
@@ -42,7 +42,7 @@ The Android emulator can reach this API at `http://10.0.2.2:8000`. Use a debug b
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection URL used by the API and migrations |
-| `PUBLIC_URL` | Public base URL included in generated invitations |
+| `PUBLIC_URL` | Canonical public API base URL used in invitations and group-ring wakeups; must match the server address configured in the app |
 | `INVITE_LIFETIME_HOURS` | Default lifetime of a reusable invitation, 24 hours |
 | `SECRET_KEY` | Required signing secret, identical on web and worker replicas |
 | `ALLOWED_HOSTS` | Comma-separated public hostnames; include the Render hostname and custom domain |
@@ -60,7 +60,7 @@ The variables below are currently relevant to the official jay.poppybit.com depl
 | Variable | Purpose |
 | --- | --- |
 | `ANDROID_APP_LINKS` | JSON object mapping Android package names to lists of SHA-256 signing certificate fingerprints; defaults to `{}` |
-| `FIREBASE_CREDENTIALS_JSON` | Optional Firebase service-account JSON for immediate synchronisation pushes |
+| `FIREBASE_CREDENTIALS_JSON` | Optional Firebase service-account JSON for immediate synchronisation pushes and background group-ring wakeups |
 | `GOOGLE_PLAY_CREDENTIALS_JSON` | Optional Play Integrity service-account JSON for paid-app entitlement verification |
 | `PLAY_ENTITLEMENT_LIFETIME_HOURS` | Lifetime of a verified Play entitlement, defaulting to 48 hours |
 
@@ -162,6 +162,8 @@ Run these as separate supervised processes, adjusting the bind address and port 
 mise exec -- .venv/bin/uvicorn jay_server.asgi:application --host 0.0.0.0 --port 8000
 mise exec -- .venv/bin/python manage.py run_worker
 ```
+
+For background group ringing, apply migration `0015` before starting the updated web and worker processes, then publish the updated app. Existing 1.2.5 and 1.2.6 apps keep their available group features. Background-ring support is registered per push token, so updating one device does not send unsupported ring wakeups to older devices using the same profile. Set `PUBLIC_URL` to the API address configured in the app; Firebase credentials and a running worker are required for background wakeups.
 
 Use `/health/live` for web liveness, `/health/ready` for database and schema readiness, and `manage.py check_worker` for worker progress and failures. Stop processes gracefully, keep database backups, and test restoration. Rolling deployments require schema compatibility between overlapping versions.
 

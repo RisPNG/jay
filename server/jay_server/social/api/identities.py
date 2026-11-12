@@ -99,7 +99,9 @@ class PushSubscriptionView(APIView):
         serializer.is_valid(raise_exception=True)
         with mutation(request, serializer.validated_data) as receipt:
             if not receipt.completed_at:
-                PushSubscription.objects.update_or_create(token=serializer.validated_data["token"], defaults={"identity": request.user, "updated_at": timezone.now()})
+                PushSubscription.objects.update_or_create(token=serializer.validated_data["token"], defaults={
+                    "identity": request.user, "group_ring_enabled": request.headers.get("X-Jay-Group-Ring") == "1", "updated_at": timezone.now(),
+                })
                 receipt.status, receipt.response = 204, None
         return Response(status=204)
 

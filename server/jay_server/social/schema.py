@@ -44,6 +44,8 @@ class JaySchema(AutoSchema):
         parameters.append(OpenApiParameter("X-Jay-Protocol", OpenApiTypes.STR, OpenApiParameter.HEADER, description="Send 3 to support hourly alarm schedules. Omitted or older values receive calendar schedules only."))
         if not self.path.endswith("/identities/register"):
             parameters.append(OpenApiParameter("X-Jay-Installation", OpenApiTypes.STR, OpenApiParameter.HEADER, description="Private installation credential bound to a verified paid Play installation; never part of a profile export."))
+        if self.method == "PUT" and self.path.endswith("/identity/push-token"):
+            parameters.append(OpenApiParameter("X-Jay-Group-Ring", OpenApiTypes.STR, OpenApiParameter.HEADER, description="Send 1 when this installation supports background group-ring notifications. Omission disables ring wakes for this token without changing synchronization pushes."))
         if self.method in {"POST", "PUT", "PATCH", "DELETE"} and not self.path.endswith("/identities/register"):
             parameters.append(OpenApiParameter("Idempotency-Key", OpenApiTypes.UUID, OpenApiParameter.HEADER, required=True, description="Stable UUID for this exact saved operation; reuse on every retry."))
         if self.method == "GET" and self.path.endswith("/sync"):

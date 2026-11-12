@@ -32,6 +32,22 @@ class SocialActivityCoordinatorTest {
     }
 
     @Test
+    fun liveUpdatesBindToOneSharedServiceUntilTheActivityStops() {
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).get()
+        val coordinator = SocialActivityCoordinator(activity)
+
+        coordinator.startLiveSync()
+        coordinator.startLiveSync()
+
+        val application = shadowOf(ApplicationProvider.getApplicationContext<Application>())
+        val bound = application.boundServiceConnections
+        assertEquals(1, bound.size)
+        coordinator.stopLiveSync()
+        assertTrue(application.boundServiceConnections.isEmpty())
+        coordinator.stopLiveSync()
+    }
+
+    @Test
     fun incomingLinksAreQueuedOnceForTheirExistingFlows() {
         val coordinator = SocialActivityCoordinator(
             Robolectric.buildActivity(ComponentActivity::class.java).get()

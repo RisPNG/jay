@@ -9,6 +9,7 @@ import com.bnyro.clock.util.RingingCoordinator
 import com.bnyro.clock.util.RingingSession
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -24,6 +25,7 @@ import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowMediaPlayer
 import org.robolectric.shadows.util.DataSource
 import java.io.IOException
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
@@ -108,6 +110,42 @@ class GroupRingPlaybackTest {
         shadowOf(Looper.getMainLooper()).idleFor(1, TimeUnit.SECONDS)
         assertNull(RingingCoordinator.selected)
         assertEquals(ShadowMediaPlayer.State.END, players.single().state)
+    }
+
+    @Test
+    fun delayedFramesOnlyRingForTheirRemainingServerLease() {
+        val serverTime = Instant.parse("2026-11-12T12:00:00Z")
+        val event = Json.parseToJsonElement("""{"session_id":"delayed","active":true,"lease_seconds":5,"server_time":"$serverTime","expires_at":"${serverTime.plusSeconds(2)}"}""").jsonObject
+        playback.receive(event)
+
+        assertSame(playback, RingingCoordinator.selected)
+        shadowOf(Looper.getMainLooper()).idleFor(2, TimeUnit.SECONDS)
+
+        assertNull(RingingCoordinator.selected)
+        assertEquals(ShadowMediaPlayer.State.END, players.single().state)
+    }
+
+    @Test
+    fun anExpiredFrameCannotStartPlayback() {
+        val now = Instant.ofEpochMilli(System.currentTimeMillis())
+        playback.receive(Json.parseToJsonElement("""{"session_id":"expired","active":true,"lease_seconds":5,"expires_at":"${now.minusSeconds(1)}"}""").jsonObject)
+
+        assertNull(RingingCoordinator.selected)
+        assertTrue(players.isEmpty())
+    }
+
+    @Test
+    fun leaseChangesReportTheRemainingCallersUntilTheirLastExpiry() {
+        val updates = mutableListOf<List<String>>()
+        playback = GroupRingPlayback(ApplicationProvider.getApplicationContext<Application>()) { events ->
+            updates.add(events.map { requireNotNull(it["session_id"]).jsonPrimitive.content })
+        }
+        playback.receive(Json.parseToJsonElement("""{"session_id":"first","active":true,"lease_seconds":5}""").jsonObject)
+        playback.receive(Json.parseToJsonElement("""{"session_id":"second","active":true,"lease_seconds":5}""").jsonObject)
+        playback.receive(Json.parseToJsonElement("""{"session_id":"first","active":false,"lease_seconds":5}""").jsonObject)
+        shadowOf(Looper.getMainLooper()).idleFor(5, TimeUnit.SECONDS)
+
+        assertEquals(listOf(listOf("first"), listOf("first", "second"), listOf("second"), emptyList()), updates)
     }
 
     @Test

@@ -590,7 +590,7 @@ class SocialRepository(
         SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl)).holdGroupRing(groupId)
     }
 
-    suspend fun followLiveChanges() = withContext(Dispatchers.IO) {
+    suspend fun followLiveChanges(onRing: suspend (JsonObject?) -> Unit) = withContext(Dispatchers.IO) {
         val serverUrl = Preferences.instance.getString(
             SocialPreferences.serverUrlKey,
             DEFAULT_SERVER_URL
@@ -603,7 +603,6 @@ class SocialRepository(
                     registeredIdentity = serverUrl to identity.id
                 }
             }
-            val playback = withContext(Dispatchers.Main) { GroupRingPlayback(context) }
             val wake = Channel<Unit>(Channel.CONFLATED)
             val pendingMutex = Mutex()
             var pendingScopes: Set<String>? = emptySet()
@@ -625,7 +624,18 @@ class SocialRepository(
                         configuredServer.trimEnd('/') == serverUrl.trimEnd('/') &&
                             DeviceIdentityStore.loadOrCreate(context, configuredServer).id == identity.id
                     },
-                    onRing = { withContext(Dispatchers.Main) { playback.receive(it) } },
+                    onRing = { event ->
+                        val clock = socialDao.getClock()
+                        withContext(Dispatchers.Main) {
+                            val serverTime = when {
+                                clock == null -> System.currentTimeMillis()
+                                clock.bootCount == android.provider.Settings.Global.getInt(context.contentResolver, android.provider.Settings.Global.BOOT_COUNT, 0) ->
+                                    clock.serverMillis + android.os.SystemClock.elapsedRealtime() - clock.elapsedMillis
+                                else -> System.currentTimeMillis() + clock.serverMillis - clock.wallMillis
+                            }
+                            onRing(event?.let { JsonObject(it + ("server_time" to JsonPrimitive(Instant.ofEpochMilli(serverTime).toString()))) })
+                        }
+                    },
                     onChange = { scopes ->
                         pendingMutex.withLock {
                             pendingScopes = if (pendingScopes == null || scopes == null) null else pendingScopes.orEmpty() + scopes
@@ -636,7 +646,7 @@ class SocialRepository(
             } finally {
                 synchronizeJob.cancel()
                 wake.close()
-                withContext(NonCancellable + Dispatchers.Main) { playback.receive(null) }
+                withContext(NonCancellable + Dispatchers.Main) { onRing(null) }
             }
         }
     }

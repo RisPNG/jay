@@ -1862,6 +1862,14 @@
                     },
                     {
                         "in": "header",
+                        "name": "X-Jay-Group-Ring",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Send 1 when this installation supports background group-ring notifications. Omission disables ring wakes for this token without changing synchronization pushes."
+                    },
+                    {
+                        "in": "header",
                         "name": "X-Jay-Installation",
                         "schema": {
                             "type": "string"

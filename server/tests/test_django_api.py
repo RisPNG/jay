@@ -9,7 +9,7 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from jay_server.social.models import DeliveryWork, Group, GroupMembership, Identity, SharedSound, SharedTimer, SyncScope, SyncVersion
+from jay_server.social.models import DeliveryWork, Group, GroupMembership, Identity, PushSubscription, SharedSound, SharedTimer, SyncScope, SyncVersion
 from jay_server.social.synchronization import publish_changes
 
 
@@ -21,6 +21,27 @@ def test_registration_cannot_replace_credentials(client):
     response = client.post("/v1/identities/register", {"id": "1" * 64, "name": "Mallory", "token": "different" * 8, "time_zone": "UTC"}, format="json")
     assert response.status_code == 409
     assert bytes(Identity.objects.get(pk="1" * 64).token_hash) == before
+
+
+def test_push_token_ring_support_is_installation_scoped_and_disabled_on_downgrade(client):
+    legacy = client.put("/v1/identity/push-token", {"token": "legacy"}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert legacy.status_code == 204
+    assert PushSubscription.objects.get(token="legacy").group_ring_enabled is False
+    upgraded = client.put("/v1/identity/push-token", {"token": "current"}, format="json", headers={
+        "Idempotency-Key": str(uuid4()), "X-Jay-Group-Ring": "1",
+    })
+    assert upgraded.status_code == 204
+    assert PushSubscription.objects.get(token="current").group_ring_enabled is True
+    assert PushSubscription.objects.get(token="legacy").group_ring_enabled is False
+    downgraded = client.put("/v1/identity/push-token", {"token": "current"}, format="json", headers={"Idempotency-Key": str(uuid4())})
+    assert downgraded.status_code == 204
+    assert PushSubscription.objects.get(token="current").group_ring_enabled is False
+
+
+def test_legacy_server_inserts_keep_ring_wakes_disabled(client):
+    with connection.cursor() as cursor:
+        cursor.execute("INSERT INTO social_pushsubscription (token, identity_id, updated_at) VALUES (%s, %s, %s)", ["legacy-server", "1" * 64, timezone.now()])
+    assert PushSubscription.objects.get(token="legacy-server").group_ring_enabled is False
 
 
 def test_timer_retry_and_payload_binding(client, group, timer_payload):

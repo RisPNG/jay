@@ -1,21 +1,25 @@
 package com.bnyro.clock.social.presentation
 
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.core.net.toUri
-import androidx.lifecycle.lifecycleScope
-import com.bnyro.clock.App
 import com.bnyro.clock.navigation.HomeRoutes
+import com.bnyro.clock.social.data.GroupRingService
 import com.bnyro.clock.social.data.SocialLink
 import com.bnyro.clock.social.data.SocialPreferences
 import com.bnyro.clock.util.Preferences
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 class SocialActivityCoordinator(private val activity: ComponentActivity) {
-    private var liveSyncJob: Job? = null
+    private var liveSyncBound = false
+    private val liveSyncConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, service: IBinder) = Unit
+
+        override fun onServiceDisconnected(name: ComponentName) = Unit
+    }
 
     fun receiveLink(intent: Intent?): Boolean {
         if (intent?.action != Intent.ACTION_VIEW) return false
@@ -56,18 +60,19 @@ class SocialActivityCoordinator(private val activity: ComponentActivity) {
     }
 
     fun startLiveSync() {
-        liveSyncJob = activity.lifecycleScope.launch {
-            while (isActive) {
-                runCatching {
-                    (activity.application as App).container.socialRepository.followLiveChanges()
-                }
-                if (isActive) delay(2_000)
-            }
+        if (!liveSyncBound) {
+            liveSyncBound = activity.bindService(
+                Intent(activity, GroupRingService::class.java),
+                liveSyncConnection,
+                Context.BIND_AUTO_CREATE
+            )
         }
     }
 
     fun stopLiveSync() {
-        liveSyncJob?.cancel()
-        liveSyncJob = null
+        if (liveSyncBound) {
+            activity.unbindService(liveSyncConnection)
+            liveSyncBound = false
+        }
     }
 }
