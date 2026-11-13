@@ -96,8 +96,19 @@ fun AlarmPicker(
     var vibrationPatternName by remember {
         mutableStateOf(currentAlarm.vibrationPatternName)
     }
-    var soundName by remember { mutableStateOf(currentAlarm.soundName) }
-    var soundUri by remember { mutableStateOf(currentAlarm.soundUri) }
+    val defaultSoundUri = remember {
+        Preferences.instance.getString(Preferences.defaultAlarmSoundUriKey, null)
+    }
+    val defaultSoundName = remember {
+        Preferences.instance.getString(Preferences.defaultAlarmSoundNameKey, null)
+    }
+    var soundName by remember {
+        mutableStateOf(currentAlarm.soundName ?: if (isNewAlarm) defaultSoundName else null)
+    }
+    var soundUri by remember {
+        mutableStateOf(currentAlarm.soundUri ?: if (isNewAlarm) defaultSoundUri else null)
+    }
+    val displaySoundName = soundName ?: defaultSoundName ?: stringResource(R.string.default_sound)
 
     var startDate by remember { mutableLongStateOf(currentAlarm.startDate) }
     var startWithLaterOffset by remember { mutableStateOf(currentAlarm.startWithLaterOffset) }
@@ -271,7 +282,7 @@ fun AlarmPicker(
                 }
                 SwitchWithDivider(
                     title = stringResource(R.string.sound),
-                    description = soundName ?: stringResource(R.string.default_sound),
+                    description = displaySoundName,
                     isChecked = soundEnabled,
                     icon = Icons.Rounded.Alarm,
                     onClick = {

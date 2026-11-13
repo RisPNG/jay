@@ -31,7 +31,6 @@ import com.bnyro.clock.App
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.Permission
-import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.presentation.screens.alarm.AlarmActivity
 import com.bnyro.clock.presentation.screens.ringing.RingingActivity
 import com.bnyro.clock.ui.MainActivity
@@ -44,9 +43,6 @@ import com.bnyro.clock.util.RingingSession
 import com.bnyro.clock.util.VolumeRamp
 import com.bnyro.clock.util.widgets.TextColor
 import com.bnyro.clock.util.widgets.getColorValue
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 class AlarmService : Service() {
@@ -141,7 +137,6 @@ class AlarmService : Service() {
         unregisterReceiver(alarmActionReceiver)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         super.onDestroy()
-        retoggleAlarm()
     }
 
     override fun onBind(intent: Intent): IBinder? = null
@@ -370,9 +365,6 @@ class AlarmService : Service() {
             }
         )
 
-
-
-
         val dismissAlarmIntent = Intent(ALARM_INTENT_ACTION)
             .putExtra(ACTION_EXTRA_KEY, DISMISS_ACTION)
             .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
@@ -431,18 +423,6 @@ class AlarmService : Service() {
             setDeleteIntent(onDeleteIntent)
             setOngoing(false)
         }.build()
-    }
-    private fun retoggleAlarm() {
-        val id = currentAlarm?.id ?: return
-        val appContext = applicationContext
-        val repository = (application as App).container.alarmRepository
-
-        CoroutineScope(Dispatchers.IO).launch {
-            val fresh = repository.getAlarmById(id) ?: return@launch
-            if (!fresh.enabled || fresh.snoozedUntil != null) return@launch
-
-            CreateUpdateDeleteAlarmUseCase(appContext, repository).updateAlarm(fresh)
-        }
     }
 
     private fun getPendingIntent(intent: Intent, requestCode: Int): PendingIntent =
