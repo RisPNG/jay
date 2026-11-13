@@ -346,7 +346,6 @@ fun SettingsScreen(
                 showDefaultRingtoneDialog = true
             }
 
-
             IconPreference(
                 title = stringResource(R.string.upcoming_alarm),
                 summary = pluralStringResource(
