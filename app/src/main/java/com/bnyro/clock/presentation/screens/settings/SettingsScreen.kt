@@ -339,6 +339,7 @@ fun SettingsScreen(
             ) {
                 showDefaultRingtoneDialog = true
             }
+
             IconPreference(
                 title = stringResource(R.string.upcoming_alarm),
                 info = stringResource(R.string.upcoming_alarm_info),
@@ -351,6 +352,7 @@ fun SettingsScreen(
             ) {
                 showUpcomingAlarmDurationDialog = true
             }
+
             IconPreference(
                 title = stringResource(R.string.volume_ramp),
                 summary = volumeRampSummary(alarmVolumeRampSeconds),
@@ -505,6 +507,7 @@ fun SettingsScreen(
             ) {
                 documentPickerLauncher.launch(arrayOf("application/json", "text/plain"))
             }
+
             IconPreference(
                 title = stringResource(R.string.export_backup),
                 summary = stringResource(R.string.export_backup_description),
@@ -524,6 +527,7 @@ fun SettingsScreen(
             ) {
                 uriHandler.openUri("https://github.com/you-apps/ClockYou")
             }
+
             IconPreference(
                 title = stringResource(R.string.clock_you_version), summary = stringResource(
                     R.string.version_value, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE
