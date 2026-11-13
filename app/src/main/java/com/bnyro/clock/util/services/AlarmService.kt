@@ -482,9 +482,6 @@ class AlarmService : Service() {
             }
         )
 
-
-
-
         val dismissAlarmIntent = Intent(ALARM_INTENT_ACTION)
             .putExtra(ACTION_EXTRA_KEY, DISMISS_ACTION)
             .putExtra(AlarmHelper.EXTRA_ID, alarm.id)
@@ -546,6 +543,7 @@ class AlarmService : Service() {
             setOngoing(false)
         }.build()
     }
+
     private fun getPendingIntent(intent: Intent, requestCode: Int): PendingIntent =
         PendingIntent.getBroadcast(
             this,

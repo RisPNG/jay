@@ -9,18 +9,12 @@ import com.bnyro.clock.App
 import com.bnyro.clock.social.data.SocialAlarmSchedule
 import com.bnyro.clock.social.data.SocialIgnoredAlarmWorker
 import com.bnyro.clock.social.data.SocialPreferences
-import com.bnyro.clock.domain.usecase.CreateUpdateDeleteAlarmUseCase
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.TimeHelper
 import com.bnyro.clock.util.services.AlarmService
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.Instant
-import kotlin.time.Duration.Companion.milliseconds
 
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -94,8 +88,5 @@ class AlarmReceiver : BroadcastReceiver() {
         ContextCompat.startForegroundService(context, playAlarm)
 
         AlarmHelper.enqueue(context, alarm)
-
-
-
     }
 }
