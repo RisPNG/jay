@@ -347,4 +347,14 @@
     <string name="snoozed_named_alarm">推迟了 %1$s 个闹钟</string>
     <string name="alarm_snoozed_for">%1$s 内（已推迟）</string>
     <string name="default_vibration_pattern">默认</string>
+    <string name="name">名称</string>
+    <string name="right">右</string>
+    <string name="left">左</string>
+    <string name="subtract_seconds">减去 %1$d 秒</string>
+    <string name="ringing_snooze_minutes">推迟 %1$d 分钟</string>
+    <string name="ringing_add_seconds">添加 %1$d 秒</string>
+    <string name="ringing_add_minutes">添加 %1$d 分钟</string>
+    <string name="default_analog_widget">默认</string>
+    <string name="system_analog_widget">系统默认</string>
+    <string name="alarm_time_label">%1$s 闹钟</string>
 </resources>

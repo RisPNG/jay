@@ -410,4 +410,14 @@
     <string name="snoozed_named_alarm">Odłożono alarm: %1$s</string>
     <string name="alarm_snoozed_for">Za %1$s (odłożony)</string>
     <string name="default_vibration_pattern">Domyślny</string>
+    <string name="name">Nazwa</string>
+    <string name="right">Prawo</string>
+    <string name="left">Lewo</string>
+    <string name="subtract_seconds">Odejmij %1$d sek.</string>
+    <string name="ringing_snooze_minutes">Drzemka (%1$d min.)</string>
+    <string name="ringing_add_seconds">Dodaj %1$d sek.</string>
+    <string name="ringing_add_minutes">Dodaj %1$d min.</string>
+    <string name="default_analog_widget">Domyślny</string>
+    <string name="system_analog_widget">Domyślny systemowy</string>
+    <string name="alarm_time_label">Alarm: %1$s</string>
 </resources>
