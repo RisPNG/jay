@@ -94,7 +94,7 @@ The [full server guide](server/README.md) covers the setup, and the [access guid
   <a href="https://play.google.com/store/apps/details?id=com.rispng.jay"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" width="180" alt="Get it on Google Play"></a>
 </p>
 
-You will need **Android 6.0 or newer**. Open **Assets** on the GitHub release and choose the production APK. There are a few files there, so here is what each one is for:
+You will need **Android 7.0 or newer**. Open **Assets** on the GitHub release and choose the production APK. There are a few files there, so here is what each one is for:
 
 | File | Who it is for |
 | --- | --- |

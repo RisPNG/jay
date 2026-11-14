@@ -53,7 +53,7 @@ See [shared sounds and Play access](docs/entitlements.md) for installation purch
 
 The Android build uses NDK 29.0.14206865 and CMake 3.31.6, pinned in `app/build.gradle.kts`. Install these through Android SDK Manager before building, or allow Android Gradle Plugin to install them after accepting the SDK licenses. CMake fetches the official libFLAC 1.5.0 source archive and verifies its pinned SHA-256. Initial native configuration requires network access; subsequent builds reuse the source in the build cache.
 
-`app/src/main/cpp/social/flac_encoder.c` implements the shared-audio encoder using libFLAC. It builds for armeabi-v7a, arm64-v8a, x86 and x86_64, retaining API 23 support. The library is statically linked into `libjay_audio.so`; command-line programs, C++ bindings, Ogg support and background encoding threads are disabled. The Xiph BSD license is included in the APK at `assets/licenses/libFLAC.txt`. Keep its version, source hash and license synchronized when updating the library.
+`app/src/main/cpp/social/flac_encoder.c` implements the shared-audio encoder using libFLAC. It builds for armeabi-v7a, arm64-v8a, x86 and x86_64, retaining API 24 support. The library is statically linked into `libjay_audio.so`; command-line programs, C++ bindings, Ogg support and background encoding threads are disabled. The Xiph BSD license is included in the APK at `assets/licenses/libFLAC.txt`. Keep its version, source hash and license synchronized when updating the library.
 
 ## How the branches fit together
 
