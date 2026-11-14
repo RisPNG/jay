@@ -452,4 +452,14 @@
     <string name="snoozed_alarm">تم تأجيل المنبه</string>
     <string name="alarm_snoozed_for">في %1$s (مؤجَّل)</string>
     <string name="default_vibration_pattern">الافتراضي</string>
+    <string name="name">الاسم</string>
+    <string name="right">يمين</string>
+    <string name="left">يسار</string>
+    <string name="subtract_seconds">اطرح %1$d ثانية</string>
+    <string name="ringing_add_seconds">إضافة %1$d ثانية</string>
+    <string name="ringing_snooze_minutes">تأجيل %1$d دقيقة</string>
+    <string name="ringing_add_minutes">إضافة %1$d دقيقة</string>
+    <string name="default_analog_widget">الافتراضي</string>
+    <string name="system_analog_widget">افتراضي النظام</string>
+    <string name="alarm_time_label">منبه %1$s</string>
 </resources>
