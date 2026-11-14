@@ -410,4 +410,14 @@
     <string name="alarm_snoozed_for">Через %1$s (відкладено)</string>
     <string name="duration">Тривалість</string>
     <string name="default_vibration_pattern">Типово</string>
+    <string name="name">Назва</string>
+    <string name="right">Управо</string>
+    <string name="left">Уліво</string>
+    <string name="subtract_seconds">Відняти %1$d с</string>
+    <string name="ringing_snooze_minutes">Відкласти на %1$d хв</string>
+    <string name="ringing_add_seconds">Додати %1$d с</string>
+    <string name="ringing_add_minutes">Додати %1$d хв</string>
+    <string name="default_analog_widget">Типово</string>
+    <string name="system_analog_widget">Типовий системний</string>
+    <string name="alarm_time_label">%1$s будильник</string>
 </resources>
