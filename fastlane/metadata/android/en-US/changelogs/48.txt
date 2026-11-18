@@ -1,0 +1,7 @@
+- Ring group members in the background with a coloured notification.
+- Prefer the phone speaker for alarms and timers.
+- Add app language and defaults for alarm sounds and clock faces.
+- Improve centred add buttons, ringing haptics, group menus, and translations.
+- Hide navigation when only one tab is enabled.
+- Keep group support for 1.2.5 and 1.2.6.
+- Require Android 7.0 or newer.
