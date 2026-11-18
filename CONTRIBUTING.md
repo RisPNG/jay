@@ -75,7 +75,7 @@ flowchart LR
 | `main-canary` | Clock You together with every active contribution still waiting upstream. It contains no social code and publishes nothing. |
 | `jay` | The social extension on top of `main-canary`, with the integration points described above. All prereleases and stable releases come from here. |
 
-Each contribution branch delivers one complete change within one application area. Changes may span files within that area. Split work across different areas into separate, ordered contribution branches, each with a focused PR and documented dependencies and overlapping changes.
+Each contribution branch delivers one complete change within one application area. Changes may span files within that area. Give each change one owning branch. When a contribution needs another pending change, record the prerequisite and submission order, then review the dependent PR against its intended base to make sure it introduces only its own work.
 
 Contribution branches and `main-canary` use Clock You's build, dependency, and CI configuration as it appears on `main`. Keep `mise.toml` and other Mise configuration, personal development scripts and editor settings, and other Jay-specific tooling on `jay`.
 
@@ -111,6 +111,17 @@ Every contribution that is still active receives the updated `main`, including t
 
 From there, the updated `main` is merged into `main-canary`, followed by every active contribution branch. Finally, `main-canary` is merged into `jay`, where conflict resolution stays within the documented integration points.
 
+### Pending contribution dependencies
+
+| Owner to submit first | Dependent contribution | Scope to check after the prerequisite reaches `main` |
+| --- | --- | --- |
+| `centered-fab-layout` | `advanced-alarm-menu` | Keep the alarm menu in the dependent PR. The FAB sizing and layout repair belong to the owner. |
+| `settings-information` | `alarm-snooze-limit`, `alarm-timeout-and-restart`, and `timer-repetitions-and-timeouts` | Keep the feature-specific explanations with their features. The shared info controls, general settings explanations, and picker previews belong to the owner. |
+| `timer-notification-lifecycle` | `timer-repetitions-and-timeouts` | Keep the monotonic countdown and notification lifecycle in the first PR. The dependent PR adds repeat scheduling, per-timer timeouts, and repeat backup progress. |
+| `alarm-timeout-and-restart` and `timer-repetitions-and-timeouts` | `ringing-priority` | Keep ring selection and handoff in the dependent PR. The alarm and timer models, settings, and timing policies belong to their respective owners. |
+
+The alarm recurrence, snooze limit, and timeout contributions each add a different Room migration from the same upstream schema version. Allocate the next migration on the accepted upstream base as each PR is prepared. The fifteen-minute default snooze is a separate behaviour from limiting the number of snoozes and needs its own PR.
+
 ### Tidying up finished branches
 
 Local contribution branches can be removed when their tracked branches have been deleted from `origin` and their work is preserved in `main` or `main-canary`, or superseded by an accepted upstream implementation. Linked worktrees and uncommitted changes need a check before removal too.
@@ -119,7 +130,7 @@ A missing remote branch on its own does not tell us whether the work is safe to 
 
 ### Checking the result and sharing it
 
-Compare each active contribution branch and `main-canary` with `main` before pushing. Check that the diff stays within the intended Clock You changes and follows the build, tooling, and test rules above.
+Before merging into `main-canary` or pushing, compare each active contribution branch with `main` and every other active contribution. Check patches and behaviour for duplicate changes, including equivalent implementations with different commit hashes. Resolve overlap in the affected contribution branches and repeat the comparison against each intended PR base. Compare `main-canary` with `main` and check that all resulting diffs follow the build, tooling, and test rules above.
 
 Use Clock You's Gradle tasks to verify changed contribution branches and `main-canary`. For an upstream update, run Jay's server tests against PostgreSQL, run its Android unit tests, and compile its debug and release variants.
 
