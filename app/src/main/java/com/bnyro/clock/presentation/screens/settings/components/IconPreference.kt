@@ -19,6 +19,7 @@ fun IconPreference(
     title: String,
     summary: String? = null,
     imageVector: ImageVector,
+    info: String? = null,
     onClick: () -> Unit = {}
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -33,8 +34,10 @@ fun IconPreference(
         verticalAlignment = Alignment.CenterVertically
     ) {
         PreferenceItem(
+            modifier = Modifier.weight(1f),
             title = title,
-            summary = summary
+            summary = summary,
+            info = info
         )
         ClickableIcon(
             imageVector = imageVector,

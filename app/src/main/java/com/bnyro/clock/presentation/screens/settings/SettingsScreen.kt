@@ -3,6 +3,8 @@ package com.bnyro.clock.presentation.screens.settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -70,6 +72,7 @@ import com.bnyro.clock.navigation.homeRoutes
 import com.bnyro.clock.presentation.components.ClickableIcon
 import com.bnyro.clock.presentation.components.ScrollPickerDialog
 import com.bnyro.clock.presentation.features.RingtonePickerDialog
+import com.bnyro.clock.presentation.screens.alarm.components.AlarmPickerSelector
 import com.bnyro.clock.presentation.screens.alarm.model.AlarmModel
 import com.bnyro.clock.presentation.screens.clock.model.ClockModel
 import com.bnyro.clock.presentation.screens.settings.components.ButtonGroupPref
@@ -78,6 +81,7 @@ import com.bnyro.clock.presentation.screens.settings.components.IconPreference
 import com.bnyro.clock.presentation.screens.settings.components.SettingsCategory
 import com.bnyro.clock.presentation.screens.settings.components.SwitchPref
 import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
+import com.bnyro.clock.presentation.screens.timer.components.TimerPickerSelector
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.TimerService
@@ -298,6 +302,25 @@ fun SettingsScreen(
 
             ButtonGroupPref(
                 title = stringResource(R.string.alarm_picker_style),
+                preview = { style ->
+                    var hours by remember { mutableIntStateOf(7) }
+                    var minutes by remember { mutableIntStateOf(30) }
+                    Box(
+                        modifier = if (style == PickerStyle.WHEEL) {
+                            Modifier.horizontalScroll(rememberScrollState())
+                        } else Modifier
+                    ) {
+                        AlarmPickerSelector(
+                            pickerStyle = style,
+                            initialHours = hours,
+                            initialMinutes = minutes,
+                            isEditing = true,
+                            useVerticalLayout = true,
+                            onHoursChanged = { hours = it },
+                            onMinutesChanged = { minutes = it }
+                        )
+                    }
+                },
                 options = PickerStyle.entries.map {
                     stringResource(
                         when (it) {
@@ -339,6 +362,7 @@ fun SettingsScreen(
                 showDefaultRingtoneDialog = true
             }
 
+
             var showUpcomingAlarmDurationDialog by remember { mutableStateOf(false) }
             var upcomingAlarmDurationMinutes by remember {
                 mutableIntStateOf(
@@ -350,6 +374,7 @@ fun SettingsScreen(
             }
             IconPreference(
                 title = stringResource(R.string.upcoming_alarm),
+                info = stringResource(R.string.upcoming_alarm_info),
                 summary = pluralStringResource(
                     R.plurals.duration_minutes,
                     upcomingAlarmDurationMinutes,
@@ -406,6 +431,17 @@ fun SettingsScreen(
 
             ButtonGroupPref(
                 title = stringResource(R.string.timer_picker_style),
+                preview = { style ->
+                    var seconds by remember(style) { mutableIntStateOf(300) }
+                    TimerPickerSelector(
+                        pickerStyle = style,
+                        seconds = seconds,
+                        onSecondsChanged = { seconds = it },
+                        modifier = if (style == PickerStyle.WHEEL) {
+                            Modifier.horizontalScroll(rememberScrollState())
+                        } else Modifier
+                    )
+                },
                 options = PickerStyle.entries.map {
                     stringResource(
                         when (it) {
