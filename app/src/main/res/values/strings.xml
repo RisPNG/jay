@@ -190,6 +190,7 @@
     <string name="name">Name</string>
     <string name="plus_button_position">Plus button position</string>
     <string name="right">Right</string>
+    <string name="center">Center</string>
     <string name="left">Left</string>
     <string name="start_tab">Start tab</string>
     <string name="start_week_on">Start week on</string>
@@ -426,4 +427,7 @@
     <string name="alarm_timeout_info">Choose how long each alarm alert rings before it stops automatically.</string>
     <string name="timer_timeout_info">Choose how long the alert rings after a timer finishes.</string>
     <string name="upcoming_alarm_info">Choose how long before an alarm starts showing its upcoming notification.</string>
+    <string name="language">Language</string>
+    <string name="select_language">Select language</string>
+    <string name="system_default">System default</string>
 </resources>

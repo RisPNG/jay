@@ -2,14 +2,23 @@ package com.bnyro.clock.presentation.screens.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,17 +26,21 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.MoreTime
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
@@ -36,13 +49,17 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModelProvider
 import com.bnyro.clock.BuildConfig
 import com.bnyro.clock.R
@@ -75,6 +92,9 @@ import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.social.data.PlayInstallationStore
 import com.bnyro.clock.social.presentation.SocialSettingsSection
 import com.bnyro.clock.social.presentation.JaySupportPreference
+import com.bnyro.clock.util.services.TimerService
+import java.util.Locale
+import org.xmlpull.v1.XmlPullParser
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -94,6 +114,11 @@ fun SettingsScreen(
     var showAlarmVolumeRampDialog by remember { mutableStateOf(false) }
     var showTimerVolumeRampDialog by remember { mutableStateOf(false) }
     var showDefaultRingtoneDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+
+    val displayLocale = LocalConfiguration.current.locales[0]
+    val currentLanguage = AppCompatDelegate.getApplicationLocales()[0]
+    val systemDefault = stringResource(R.string.system_default)
 
     var timerIncrementSeconds by remember {
         mutableIntStateOf(
@@ -186,6 +211,18 @@ fun SettingsScreen(
             }
             SettingsCategory(stringResource(R.string.general))
 
+            val languageSummary = currentLanguage?.getDisplayName(displayLocale)
+                ?.replaceFirstChar { it.titlecase(displayLocale) }
+                ?: systemDefault
+
+            IconPreference(
+                title = stringResource(R.string.language),
+                summary = languageSummary,
+                imageVector = Icons.Default.Language
+            ) {
+                showLanguageDialog = true
+            }
+
             ButtonGroupPref(
                 title = stringResource(R.string.theme),
                 options = SettingsModel.Theme.entries.map { stringResource(it.resId) },
@@ -234,6 +271,7 @@ fun SettingsScreen(
                 options = SettingsModel.FabAlignment.entries.map { alignment ->
                     when (alignment) {
                         SettingsModel.FabAlignment.LEFT -> stringResource(R.string.left)
+                        SettingsModel.FabAlignment.CENTER -> stringResource(R.string.center)
                         SettingsModel.FabAlignment.RIGHT -> stringResource(R.string.right)
                     }
                 },
@@ -580,6 +618,76 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.surfaceVariant
             )
         }
+    }
+
+    if (showLanguageDialog) {
+        val supportedLanguages = remember(context.resources) {
+            buildList<Locale?> {
+                add(null)
+                context.resources.getXml(R.xml.locales_config).use { locales ->
+                    while (locales.next() != XmlPullParser.END_DOCUMENT) {
+                        if (locales.eventType == XmlPullParser.START_TAG && locales.name == "locale") {
+                            val tag = locales.getAttributeValue("http://schemas.android.com/apk/res/android", "name")
+                            add(Locale.forLanguageTag(tag))
+                        }
+                    }
+                }
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text(stringResource(R.string.select_language)) },
+            text = {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(350.dp)
+                        .selectableGroup()
+                ) {
+                    items(supportedLanguages) { language ->
+                        val selected = language == currentLanguage
+                        val displayName = if (language == null) {
+                            systemDefault
+                        } else {
+                            language.getDisplayName(language).replaceFirstChar { it.titlecase(language) }
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = selected,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        showLanguageDialog = false
+                                        AppCompatDelegate.setApplicationLocales(
+                                            LocaleListCompat.forLanguageTags(language?.toLanguageTag().orEmpty())
+                                        )
+                                    }
+                                )
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selected,
+                                onClick = null
+                            )
+                            Text(
+                                text = displayName,
+                                modifier = Modifier.padding(start = 16.dp),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
     }
 
     if (showDefaultRingtoneDialog) {
