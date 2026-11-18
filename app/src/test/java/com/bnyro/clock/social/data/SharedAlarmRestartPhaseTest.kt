@@ -27,6 +27,7 @@ import com.bnyro.clock.social.domain.SocialOccurrenceDto
 import com.bnyro.clock.social.domain.SyncedResource
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.Preferences
+import com.bnyro.clock.util.RingingCoordinator
 import com.bnyro.clock.util.services.AlarmService
 import java.time.Instant
 import java.time.LocalDate
@@ -39,6 +40,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -174,6 +176,7 @@ class SharedAlarmRestartPhaseTest {
         try {
             controller.get().onStartCommand(Intent(context, AlarmService::class.java)
                 .putExtra(AlarmHelper.EXTRA_ID, localId).putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, ring), 0, 1)
+            val ringing = requireNotNull(RingingCoordinator.selected)
             shadowOf(context).nextStartedActivity
             Preferences.edit { putLong("${SocialPreferences.alarmDeadlinePrefix}$localId", ring + 10 * 60_000L) }
             social.socialDao().putResources(listOf(SyncedResource("group", "occurrence", "occurrence", Json.encodeToString(SocialOccurrenceDto(
@@ -188,8 +191,7 @@ class SharedAlarmRestartPhaseTest {
             assertEquals(ring + 5 * 60_000L, Preferences.instance.getLong("${SocialPreferences.alarmDeadlinePrefix}$localId", -1L))
             assertFalse(shadowOf(context).broadcastIntents.any { it.action == AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION })
             assertNull(shadowOf(context).nextStartedActivity)
-            val playing = AlarmService::class.java.getDeclaredField("isPlaying").apply { isAccessible = true }
-            assertTrue(playing.getBoolean(controller.get()))
+            assertSame(ringing, RingingCoordinator.selected)
         } finally {
             controller.destroy()
         }
@@ -204,6 +206,7 @@ class SharedAlarmRestartPhaseTest {
         try {
             controller.get().onStartCommand(Intent(context, AlarmService::class.java)
                 .putExtra(AlarmHelper.EXTRA_ID, other.id).putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, trigger), 0, 1)
+            val ringing = requireNotNull(RingingCoordinator.selected)
             shadowOf(context).nextStartedActivity
             social.socialDao().putResources(listOf(SyncedResource("group", "occurrence", "occurrence", Json.encodeToString(SocialOccurrenceDto(
                 "alarm", occurrenceId, "pending", 1, triggerAt = Instant.ofEpochMilli(trigger + 60_000L).toString(),
@@ -216,8 +219,7 @@ class SharedAlarmRestartPhaseTest {
             assertEquals(trigger + 6 * 60_000L, Preferences.instance.getLong("${SocialPreferences.alarmDeadlinePrefix}$localId", -1L))
             val notification = requireNotNull(shadowOf(controller.get()).lastForegroundNotification)
             assertEquals(other.id, shadowOf(notification.contentIntent).savedIntent.getLongExtra(AlarmHelper.EXTRA_ID, -1L))
-            val playing = AlarmService::class.java.getDeclaredField("isPlaying").apply { isAccessible = true }
-            assertTrue(playing.getBoolean(controller.get()))
+            assertSame(ringing, RingingCoordinator.selected)
             assertFalse(shadowOf(context).broadcastIntents.any { it.action == AlarmService.CANCEL_SHARED_ALARM_INTENT_ACTION })
             assertNull(shadowOf(context).nextStartedActivity)
         } finally {
