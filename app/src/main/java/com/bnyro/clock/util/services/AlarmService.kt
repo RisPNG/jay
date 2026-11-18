@@ -9,24 +9,17 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.media.AudioFocusRequest
-import android.media.AudioManager
-import android.media.MediaPlayer
-import android.media.RingtoneManager
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.Build
 import android.os.IBinder
 import android.os.Vibrator
-import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import com.bnyro.clock.App
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
@@ -37,10 +30,10 @@ import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
+import com.bnyro.clock.util.RingingAudio
 import com.bnyro.clock.util.TimeHelper
 import com.bnyro.clock.util.RingingCoordinator
 import com.bnyro.clock.util.RingingSession
-import com.bnyro.clock.util.VolumeRamp
 import com.bnyro.clock.util.widgets.TextColor
 import com.bnyro.clock.util.widgets.getColorValue
 import kotlinx.coroutines.runBlocking
@@ -58,14 +51,10 @@ import java.time.Instant
 import com.bnyro.clock.social.data.SocialPreferences
 
 class AlarmService : Service() {
-    private var isPlaying = false
     private var vibrator: Vibrator? = null
-    private var mediaPlayer: MediaPlayer? = null
-    private lateinit var audioManager: AudioManager
-    private var audioFocusRequest: AudioFocusRequest? = null
+    private val ringingAudio by lazy { RingingAudio(this) }
     private val ringingAlarms = linkedMapOf<Long, AlarmRing>()
     private val timeoutHandler = Handler(Looper.getMainLooper())
-    private var volumeRamp: VolumeRamp? = null
 
     private inner class AlarmRing(val alarm: Alarm, val ringTime: Long, val occurrenceId: String) : RingingSession {
         var alertScreenVisible = false
@@ -76,11 +65,12 @@ class AlarmService : Service() {
         override val vibrate get() = alarm.vibrate
         override val timeoutMillis get() = alarm.timeoutMinutes * 60_000L
         override val isAlarm = true
+        val deadlineAt get() = ringTime + timeoutMillis
 
         override fun onSelected() {
             alertGeneration++
-            play(alarm)
             startForeground(notificationId, createNotification(this@AlarmService, this))
+            play(alarm, deadlineAt)
             startActivity(alertIntent(this))
         }
 
@@ -137,7 +127,6 @@ class AlarmService : Service() {
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate() {
-        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         ContextCompat.registerReceiver(
             this,
@@ -257,7 +246,7 @@ class AlarmService : Service() {
         }
         timeoutHandler.postDelayed(
             ring.timeout,
-            (triggerTime + timeoutMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+            (ring.deadlineAt - System.currentTimeMillis()).coerceAtLeast(0L)
         )
         RingingCoordinator.start(ring)
         return START_STICKY
@@ -266,7 +255,7 @@ class AlarmService : Service() {
     private fun handleTimeout(ring: AlarmRing) {
         if (ringingAlarms[ring.alarm.id] !== ring) return
         val alarm = ring.alarm
-        val deadlineAt = ring.ringTime + ring.timeoutMillis
+        val deadlineAt = ring.deadlineAt
         if (alarm.missedRestartEnabled) {
             val snoozedUntil = AlarmHelper.snooze(
                 this, alarm, snoozedUntil = deadlineAt + alarm.missedRestartMinutes * 60_000L
@@ -349,107 +338,26 @@ class AlarmService : Service() {
             .setPackage(packageName))
     }
 
-    private fun play(alarm: Alarm) {
+    private fun play(alarm: Alarm, deadline: Long) {
         stopAudio()
         if (alarm.soundEnabled) {
-            val alert: Uri? = alarm.soundUri?.toUri() ?: RingtoneManager.getDefaultUri(
-                RingtoneManager.TYPE_ALARM
+            ringingAudio.start(
+                alarm.soundUri,
+                Preferences.instance.getInt(Preferences.alarmVolumeRampSecondsKey, 0),
+                deadline
             )
-            mediaPlayer = MediaPlayer()
-            mediaPlayer!!.setOnErrorListener { mp, _, _ ->
-                Log.e("Media Player", "Error occurred while playing audio.")
-                mp.release()
-                mediaPlayer = null
-                if (alarm.soundUri != null) {
-                    runCatching {
-                        mediaPlayer = MediaPlayer().apply {
-                            setDataSource(
-                                this@AlarmService,
-                                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                            )
-                            startAlarm(this)
-                        }
-                    }
-                }
-                true
-            }
-            try {
-                mediaPlayer!!.setDataSource(this, alert!!)
-                startAlarm(mediaPlayer!!)
-            } catch (e: Exception) {
-                Log.e("Failed to play ringtone", e.message, e)
-                if (alarm.soundUri != null) {
-                    runCatching {
-                        mediaPlayer?.release()
-                        mediaPlayer = MediaPlayer().apply {
-                            setDataSource(
-                                this@AlarmService,
-                                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                            )
-                            startAlarm(this)
-                        }
-                    }
-                }
-            }
         }
-        /* Start the vibrator after everything is ok with the media player */
         if (alarm.vibrate) {
             val vibrationPattern = alarm.vibrationPattern.map(Int::toLong).toLongArray()
             vibrator!!.vibrate(vibrationPattern, 0, NotificationHelper.audioAttributes)
         } else {
             vibrator!!.cancel()
         }
-        isPlaying = true
     }
 
-    private fun startAlarm(player: MediaPlayer) {
-        player.isLooping = true
-        player.setAudioAttributes(NotificationHelper.audioAttributes)
-        player.prepare()
-        volumeRamp?.cancel()
-        val focusResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-                .setAudioAttributes(NotificationHelper.audioAttributes)
-                .build()
-            audioFocusRequest = request
-            audioManager.requestAudioFocus(request)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(
-                null,
-                AudioManager.STREAM_ALARM,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
-            )
-        }
-        if (focusResult != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return
-        volumeRamp = VolumeRamp(
-            player,
-            Preferences.instance.getInt(Preferences.alarmVolumeRampSecondsKey, 0)
-        ).apply { start() }
-        player.start()
-    }
     private fun stopAudio() {
-        if (!isPlaying) return
-        isPlaying = false
-
-        volumeRamp?.cancel()
-        volumeRamp = null
-        // Stop audio playing
-        if (mediaPlayer != null) {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
-            mediaPlayer = null
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-            audioFocusRequest = null
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.abandonAudioFocus(null)
-        }
-        // Stop vibrator
+        ringingAudio.stop()
         vibrator?.cancel()
-
     }
 
     private fun createNotification(context: Context, ring: AlarmRing): Notification {
