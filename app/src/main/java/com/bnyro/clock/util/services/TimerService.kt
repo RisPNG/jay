@@ -72,6 +72,7 @@ class TimerService : Service() {
     var timerObjects = mutableListOf<TimerObject>()
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var foregroundTimerId: Int? = null
     private var promotedTimerId: Int? = null
     private var alertedTimerId: Int? = null
     private val ringingTimers = linkedMapOf<Int, TimerRing>()
@@ -215,11 +216,11 @@ class TimerService : Service() {
                     val finished = obj.currentPosition.value == 0
                     val addedSeconds = intent.getIntExtra(INCREMENT_EXTRA_KEY, obj.effectiveIncrementSeconds)
                     val addedMillis = addedSeconds * 1000
-                    val expiresAt = if (finished) System.currentTimeMillis() + addedMillis
-                    else obj.expiresAt + addedMillis
 
                     if (obj.sharedTimerId != null) {
                         if (!obj.sharedCanEdit) return
+                        val expiresAt = if (finished) System.currentTimeMillis() + addedMillis
+                        else obj.expiresAt + addedMillis
                         SocialTimerWorker.enqueue(applicationContext, obj, SocialTimerWorker.ACTION_ADJUST, expiresAt, if (finished) 0 else obj.repeatIndex,
                             adjustmentSeconds = addedSeconds)
                         if (finished) endRinging(obj)
@@ -234,12 +235,16 @@ class TimerService : Service() {
                         obj.initialPosition.value = addedMillis
                     } else {
                         obj.initialPosition.value += addedMillis
+                        if (obj.state.value == WatchState.RUNNING) {
+                            obj.currentPosition.value =
+                                (obj.elapsedRealtimeDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(0).toInt()
+                        }
                     }
                     obj.currentPosition.value += addedMillis
 
                     if (obj.state.value == WatchState.RUNNING) {
                         cancelAlarm(obj)
-                        scheduleAlarm(obj, expiresAt)
+                        scheduleAlarm(obj)
                         if (finished) acquireWakeLock()
                     }
 
@@ -397,9 +402,7 @@ class TimerService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        val scheduledObject = timer.asScheduledObject()
-        scheduledObject.state.value = WatchState.RUNNING
-        enqueueNew(scheduledObject)
+        enqueueNew(timer.asScheduledObject())
         return START_STICKY
     }
 
@@ -657,6 +660,10 @@ class TimerService : Service() {
     private fun pause(timerObject: TimerObject) {
         timerObject.currentPosition.value =
             (timerObject.elapsedRealtimeDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(0).toInt()
+        if (timerObject.currentPosition.value == 0) {
+            expire(timerObject)
+            return
+        }
         timerObject.state.value = WatchState.PAUSED
         cancelAlarm(timerObject)
         updateNotification(timerObject)
@@ -679,9 +686,7 @@ class TimerService : Service() {
             showFinishedNotification(timerObject)
             return
         }
-        val nextTimer = timerObjects.filter { it.state.value == WatchState.RUNNING }
-            .minByOrNull { it.elapsedRealtimeDeadline }
-        if (nextTimer?.id != promotedTimerId) promoteForeground()
+        if (nextRunningTimer?.id != promotedTimerId) promoteForeground()
         if (ActivityCompat.checkSelfPermission(
                 this, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
@@ -735,37 +740,39 @@ class TimerService : Service() {
         return System.currentTimeMillis() - ring.ringingSince
     }
 
-    /**
-     * The notification the service is held in the foreground by is the one the reader most needs to
-     * see: the timer that is ringing, or failing that the earliest timer still counting.
-     */
-    private fun promoteForeground(announcing: Boolean = false) {
-        val counting = timerObjects.filter { it.state.value == WatchState.RUNNING }
+    private val nextRunningTimer
+        get() = timerObjects.asSequence().filter { it.state.value == WatchState.RUNNING }
             .minByOrNull { it.elapsedRealtimeDeadline }
-        val previous = promotedTimerId
+
+    private fun promoteForeground(announcing: Boolean = false) {
+        val counting = nextRunningTimer
+        val previousPromotion = promotedTimerId
         promotedTimerId = counting?.id
-        if (previous != promotedTimerId && ActivityCompat.checkSelfPermission(
+
+        val ringing = timerObjects.find { it.id == ringingTimerId }
+        val previousForeground = timerObjects.find { it.id == foregroundTimerId && it.currentPosition.value > 0 }
+        val foreground = (counting ?: previousForeground).takeIf { ringing == null }
+        foregroundTimerId = foreground?.id
+
+        when {
+            ringing != null -> startForeground(
+                finishedNotificationId(ringing),
+                finishedNotification(ringing, announcing = announcing)
+            )
+            foreground != null -> startForeground(foreground.id, getNotification(foreground))
+            else -> ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        }
+
+        if ((previousPromotion != promotedTimerId || previousForeground?.id != foregroundTimerId) &&
+            ActivityCompat.checkSelfPermission(
                 this, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         ) {
             val notificationManager = NotificationManagerCompat.from(this)
             timerObjects.filter {
-                (it.id == previous || it.id == promotedTimerId) && it.currentPosition.value > 0
+                (it.id == previousPromotion || it.id == promotedTimerId || it.id == previousForeground?.id) &&
+                    it.id != foregroundTimerId && it.currentPosition.value > 0
             }.forEach { notificationManager.notify(it.id, getNotification(it)) }
-        }
-        val ringing = timerObjects.find { it.id == ringingTimerId }
-        if (ringing != null) {
-            startForeground(
-                finishedNotificationId(ringing),
-                finishedNotification(ringing, announcing = announcing)
-            )
-            return
-        }
-
-        if (counting != null) {
-            startForeground(counting.id, getNotification(counting))
-        } else {
-            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         }
     }
 
