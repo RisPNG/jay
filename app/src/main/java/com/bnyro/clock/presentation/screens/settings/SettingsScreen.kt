@@ -84,7 +84,6 @@ import com.bnyro.clock.presentation.screens.settings.model.SettingsModel
 import com.bnyro.clock.presentation.screens.timer.components.TimerPickerSelector
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.Preferences
-import com.bnyro.clock.util.services.AlarmService
 import com.bnyro.clock.util.services.TimerService
 import java.util.Locale
 
@@ -100,7 +99,6 @@ fun SettingsScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(
         rememberTopAppBarState()
     )
-    var showAlarmTimeoutDialog by remember { mutableStateOf(false) }
     var showTimerIncrementDialog by remember { mutableStateOf(false) }
     var showAlarmVolumeRampDialog by remember { mutableStateOf(false) }
     var showTimerVolumeRampDialog by remember { mutableStateOf(false) }
@@ -112,14 +110,6 @@ fun SettingsScreen(
     var timerIncrementSeconds by remember {
         mutableIntStateOf(
             Preferences.instance.getInt(Preferences.timerIncrementSecondsKey, 60)
-        )
-    }
-    var alarmTimeoutMinutes by remember {
-        mutableIntStateOf(
-            Preferences.instance.getInt(
-                Preferences.alarmTimeoutMinutesKey,
-                AlarmService.ALARM_TIMEOUT_MINUTES
-            )
         )
     }
     var alarmVolumeRampSeconds by remember {
@@ -362,19 +352,6 @@ fun SettingsScreen(
                 Preferences.edit {
                     putString(Preferences.volumeButtonActionKey, action.name)
                 }
-            }
-
-            IconPreference(
-                title = stringResource(R.string.timeout_after),
-                summary = pluralStringResource(
-                    R.plurals.duration_minutes,
-                    alarmTimeoutMinutes,
-                    alarmTimeoutMinutes
-                ),
-                info = stringResource(R.string.alarm_timeout_info),
-                imageVector = Icons.Rounded.Timer
-            ) {
-                showAlarmTimeoutDialog = true
             }
 
             IconPreference(
@@ -702,22 +679,6 @@ fun SettingsScreen(
                 timerIncrementSeconds = it
                 Preferences.edit { putInt(Preferences.timerIncrementSecondsKey, it) }
                 showTimerIncrementDialog = false
-            }
-        )
-    }
-    if (showAlarmTimeoutDialog) {
-        ScrollPickerDialog(
-            onDismissRequest = { showAlarmTimeoutDialog = false },
-            title = stringResource(R.string.select_alarm_timeout),
-            unit = stringResource(R.string.minutes),
-            value = alarmTimeoutMinutes,
-            maxValue = 120,
-            offset = 1,
-            label = { it.toString() },
-            onValueSet = {
-                alarmTimeoutMinutes = it
-                Preferences.edit { putInt(Preferences.alarmTimeoutMinutesKey, it) }
-                showAlarmTimeoutDialog = false
             }
         )
     }

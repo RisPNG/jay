@@ -1,6 +1,7 @@
 package com.bnyro.clock.presentation.screens.alarmpicker.components
 
 import com.bnyro.clock.ui.theme.resolveLabelColor
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -18,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.Snooze
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -38,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -48,6 +53,7 @@ import com.bnyro.clock.domain.model.Alarm
 import com.bnyro.clock.domain.model.PickerStyle
 import com.bnyro.clock.presentation.components.DialogButton
 import com.bnyro.clock.presentation.components.DialogButtonStyle
+import com.bnyro.clock.presentation.components.InfoButton
 import com.bnyro.clock.presentation.components.LabelColorPreference
 import com.bnyro.clock.presentation.components.ScrollPickerDialog
 import com.bnyro.clock.presentation.components.SwitchWithDivider
@@ -67,6 +73,8 @@ fun AlarmPicker(
 ) {
     var showRingtoneDialog by remember { mutableStateOf(false) }
     var showSnoozeDialog by remember { mutableStateOf(false) }
+    var showMissedRestartDialog by remember { mutableStateOf(false) }
+    var showTimeoutDialog by remember { mutableStateOf(false) }
     var showVibrationDialog by remember { mutableStateOf(false) }
     var wannadeletequestion by remember { mutableStateOf(false) }
 
@@ -111,6 +119,9 @@ fun AlarmPicker(
 
     var snoozeMinutes by remember { mutableIntStateOf(currentAlarm.snoozeMinutes) }
     var snoozeEnabled by remember { mutableStateOf(currentAlarm.snoozeEnabled) }
+    var timeoutMinutes by remember { mutableIntStateOf(currentAlarm.timeoutMinutes) }
+    var missedRestartEnabled by remember { mutableStateOf(currentAlarm.missedRestartEnabled) }
+    var missedRestartMinutes by remember { mutableIntStateOf(currentAlarm.missedRestartMinutes) }
     var soundEnabled by remember { mutableStateOf(currentAlarm.soundEnabled) }
 
     val initialTime = remember { TimeHelper.millisToTime(currentAlarm.time) }
@@ -202,6 +213,45 @@ fun AlarmPicker(
                     )
                 }
                 LabelColorPreference(color = labelColor, onColorSelected = { labelColor = it })
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showTimeoutDialog = true }
+                        .padding(8.dp, 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Timer,
+                        contentDescription = null,
+                        modifier = Modifier.padding(start = 8.dp, end = 16.dp).size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(R.string.timeout_after),
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            InfoButton(
+                                title = stringResource(R.string.timeout_after),
+                                modifier = Modifier.height(with(LocalDensity.current) {
+                                    MaterialTheme.typography.titleLarge.lineHeight.toDp()
+                                })
+                            ) {
+                                Text(text = stringResource(R.string.alarm_timeout_info))
+                            }
+                        }
+                        Text(
+                            text = pluralStringResource(
+                                R.plurals.duration_minutes,
+                                timeoutMinutes,
+                                timeoutMinutes
+                            ),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
                 SwitchWithDivider(
                     title = stringResource(R.string.sound),
                     description = displaySoundName,
@@ -254,6 +304,19 @@ fun AlarmPicker(
                         snoozeEnabled = it
                     }
                 )
+                SwitchWithDivider(
+                    title = stringResource(R.string.missed_restart),
+                    description = pluralStringResource(
+                        R.plurals.duration_minutes,
+                        missedRestartMinutes,
+                        missedRestartMinutes
+                    ),
+                    info = stringResource(R.string.missed_restart_info),
+                    isChecked = missedRestartEnabled,
+                    icon = Icons.Rounded.Replay,
+                    onClick = { showMissedRestartDialog = true },
+                    onChecked = { missedRestartEnabled = it }
+                )
             }
         }
 
@@ -289,6 +352,9 @@ fun AlarmPicker(
                         soundUri = soundUri,
                         snoozeEnabled = snoozeEnabled,
                         snoozeMinutes = snoozeMinutes,
+                        timeoutMinutes = timeoutMinutes,
+                        missedRestartEnabled = missedRestartEnabled,
+                        missedRestartMinutes = missedRestartMinutes,
                         soundEnabled = soundEnabled,
                         vibrationPattern = vibrationPattern,
                         vibrationPatternName = vibrationPatternName,
@@ -328,6 +394,36 @@ fun AlarmPicker(
             onValueSet = {
                 snoozeMinutes = it
                 showSnoozeDialog = false
+            }
+        )
+    }
+    if (showMissedRestartDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showMissedRestartDialog = false },
+            title = stringResource(R.string.select_missed_restart_time),
+            unit = stringResource(R.string.minutes),
+            value = missedRestartMinutes,
+            maxValue = 120,
+            offset = 1,
+            label = { it.toString() },
+            onValueSet = {
+                missedRestartMinutes = it
+                showMissedRestartDialog = false
+            }
+        )
+    }
+    if (showTimeoutDialog) {
+        ScrollPickerDialog(
+            onDismissRequest = { showTimeoutDialog = false },
+            title = stringResource(R.string.select_alarm_timeout),
+            unit = stringResource(R.string.minutes),
+            value = timeoutMinutes,
+            maxValue = 120,
+            offset = 1,
+            label = { it.toString() },
+            onValueSet = {
+                timeoutMinutes = it
+                showTimeoutDialog = false
             }
         )
     }
