@@ -120,7 +120,9 @@ From there, the updated `main` is merged into `main-canary`, followed by every a
 | `timer-notification-lifecycle` | `timer-repetitions-and-timeouts` | Keep the monotonic countdown and notification lifecycle in the first PR. The dependent PR adds repeat scheduling, per-timer timeouts, and repeat backup progress. |
 | `alarm-timeout-and-restart` and `timer-repetitions-and-timeouts` | `ringing-priority` | Keep ring selection and handoff in the dependent PR. The alarm and timer models, settings, and timing policies belong to their respective owners. |
 
-The alarm recurrence, snooze limit, and timeout contributions each add a different Room migration from the same upstream schema version. Allocate the next migration on the accepted upstream base as each PR is prepared. The fifteen-minute default snooze is a separate behaviour from limiting the number of snoozes and needs its own PR.
+For a contribution with several prerequisites, verify its diff against their combined tree. Once the prerequisites reach `main`, update the contribution from `main` and check the upstream PR diff again.
+
+The alarm recurrence, snooze limit, and timeout contributions each add a different Room migration from the same upstream schema version. Allocate the next migration on the accepted upstream base as each PR is prepared. `alarm-snooze-duration-default` owns the fifteen-minute default for new alarms. `alarm-snooze-limit` owns the cap on the number of snoozes.
 
 ### Tidying up finished branches
 
