@@ -2,6 +2,7 @@ package com.bnyro.clock.presentation.screens.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -49,12 +52,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModelProvider
 import com.bnyro.clock.BuildConfig
@@ -87,6 +91,7 @@ import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.services.TimerService
 import java.util.Locale
+import org.xmlpull.v1.XmlPullParser
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -107,7 +112,9 @@ fun SettingsScreen(
     var showDefaultRingtoneDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
 
-    val currentLanguageTag = Preferences.instance.getString(Preferences.languageKey, "") ?: ""
+    val displayLocale = LocalConfiguration.current.locales[0]
+    val currentLanguage = AppCompatDelegate.getApplicationLocales()[0]
+    val systemDefault = stringResource(R.string.system_default)
 
     var timerIncrementSeconds by remember {
         mutableIntStateOf(
@@ -193,15 +200,12 @@ fun SettingsScreen(
             val uriHandler = LocalUriHandler.current
             SettingsCategory(stringResource(R.string.general))
 
-            val languageSummary = if (currentLanguageTag.isEmpty()) {
-                "System Default"
-            } else {
-                Locale.forLanguageTag(currentLanguageTag).getDisplayName(Locale.getDefault())
-                    .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-            }
+            val languageSummary = currentLanguage?.getDisplayName(displayLocale)
+                ?.replaceFirstChar { it.titlecase(displayLocale) }
+                ?: systemDefault
 
             IconPreference(
-                title = "Language",
+                title = stringResource(R.string.language),
                 summary = languageSummary,
                 imageVector = Icons.Default.Language
             ) {
@@ -582,47 +586,56 @@ fun SettingsScreen(
     }
 
     if (showLanguageDialog) {
-        val supportedTags = listOf(
-            "", "en", "ar", "az", "be", "bg", "bn", "bo", "br", "ca", "cs", "da", "de",
-            "el", "es", "et", "fa", "fat", "fi", "fr", "hi", "ia", "id", "it", "he",
-            "ja", "jv", "lt", "my", "nb-NO", "ne", "nl", "pl", "pt", "pt-BR", "ro",
-            "ru", "ryu", "sat", "sr", "sv", "ta", "tr", "uk", "vi", "zh-CN", "zh-TW"
-        )
+        val supportedLanguages = remember(context.resources) {
+            buildList<Locale?> {
+                add(null)
+                context.resources.getXml(R.xml.locales_config).use { locales ->
+                    while (locales.next() != XmlPullParser.END_DOCUMENT) {
+                        if (locales.eventType == XmlPullParser.START_TAG && locales.name == "locale") {
+                            val tag = locales.getAttributeValue("http://schemas.android.com/apk/res/android", "name")
+                            add(Locale.forLanguageTag(tag))
+                        }
+                    }
+                }
+            }
+        }
 
         AlertDialog(
             onDismissRequest = { showLanguageDialog = false },
-            title = { Text("Select Language") },
+            title = { Text(stringResource(R.string.select_language)) },
             text = {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(350.dp)
+                        .selectableGroup()
                 ) {
-                    items(supportedTags) { tag ->
-                        val displayName = if (tag.isEmpty()) {
-                            "System Default"
+                    items(supportedLanguages) { language ->
+                        val selected = language == currentLanguage
+                        val displayName = if (language == null) {
+                            systemDefault
                         } else {
-                            val loc = Locale.forLanguageTag(tag)
-                            loc.getDisplayName(loc).replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() }
+                            language.getDisplayName(language).replaceFirstChar { it.titlecase(language) }
                         }
 
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    Preferences.edit { putString(Preferences.languageKey, tag) }
-                                    if (tag.isEmpty()) {
-                                        AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
-                                    } else {
-                                        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
+                                .selectable(
+                                    selected = selected,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        showLanguageDialog = false
+                                        AppCompatDelegate.setApplicationLocales(
+                                            LocaleListCompat.forLanguageTags(language?.toLanguageTag().orEmpty())
+                                        )
                                     }
-                                    showLanguageDialog = false
-                                }
+                                )
                                 .padding(vertical = 12.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = currentLanguageTag == tag,
+                                selected = selected,
                                 onClick = null
                             )
                             Text(
@@ -636,7 +649,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showLanguageDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(android.R.string.cancel))
                 }
             }
         )
