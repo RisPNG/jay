@@ -41,7 +41,7 @@ The [architecture guide](docs/architecture.md) describes the social protocol, pe
 
 The `full` and `lite` product flavors share the clock, social and audio implementation. `fullRelease` uses `com.rispng.jay`; `liteRelease` uses `com.rispng.jay.lite`. Both editions display Jay as the launcher name. `fullDebug` retains `com.rispng.jay.debug`. There is no Lite debug variant.
 
-Build with `mise exec -- ./gradlew assembleFullDebug assembleFullRelease assembleLiteRelease bundleFullRelease bundleLiteRelease`. Run the JVM suite with `mise exec -- ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest`; release tests cover edition-specific access behavior. Stable release automation publishes both editions' APKs and app bundles, plus the full debug APK. Prereleases publish all three APKs without app bundles.
+On `jay`, build with `mise exec -- ./gradlew assembleFullDebug assembleFullRelease assembleLiteRelease bundleFullRelease bundleLiteRelease`. Run the JVM suite with `mise exec -- ./gradlew testFullDebugUnitTest testFullReleaseUnitTest testLiteReleaseUnitTest`. The release tests cover edition-specific access behaviour. Stable release automation publishes both editions' APKs and app bundles, plus the full debug APK. Prereleases publish all three APKs without app bundles.
 
 Use the Java runtime pinned in `mise.toml` for these checks. Android 16 notification tests require Java 21, and the build workflows use the same mise configuration.
 
@@ -76,6 +76,10 @@ flowchart LR
 | `jay` | The social extension on top of `main-canary`, with the integration points described above. All prereleases and stable releases come from here. |
 
 Each contribution branch delivers one complete change within one application area. Changes may span files within that area. Split work across different areas into separate, ordered contribution branches, each with a focused PR and documented dependencies and overlapping changes.
+
+Contribution branches and `main-canary` use Clock You's build, dependency, and CI configuration as it appears on `main`. Keep `mise.toml` and other Mise configuration, personal development scripts and editor settings, and other Jay-specific tooling on `jay`.
+
+Contributions may edit tests already present on Clock You's `main` when the change requires it. Keep new test cases, test files, and fixtures on `jay`, including regression coverage for Clock You features. The same rule applies to `main-canary`.
 
 An `upstream` remote points to Clock You. Preserving its history in `main` means we can compare and update the base without creating another copy of the same commits. `main` always feeds into `main-canary`, even when there are no pending contributions, and every active contribution branch is merged into `main-canary` while it waits upstream.
 
@@ -115,7 +119,9 @@ A missing remote branch on its own does not tell us whether the work is safe to 
 
 ### Checking the result and sharing it
 
-Verification covers both the changed contribution branches and the integrated `jay` result. For an upstream update, that means running the server tests against PostgreSQL and the Android unit tests, and compiling the Android debug and release variants.
+Compare each active contribution branch and `main-canary` with `main` before pushing. Check that the diff stays within the intended Clock You changes and follows the build, tooling, and test rules above.
+
+Use Clock You's Gradle tasks to verify changed contribution branches and `main-canary`. For an upstream update, run Jay's server tests against PostgreSQL, run its Android unit tests, and compile its debug and release variants.
 
 Device checks cover creation, update, deletion, snooze, early dismissal, reboot rescheduling, invitation links, and server switching. If a check could not be completed, please include that in the update so the next person knows what still needs attention.
 
