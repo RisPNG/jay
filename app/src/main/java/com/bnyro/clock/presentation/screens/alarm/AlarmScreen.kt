@@ -1,20 +1,20 @@
 package com.bnyro.clock.presentation.screens.alarm
 
 import android.content.res.Configuration
-import androidx.activity.compose.BackHandler
 import androidx.compose.ui.platform.LocalConfiguration
-import com.bnyro.clock.presentation.screens.clock.components.DigitalClockDisplay
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -32,7 +32,10 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LargeFloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -54,6 +57,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.bnyro.clock.presentation.screens.clock.components.DigitalClockDisplay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -84,7 +88,6 @@ fun AlarmScreen(
     alarmModel: AlarmModel,
     settingsModel: SettingsModel
 ) {
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
     val alarms by alarmModel.alarms.collectAsStateWithLifecycle()
     val filters by alarmModel.filters.collectAsStateWithLifecycle()
@@ -124,6 +127,7 @@ fun AlarmScreen(
     var wannadeletequestion by remember { mutableStateOf(false) }
     var showAlarmKinds by remember { mutableStateOf(false) }
 
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     BackHandler(enabled = alarmModel.showFilter) {
         alarmModel.showFilter = false
         alarmModel.resetFilters()
@@ -143,46 +147,80 @@ fun AlarmScreen(
         fabPosition = settingsModel.fabAlignment.position,
         fab = {
             if (!alarmModel.showFilter && !isSelectionMode) {
-                Surface(
-                    shape = FloatingActionButtonDefaults.shape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    shadowElevation = 6.dp
-                ) {
-                    Row(modifier = Modifier.height(FAB_SIZE)) {
-                        Box(
-                            modifier = Modifier
-                                .size(FAB_SIZE)
-                                .clickable { onAlarm.invoke(0L, false) },
-                            contentAlignment = Alignment.Center
+                val alarmKinds: @Composable () -> Unit = {
+                    DropdownMenu(
+                        expanded = showAlarmKinds,
+                        onDismissRequest = { showAlarmKinds = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.add_advanced_alarm)) },
+                            onClick = {
+                                showAlarmKinds = false
+                                onAlarm.invoke(0L, true)
+                            }
+                        )
+                    }
+                }
+                if (settingsModel.fabAlignment.position == FabPosition.Center) {
+                    Box(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 4.dp)) {
+                        LargeFloatingActionButton(
+                            onClick = { onAlarm.invoke(0L, false) },
+                            shape = CircleShape,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ) {
                             Icon(Icons.Rounded.Add, null)
                         }
-                        VerticalDivider(
-                            modifier = Modifier
-                                .padding(vertical = 12.dp)
-                                .width(1.dp),
-                            color = MaterialTheme.colorScheme.primaryFade
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .width(FAB_SIZE / 2)
-                                .clickable { showAlarmKinds = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Rounded.ExpandLess, null)
-                            DropdownMenu(
-                                expanded = showAlarmKinds,
-                                onDismissRequest = { showAlarmKinds = false }
+
+                        Box(Modifier.align(Alignment.BottomEnd).offset(x = 4.dp, y = 4.dp)) {
+                            SmallFloatingActionButton(
+                                onClick = { showAlarmKinds = true },
+                                shape = CircleShape,
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                             ) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.add_advanced_alarm)) },
-                                    onClick = {
-                                        showAlarmKinds = false
-                                        onAlarm.invoke(0L, true)
-                                    }
-                                )
+                                Icon(Icons.Rounded.ExpandLess, null)
+                            }
+                            alarmKinds()
+                        }
+                    }
+                } else {
+                    Surface(
+                        shape = FloatingActionButtonDefaults.shape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        shadowElevation = 6.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.height(FAB_SIZE),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .width(FAB_SIZE)
+                                    .clickable { onAlarm.invoke(0L, false) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Rounded.Add, null)
+                            }
+
+                            VerticalDivider(
+                                modifier = Modifier
+                                    .padding(vertical = 12.dp)
+                                    .width(1.dp),
+                                color = MaterialTheme.colorScheme.primaryFade
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .width(FAB_SIZE / 2)
+                                    .clickable { showAlarmKinds = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Rounded.ExpandLess, null)
+                                alarmKinds()
                             }
                         }
                     }
@@ -336,10 +374,6 @@ fun AlarmScreen(
                                 },
                                 modifier = Modifier.animateItem(ItemFade, ItemSlide, ItemFade)
                             )
-                        }
-
-                        item(key = "bottomSpacer") {
-                            Spacer(modifier = Modifier.height(80.dp))
                         }
                     }
                 }
