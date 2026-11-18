@@ -65,7 +65,9 @@ class SettingsModel : ViewModel() {
     }
 
     enum class FabAlignment(val position: FabPosition) {
-        LEFT(FabPosition.Start), RIGHT(FabPosition.End)
+        LEFT(FabPosition.Start),
+        CENTER(FabPosition.Center),
+        RIGHT(FabPosition.End)
     }
 
     var fabAlignment: FabAlignment by mutableStateOf(FabAlignment.RIGHT)
