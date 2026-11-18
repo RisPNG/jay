@@ -23,7 +23,7 @@ class AlarmActivity : RingingActivity() {
 
     override val volumeButtonActionKey = Preferences.volumeButtonActionKey
 
-    override val snoozeAvailable get() = alarm.canSnooze
+    override val snoozeAvailable get() = alarm.snoozeEnabled
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
