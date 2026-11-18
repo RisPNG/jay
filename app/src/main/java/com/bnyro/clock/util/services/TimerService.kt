@@ -537,7 +537,8 @@ class TimerService : Service() {
             ?.let { it to endRinging(it, keepAlert = true) }
 
         ringingTimerId = timerObject.id
-        ringingSince = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        ringingSince = timerObject.expiresAt.takeIf { it > 0L }?.coerceAtMost(now) ?: now
         lastRungSeconds = 0
         NotificationManagerCompat.from(this).cancel(timerObject.id)
         play(timerObject)
@@ -554,7 +555,7 @@ class TimerService : Service() {
                     }
                 }
             }
-        }.also { timer.schedule(it, timerObject.timeoutMinutes * 60 * 1000L) }
+        }.also { timer.schedule(it, (timerObject.timeoutMinutes * 60_000L - ringDuration).coerceAtLeast(0L)) }
 
         promoteForeground(announcing = true)
         // the silenced timer's last word is posted only after the foreground has moved to the new
