@@ -56,21 +56,17 @@ fun ClockScreen(
         fabPosition = settingsModel.fabAlignment.position,
         fab = {
             if (settingsModel.fabAlignment.position == FabPosition.Center) {
-    LargeFloatingActionButton(
-        onClick = {
-            showTimeZoneDialog = true
-        },
-        shape = CircleShape
-    ) {
-        Icon(Icons.Rounded.Add, null)
-    }
-} else {
-    FloatingActionButton(onClick = {
-        showTimeZoneDialog = true
-    }) {
-        Icon(Icons.Rounded.Add, null)
-    }
-}
+                LargeFloatingActionButton(
+                    onClick = { showTimeZoneDialog = true },
+                    shape = CircleShape
+                ) {
+                    Icon(Icons.Rounded.Add, null)
+                }
+            } else {
+                FloatingActionButton(onClick = { showTimeZoneDialog = true }) {
+                    Icon(Icons.Rounded.Add, null)
+                }
+            }
         }) { pv ->
 
         val selectedZones by clockModel.selectedTimeZones.collectAsState()

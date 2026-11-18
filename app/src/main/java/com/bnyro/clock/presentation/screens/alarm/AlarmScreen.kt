@@ -10,7 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -145,31 +144,26 @@ fun AlarmScreen(
         fab = {
             if (!alarmModel.showFilter && !isSelectionMode) {
                 if (settingsModel.fabAlignment.position == FabPosition.Center) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.BottomCenter
-                    ) {
-                        Box {
-                            LargeFloatingActionButton(
-                                onClick = { onAlarm.invoke(0L, false) },
-                                shape = CircleShape,
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            ) {
-                                Icon(Icons.Rounded.Add, null)
-                            }
+                    Box(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 4.dp)) {
+                        LargeFloatingActionButton(
+                            onClick = { onAlarm.invoke(0L, false) },
+                            shape = CircleShape,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ) {
+                            Icon(Icons.Rounded.Add, null)
+                        }
 
-                            SmallFloatingActionButton(
-                                onClick = { onAlarm.invoke(0L, true) },
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .offset(x = 4.dp, y = 4.dp),
-                                shape = CircleShape,
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                            ) {
-                                Icon(Icons.Rounded.ExpandLess, null)
-                            }
+                        SmallFloatingActionButton(
+                            onClick = { onAlarm.invoke(0L, true) },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 4.dp, y = 4.dp),
+                            shape = CircleShape,
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        ) {
+                            Icon(Icons.Rounded.ExpandLess, null)
                         }
                     }
                 } else {
@@ -193,21 +187,23 @@ fun AlarmScreen(
                                 Icon(Icons.Rounded.Add, null)
                             }
 
-                    VerticalDivider(
-                        modifier = Modifier
-                            .padding(vertical = 12.dp)
-                            .width(1.dp),
-                        color = MaterialTheme.colorScheme.primaryFade
-                    )
+                            VerticalDivider(
+                                modifier = Modifier
+                                    .padding(vertical = 12.dp)
+                                    .width(1.dp),
+                                color = MaterialTheme.colorScheme.primaryFade
+                            )
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .width(FAB_SIZE / 2)
-                            .clickable { onAlarm.invoke(0L, true) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Rounded.ExpandLess, null)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .width(FAB_SIZE / 2)
+                                    .clickable { onAlarm.invoke(0L, true) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Rounded.ExpandLess, null)
+                            }
+                        }
                     }
                 }
             }
