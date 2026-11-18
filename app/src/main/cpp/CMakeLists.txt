@@ -20,7 +20,13 @@ FetchContent_Declare(flac
     URL_HASH SHA256=f2c1c76592a82ffff8413ba3c4a1299b6c7ab06c734dee03fd88630485c2b920
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
-FetchContent_MakeAvailable(flac)
+block(SCOPE_FOR VARIABLES)
+    if(ANDROID AND DEFINED ANDROID_PLATFORM_LEVEL)
+        # libFLAC uses the Android API level to detect large-file seeking support.
+        set(CMAKE_SYSTEM_VERSION "${ANDROID_PLATFORM_LEVEL}")
+    endif()
+    FetchContent_MakeAvailable(flac)
+endblock()
 
 add_library(jay_audio SHARED social/flac_encoder.c)
 target_link_libraries(jay_audio PRIVATE FLAC::FLAC)
