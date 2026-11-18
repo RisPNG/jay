@@ -12,8 +12,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
-import android.media.MediaPlayer
-import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
@@ -43,10 +41,10 @@ import com.bnyro.clock.presentation.screens.timer.TimerAlertActivity
 import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
+import com.bnyro.clock.util.RingingAudio
 import com.bnyro.clock.util.widgets.TextColor
 import com.bnyro.clock.util.widgets.getColorValue
 import com.bnyro.clock.util.TimeHelper
-import com.bnyro.clock.util.VolumeRamp
 
 import java.util.Timer
 import java.util.TimerTask
@@ -56,8 +54,9 @@ class TimerService : Service() {
     private val binder = LocalBinder()
     private val handler = Handler(Looper.getMainLooper())
 
-    private var mediaPlayer: MediaPlayer? = null
-    private var isPlaying = false
+    private val ringingAudio by lazy {
+        RingingAudio(this, requestFocus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+    }
     private var oldnow = SystemClock.elapsedRealtime()
     private val vibrator: Vibrator by lazy {
         getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
@@ -74,7 +73,6 @@ class TimerService : Service() {
     private var ringingSince = 0L
     private var lastRungSeconds = 0L
     private var ringTimeout: TimerTask? = null
-    private var volumeRamp: VolumeRamp? = null
 
     @SuppressLint("ServiceCast", "ScheduleExactAlarm")
     private fun scheduleAlarm(timerObject: TimerObject) {
@@ -214,57 +212,24 @@ class TimerService : Service() {
         }
     }
 
-    private fun play(timerObject: TimerObject) {
+    private fun play(timerObject: TimerObject, deadline: Long) {
         stopAudio()
         if (timerObject.soundEnabled) {
-            val alert: Uri = timerObject.soundUri?.toUri() ?: RingtoneManager.getDefaultUri(
-                RingtoneManager.TYPE_ALARM
+            ringingAudio.start(
+                timerObject.soundUri,
+                Preferences.instance.getInt(Preferences.timerVolumeRampSecondsKey, 0),
+                deadline
             )
-
-            mediaPlayer = MediaPlayer()
-
-            try {
-                mediaPlayer!!.setDataSource(this, alert)
-                startAlarm(mediaPlayer!!)
-            } catch (e: Exception) {
-                Log.e("failed to play ringtone", e.message, e)
-            }
         }
         if (timerObject.vibrate) {
             vibrator.vibrate(timerObject.vibrationPattern.map(Int::toLong).toLongArray(), 0)
         } else {
             vibrator.cancel()
         }
-        isPlaying = true
     }
 
-    private fun startAlarm(player: MediaPlayer) {
-        player.isLooping = true
-        player.setAudioAttributes(NotificationHelper.audioAttributes)
-        player.prepare()
-        player.start()
-        volumeRamp = VolumeRamp(
-            player,
-            Preferences.instance.getInt(Preferences.timerVolumeRampSecondsKey, 0)
-        ).apply { start() }
-    }
-
-    /**
-     * Stops the audio and vibration
-     */
     private fun stopAudio() {
-        if (!isPlaying) return
-        isPlaying = false
-
-        volumeRamp?.cancel()
-        volumeRamp = null
-
-        if (mediaPlayer != null) {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
-            mediaPlayer = null
-        }
-
+        ringingAudio.stop()
         vibrator.cancel()
     }
 
@@ -508,7 +473,9 @@ class TimerService : Service() {
         ringingSince = System.currentTimeMillis()
         lastRungSeconds = 0
         NotificationManagerCompat.from(this).cancel(timerObject.id)
-        play(timerObject)
+        val deadline = ringingSince + timeoutMinutes * 60_000L
+        promoteForeground(announcing = true)
+        play(timerObject, deadline)
 
         ringTimeout = object : TimerTask() {
             override fun run() {
@@ -518,9 +485,7 @@ class TimerService : Service() {
                     showFinishedNotification(timerObject, rangFor)
                 }
             }
-        }.also { timer.schedule(it, timeoutMinutes * 60 * 1000L) }
-
-        promoteForeground(announcing = true)
+        }.also { timer.schedule(it, (deadline - System.currentTimeMillis()).coerceAtLeast(0L)) }
         // the silenced timer's last word is posted only after the foreground has moved to the new
         // timer, because a notification still bound as the foreground one is removed by that move
         silenced?.let { (ringing, rangFor) -> showFinishedNotification(ringing, rangFor) }

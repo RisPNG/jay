@@ -9,11 +9,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.media.AudioFocusRequest
-import android.media.AudioManager
-import android.media.MediaPlayer
-import android.media.RingtoneManager
-import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -26,7 +21,6 @@ import androidx.core.app.NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import com.bnyro.clock.App
 import com.bnyro.clock.R
 import com.bnyro.clock.domain.model.Alarm
@@ -37,8 +31,8 @@ import com.bnyro.clock.ui.MainActivity
 import com.bnyro.clock.util.AlarmHelper
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
+import com.bnyro.clock.util.RingingAudio
 import com.bnyro.clock.util.TimeHelper
-import com.bnyro.clock.util.VolumeRamp
 import com.bnyro.clock.util.widgets.TextColor
 import com.bnyro.clock.util.widgets.getColorValue
 import kotlinx.coroutines.runBlocking
@@ -47,15 +41,12 @@ class AlarmService : Service() {
     private val notificationId = 5
     private var isPlaying = false
     private var vibrator: Vibrator? = null
-    private var mediaPlayer: MediaPlayer? = null
-    private lateinit var audioManager: AudioManager
-    private var audioFocusRequest: AudioFocusRequest? = null
+    private val ringingAudio by lazy { RingingAudio(this) }
     private var currentAlarm: Alarm? = null
     private var currentRingTime: Long? = null
     private var alertScreenVisible = false
 
     private val timeoutHandler = Handler(Looper.getMainLooper())
-    private var volumeRamp: VolumeRamp? = null
 
     private val alarmActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -66,12 +57,14 @@ class AlarmService : Service() {
                     currentAlarm?.let { alarm ->
                         AlarmHelper.enqueue(this@AlarmService, alarm, skipToday = true)
                     }
+                    stop()
                     stopSelf()
                 }
                 SNOOZE_ACTION -> {
                     currentAlarm?.let { alarm ->
                         AlarmHelper.snooze(this@AlarmService, alarm, currentRingTime!!, alarm.snoozeMinutes)
                     }
+                    stop()
                     stopSelf()
                 }
                 ALERT_SHOWN_ACTION, ALERT_HIDDEN_ACTION -> {
@@ -89,7 +82,6 @@ class AlarmService : Service() {
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate() {
-        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         ContextCompat.registerReceiver(
             this,
@@ -124,7 +116,12 @@ class AlarmService : Service() {
         val notification = createNotification(this, alarm)
         startForeground(notificationId, notification)
 
-        play(alarm)
+        val alarmTimeoutMinutes = Preferences.instance.getInt(
+            Preferences.alarmTimeoutMinutesKey,
+            ALARM_TIMEOUT_MINUTES
+        )
+        val deadline = System.currentTimeMillis() + alarmTimeoutMinutes * 60_000L
+        play(alarm, deadline)
         currentAlarm = alarm
         val alarmActivityIntent = Intent(this, AlarmActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
@@ -132,10 +129,6 @@ class AlarmService : Service() {
             putExtra(AlarmHelper.EXTRA_TRIGGER_TIME, currentRingTime!!)
         }
         startActivity(alarmActivityIntent)
-        val alarmTimeoutMinutes = Preferences.instance.getInt(
-            Preferences.alarmTimeoutMinutesKey,
-            ALARM_TIMEOUT_MINUTES
-        )
         timeoutHandler.postDelayed({
             if (Permission.NotificationPermission.hasPermission(this@AlarmService)) {
                 val contentIntent = PendingIntent.getActivity(
@@ -178,34 +171,21 @@ class AlarmService : Service() {
                         .build()
                 )
             }
+            stop()
             stopSelf()
-        }, alarmTimeoutMinutes * 60 * 1000L)
+        }, (deadline - System.currentTimeMillis()).coerceAtLeast(0L))
         return START_STICKY
     }
 
-    private fun play(alarm: Alarm) {
-        // stop() checks to see if we are already playing.
+    private fun play(alarm: Alarm, deadline: Long) {
         stop()
         if (alarm.soundEnabled) {
-            val alert: Uri? = alarm.soundUri?.toUri() ?: RingtoneManager.getDefaultUri(
-                RingtoneManager.TYPE_ALARM
+            ringingAudio.start(
+                alarm.soundUri,
+                Preferences.instance.getInt(Preferences.alarmVolumeRampSecondsKey, 0),
+                deadline
             )
-            mediaPlayer = MediaPlayer()
-            mediaPlayer!!.setOnErrorListener { mp, _, _ ->
-                Log.e("Media Player", "Error occurred while playing audio.")
-                mp.stop()
-                mp.release()
-                mediaPlayer = null
-                true
-            }
-            try {
-                mediaPlayer!!.setDataSource(this, alert!!)
-                startAlarm(mediaPlayer!!)
-            } catch (e: Exception) {
-                Log.e("Failed to play ringtone", e.message, e)
-            }
         }
-        /* Start the vibrator after everything is ok with the media player */
         if (alarm.vibrate) {
             val vibrationPattern = alarm.vibrationPattern.map(Int::toLong).toLongArray()
             vibrator!!.vibrate(vibrationPattern, 0, NotificationHelper.audioAttributes)
@@ -215,31 +195,6 @@ class AlarmService : Service() {
         isPlaying = true
     }
 
-    private fun startAlarm(player: MediaPlayer) {
-        player.isLooping = true
-        player.setAudioAttributes(NotificationHelper.audioAttributes)
-        player.prepare()
-        val focusResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-                .setAudioAttributes(NotificationHelper.audioAttributes)
-                .build()
-            audioFocusRequest = request
-            audioManager.requestAudioFocus(request)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(
-                null,
-                AudioManager.STREAM_ALARM,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
-            )
-        }
-        if (focusResult != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return
-        player.start()
-        volumeRamp = VolumeRamp(
-            player,
-            Preferences.instance.getInt(Preferences.alarmVolumeRampSecondsKey, 0)
-        ).apply { start() }
-    }
     /**
      * Stops alarm
      */
@@ -248,21 +203,7 @@ class AlarmService : Service() {
         if (!isPlaying) return
         isPlaying = false
 
-        volumeRamp?.cancel()
-        volumeRamp = null
-        // Stop audio playing
-        if (mediaPlayer != null) {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
-            mediaPlayer = null
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-            audioFocusRequest = null
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.abandonAudioFocus(null)
-        }
+        ringingAudio.stop()
         NotificationManagerCompat.from(this).cancel(notificationId)
         // Stop vibrator
         vibrator?.cancel()
