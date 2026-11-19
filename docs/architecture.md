@@ -50,7 +50,7 @@ Rejected edits lose their optimistic effect and retain a local rejection record.
 
 ## Transactions and retries
 
-Durable mutations other than registration require a UUID `Idempotency-Key`. A receipt binds the identity and credential generation to the method, normalized path/query and validated payload. Receipt claims and successful domain effects commit atomically. Duplicate claims serialize; mismatched requests receive `idempotency_mismatch`. Receipt replay rechecks current access and cannot expose revoked resource data.
+Durable resource mutations require a UUID `Idempotency-Key`, except registration. A receipt binds the identity and credential generation to the method, normalized path/query and validated payload. Receipt claims and successful domain effects commit atomically. Duplicate claims serialize; mismatched requests receive `idempotency_mismatch`. Receipt replay rechecks current access and cannot expose revoked resource data. Hold to Ring uses its server-generated session ID for the single history entry created when a live hold starts.
 
 Safe response bodies are retained for 30 days. Compact completion markers remain while the identity exists; an older retry receives `operation_completed` and must synchronize instead of executing again. Registration is idempotent on identity and secret. Credentials and expiring signed URLs are not persisted as replay bodies.
 
@@ -80,7 +80,7 @@ One Android service owns the live connection and group-ring playback. The visibl
 
 The [OpenAPI schema](openapi.json) defines the current JSON API. The server generates it from DRF serializers at `/openapi.json` and serves the bundled Scalar reference at `/docs`. Tests validate response examples and check generated-schema drift.
 
-Authentication uses `Authorization: Bearer …` and `X-Jay-Identity-ID`. Configuration writes include `saved_at`; group-scoped writes include `membership_id`, including DELETE bodies. Group creation supplies the group and creator-membership UUIDs. Complete configuration uses PUT; identity names and membership roles use PATCH for their single editable field.
+Authentication uses `Authorization: Bearer …` and `X-Jay-Identity-ID`. Configuration writes include `saved_at`; group-scoped resource writes include `membership_id`, including DELETE bodies. Hold to Ring checks the caller's current membership when opening and renewing the live session. Group creation supplies the group and creator-membership UUIDs. Complete configuration uses PUT; identity names and membership roles use PATCH for their single editable field.
 
 Jay 1.2.5 identifies its wire protocol with `X-Jay-Protocol: 2`, including event streams; an absent header represents the legacy client. Both versions can share a group. The API advertises shared timing support through `advanced_group_timing`, while older clients ignore unfamiliar response fields. Legacy creates retain a ten-minute timeout when the field is absent, and legacy edits preserve omitted timing fields. Modern timer cancellation includes the observed `run_id`; that explicit intent remains part of the immutable operation payload. A legacy cancellation queued before an app upgrade does not become a whole-series cancellation merely because its retry carries a newer protocol header. Older clients do not schedule later timer repeats, cannot restart missed alarms offline, and do not interpret intermediate timer-occurrence answers.
 

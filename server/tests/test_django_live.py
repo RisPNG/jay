@@ -1,16 +1,19 @@
 import asyncio
 import json
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
+from time import monotonic, sleep
 from urllib.parse import quote_plus
 from uuid import uuid4
 
 import pytest
 from asgiref.testing import ApplicationCommunicator
 from channels.db import database_sync_to_async
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, connection, connections, transaction
 from django.utils import timezone
 
 from jay_server.asgi import Application
+from jay_server.social.errors import DomainError
 from jay_server.social.live import EventConsumer, GroupRingConsumer, LiveBroker, publish_group_ring
 from jay_server.social.models import DeliveryWork, GroupActivity, GroupMembership
 from jay_server.social.synchronization import publish_changes
@@ -398,3 +401,43 @@ def test_group_ring_requires_current_editor_permission(client, group, member, ro
 
     asyncio.run(scenario())
     assert GroupActivity.objects.filter(group=group, entity_type="ring").count() == (1 if status == 200 else 0)
+
+
+def test_group_ring_does_not_start_after_a_concurrent_removal(client, group, member, settings):
+    settings.FIREBASE_CREDENTIALS_JSON = "configured"
+    session_id = str(uuid4())
+    member_id = "2" * 64
+    leader_membership = GroupMembership.objects.get(group=group, identity_id="1" * 64)
+    hold_backend = Future()
+
+    def start_hold():
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_backend_pid()")
+                hold_backend.set_result(cursor.fetchone()[0])
+            publish_group_ring("Bearer " + "another-secret" * 5, member_id, group.pk, session_id, initial=True)
+        finally:
+            connections.close_all()
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with transaction.atomic(), connection.cursor() as cursor:
+            response = client.delete(
+                f"/v1/groups/{group.pk}/members/{member_id}", {"membership_id": str(leader_membership.pk)},
+                format="json", headers={"Idempotency-Key": str(uuid4())},
+            )
+            assert response.status_code == 204
+            hold = executor.submit(start_hold)
+            backend_pid = hold_backend.result(timeout=5)
+            deadline = monotonic() + 5
+            while True:
+                cursor.execute("SELECT pg_backend_pid() = ANY(pg_blocking_pids(%s))", [backend_pid])
+                if cursor.fetchone()[0]:
+                    break
+                assert not hold.done() and monotonic() < deadline
+                sleep(0.01)
+        with pytest.raises(DomainError) as rejected:
+            hold.result(timeout=5)
+
+    assert rejected.value.status_code == 404
+    assert not GroupActivity.objects.filter(group=group, entity_type="ring", entity_id=session_id).exists()
+    assert not DeliveryWork.objects.filter(deduplication_key=f"ring:{session_id}").exists()

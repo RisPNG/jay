@@ -23,7 +23,7 @@ from rest_framework.fields import DateTimeField
 from .authentication import authenticate_identity
 from .access import require_membership
 from .errors import DomainError
-from .models import DeliveryWork, Group, GroupMembership
+from .models import DeliveryWork, Group, GroupMembership, SyncScope
 from .synchronization import publish_changes
 
 
@@ -58,9 +58,16 @@ def publish_group_ring(authorization, identity_id, group_id, session_id, scope_i
         group = Group.objects.filter(pk=group_id, deleted_at=None).first()
         if group is None:
             raise DomainError("not_found", "Group not found", 404)
-        require_membership(group, identity, editor=True)
         scope_id = str(group.scope_id)
         if initial:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT id FROM social_identity WHERE id = %s AND retired_at IS NULL FOR SHARE", [identity.pk])
+                if cursor.fetchone() is None:
+                    raise DomainError("identity_retired", "This identity is retired", 401)
+            SyncScope.objects.select_for_update().get(pk=scope_id)
+        member = require_membership(group, identity, editor=True)
+        if initial:
+            group, identity = member.group, member.identity
             publish_changes(scope_id, [], group=group, actor=identity, push_sync=False, activity={
                 "entity_type": "ring", "entity_id": session_id, "action": "rang", "entity_label": label,
             })
