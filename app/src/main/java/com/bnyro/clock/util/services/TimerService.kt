@@ -553,6 +553,7 @@ class TimerService : Service() {
         if (timerObject.id in ringingTimers) return
         val ring = TimerRing(timerObject)
         ringingTimers[timerObject.id] = ring
+        timerObject.isRinging.value = true
         NotificationManagerCompat.from(this).cancel(timerObject.id)
         handler.postDelayed(
             ring.timeout,
@@ -567,6 +568,7 @@ class TimerService : Service() {
 
     private fun endRinging(timerObject: TimerObject): Long {
         val ring = ringingTimers.remove(timerObject.id) ?: return 0L
+        ring.timerObject.isRinging.value = false
         handler.removeCallbacks(ring.timeout)
         RingingCoordinator.stop(ring)
         closeAlert(ring)
@@ -611,6 +613,11 @@ class TimerService : Service() {
 
     private fun finishedNotificationId(timerObject: TimerObject) =
         (Integer.MAX_VALUE / 3) + timerObject.id * 10
+
+    fun openRingingTimer(id: Int) {
+        val ring = ringingTimers[id] ?: return
+        startActivity(alertIntent(ring))
+    }
 
     /**
      * The screen a finished timer takes over the phone with, named after the timer it belongs to so
@@ -849,6 +856,7 @@ class TimerService : Service() {
         ringingTimers.clear()
         RingingCoordinator.stop(*rings.toTypedArray())
         rings.forEach {
+            it.timerObject.isRinging.value = false
             handler.removeCallbacks(it.timeout)
             closeAlert(it)
         }

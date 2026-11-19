@@ -29,6 +29,8 @@ data class TimerObject(
     var expiresAt: Long = 0L,
     var elapsedRealtimeDeadline: Long = 0L
 ) {
+    val isRinging = mutableStateOf(false)
+
     val secondsLeft: Int
         get() = ceil(currentPosition.value / 1000.0).toInt()
 
