@@ -15,7 +15,7 @@ from .errors import DomainError
 from .models import DeliveryWork, GroupActivity, GroupMembership, SharedAlarm, SyncScope, SyncVersion
 
 
-def publish_changes(scope_id, changes, group=None, actor=None, activity=None):
+def publish_changes(scope_id, changes, group=None, actor=None, activity=None, *, push_sync=True):
     scope = SyncScope.objects.select_for_update().get(pk=scope_id)
     scope.head_revision += 1
     scope.save(update_fields=["head_revision"])
@@ -39,15 +39,16 @@ def publish_changes(scope_id, changes, group=None, actor=None, activity=None):
     SyncVersion.objects.bulk_create(versions)
     with connection.cursor() as cursor:
         cursor.execute("SELECT pg_notify('jay_changes', %s)", [str(scope.id)])
-    payload = {"scope_id": str(scope.id), "revision": scope.head_revision}
-    if group is not None:
-        payload["group_id"] = str(group.id)
-    else:
-        payload["identity_id"] = scope.identity.pk
-    DeliveryWork.objects.update_or_create(
-        deduplication_key=f"push:{scope.id}",
-        defaults={"kind": "push", "payload": payload, "failed_at": None, "error_code": None},
-    )
+    if push_sync:
+        payload = {"scope_id": str(scope.id), "revision": scope.head_revision}
+        if group is not None:
+            payload["group_id"] = str(group.id)
+        else:
+            payload["identity_id"] = scope.identity.pk
+        DeliveryWork.objects.update_or_create(
+            deduplication_key=f"push:{scope.id}",
+            defaults={"kind": "push", "payload": payload, "failed_at": None, "error_code": None},
+        )
     return scope.head_revision
 
 

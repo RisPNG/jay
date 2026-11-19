@@ -276,6 +276,7 @@ fun GroupsScreen(
     selectedGroup?.let { group ->
         val currentGroup = groups.firstOrNull { it.id == group.id }
         val canRing = currentGroup?.canEditAlarms == true
+        var ringLabel by remember(group.id) { mutableStateOf("") }
         val ringInteractions = remember(group.id) { MutableInteractionSource() }
         val lifecycleOwner = LocalLifecycleOwner.current
         val vibrator = remember(context) { context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator }
@@ -285,7 +286,7 @@ fun GroupsScreen(
                     ringInteractions.interactions.filterIsInstance<PressInteraction>().collectLatest { interaction ->
                         when (interaction) {
                             is PressInteraction.Press -> if (canRing) {
-                                socialModel.ringGroup(group.id)
+                                socialModel.ringGroup(group.id, ringLabel)
                                 val shouldVibrate = RingingCoordinator.selected?.vibrate != true
                                 try {
                                     if (shouldVibrate) {
@@ -362,6 +363,17 @@ fun GroupsScreen(
                 Column(
                     Modifier.verticalScroll(rememberScrollState()),
                 ) {
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = ringLabel,
+                        onValueChange = { value ->
+                            val label = value.filterNot { it.isISOControl() }
+                            if (label.codePointCount(0, label.length) <= 80) ringLabel = label
+                        },
+                        enabled = canRing,
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.group_ring_label)) }
+                    )
                     Button(
                         onClick = {},
                         enabled = canRing,

@@ -582,13 +582,13 @@ class SocialRepository(
         }
     }
 
-    suspend fun holdGroupRing(groupId: String) = withContext(Dispatchers.IO) {
+    suspend fun holdGroupRing(groupId: String, label: String?) = withContext(Dispatchers.IO) {
         val group = groups.first().first { it.id == groupId }
         check(group.canEditAlarms) { "Group edit permission is required to ring this group" }
         val serverUrl = Preferences.instance.getString(SocialPreferences.serverUrlKey, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
         SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl))
-            .holdGroupRing(groupId, groupRingOrigin, PushRegistrationWorker.tokenDigest)
+            .holdGroupRing(groupId, groupRingOrigin, PushRegistrationWorker.tokenDigest, label)
     }
 
     suspend fun followLiveChanges(onRing: suspend (JsonObject?) -> Unit) = withContext(Dispatchers.IO) {

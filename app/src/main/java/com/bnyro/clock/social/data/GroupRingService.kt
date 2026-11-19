@@ -146,9 +146,11 @@ class GroupRingService : Service() {
 
     private fun showRingingNotification() {
         val text = rings.mapNotNull {
-            val actor = it["actor_label"]?.jsonPrimitive?.contentOrNull
-            val group = it["group_label"]?.jsonPrimitive?.contentOrNull
-            if (actor != null && group != null) getString(R.string.group_ring_notification_text, actor, group) else null
+            val actor = it["actor_label"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val group = it["group_label"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val label = it["ring_label"]?.jsonPrimitive?.contentOrNull
+            if (label.isNullOrBlank()) getString(R.string.group_ring_notification_text, actor, group)
+            else getString(R.string.group_ring_notification_text_labeled, actor, group, label)
         }.distinct().joinToString("\n")
         startForeground(
             NOTIFICATION_ID,
@@ -179,7 +181,9 @@ class GroupRingService : Service() {
             val groupId = ring["group_id"]?.jsonPrimitive?.contentOrNull ?: continue
             val actor = ring["actor_label"]?.jsonPrimitive?.contentOrNull ?: continue
             val group = ring["group_label"]?.jsonPrimitive?.contentOrNull ?: continue
-            val text = getString(R.string.group_ring_completed, actor, group)
+            val label = ring["ring_label"]?.jsonPrimitive?.contentOrNull
+            val text = if (label.isNullOrBlank()) getString(R.string.group_ring_completed, actor, group)
+            else getString(R.string.group_ring_completed_labeled, actor, group, label)
             manager.notify(
                 "group-ring:$groupId",
                 COMPLETED_NOTIFICATION_ID,

@@ -210,11 +210,13 @@ class GroupRingServiceTest {
             it.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
         }.sorted())
 
-        service.receive(Json.parseToJsonElement("""{"session_id":"latest","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Bob","group_label":"Family"}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"latest","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Bob","group_label":"Family","ring_label":"Breakfast"}""").jsonObject)
+        val ongoing = notifications.activeNotifications.single { it.id == GroupRingService.NOTIFICATION_ID }
+        assertEquals("Bob is ringing Family for Breakfast", ongoing.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
         service.receive(Json.parseToJsonElement("""{"session_id":"latest","group_id":"$familyGroupId","active":false,"lease_seconds":5}""").jsonObject)
         service.receive(firstRelease)
 
-        assertEquals(listOf("Bob rang Family", "Casey rang Family"), notifications.activeNotifications.map {
+        assertEquals(listOf("Bob rang Family for Breakfast", "Casey rang Family"), notifications.activeNotifications.map {
             it.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
         }.sorted())
     }

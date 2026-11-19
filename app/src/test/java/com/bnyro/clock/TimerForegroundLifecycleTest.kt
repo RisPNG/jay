@@ -11,11 +11,13 @@ import com.bnyro.clock.domain.model.BackupTimer
 import com.bnyro.clock.domain.model.TimerDescriptor
 import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.domain.model.WatchState
+import com.bnyro.clock.presentation.screens.timer.TimerAlertActivity
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.RingingCoordinator
 import com.bnyro.clock.util.services.TimerService
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -155,6 +157,67 @@ class TimerForegroundLifecycleTest {
             assertEquals(2, service.timerObjects.size)
             updateState.invoke(service)
             assertEquals(2, service.timerObjects.size)
+        } finally {
+            service.timerObjects.toList().forEach { timer ->
+                service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_STOP, timer.id))
+            }
+            shadowOf(Looper.getMainLooper()).idle()
+            controller.destroy()
+            Preferences.instance.edit().clear().commit()
+        }
+    }
+
+    @Test
+    fun openingAnAlertTargetsOnlyTheRequestedLiveRing() {
+        val application = ApplicationProvider.getApplicationContext<Application>()
+        Preferences.init(application)
+        Preferences.instance.edit().clear()
+            .putBoolean(Preferences.timerFullScreenAlertKey, false).commit()
+        shadowOf(application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        NotificationHelper.createStaticNotificationChannels(application)
+        val controller = Robolectric.buildService(TimerService::class.java).create()
+        val service = controller.get()
+        val updateState = TimerService::class.java.getDeclaredMethod("updateState").apply {
+            isAccessible = true
+        }
+        try {
+            val firstSettings = TimerSettings(seconds = 1, soundEnabled = false, vibrate = false, timeoutMinutes = 5)
+            val secondSettings = firstSettings.copy(seconds = 2, timeoutMinutes = 1)
+            listOf(TimerDescriptor(1, firstSettings), TimerDescriptor(2, secondSettings)).forEach { descriptor ->
+                service.onStartCommand(
+                    Intent(application, TimerService::class.java).putExtra(
+                        TimerService.INITIAL_TIMER_EXTRA_KEY, descriptor
+                    ), 0, descriptor.id
+                )
+            }
+            val (first, second) = service.timerObjects
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            updateState.invoke(service)
+            val firstRing = RingingCoordinator.selected
+            assertNotNull(firstRing)
+
+            service.openRingingTimer(second.id)
+            assertNull(shadowOf(application).nextStartedActivity)
+
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            updateState.invoke(service)
+            assertTrue(first.isRinging.value)
+            assertTrue(second.isRinging.value)
+
+            service.openRingingTimer(second.id)
+
+            val alert = requireNotNull(shadowOf(application).nextStartedActivity)
+            assertEquals(TimerAlertActivity::class.java.name, alert.component?.className)
+            assertEquals(second.id, alert.getIntExtra(TimerService.ID_EXTRA_KEY, 0))
+            assertSame(firstRing, RingingCoordinator.selected)
+
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(61))
+            service.openRingingTimer(second.id)
+
+            assertTrue(second in service.timerObjects)
+            assertFalse(second.isRinging.value)
+            assertNull(shadowOf(application).nextStartedActivity)
+            assertSame(firstRing, RingingCoordinator.selected)
         } finally {
             service.timerObjects.toList().forEach { timer ->
                 service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_STOP, timer.id))

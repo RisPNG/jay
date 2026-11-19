@@ -132,12 +132,12 @@ class SocialModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun ringGroup(groupId: String?) {
+    fun ringGroup(groupId: String?, label: String = "") {
         groupRingJob?.cancel()
         groupRingJob = groupId?.let {
             viewModelScope.launch {
                 try {
-                    repository.holdGroupRing(it)
+                    repository.holdGroupRing(it, label.trim().takeIf(String::isNotEmpty))
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Exception) {
