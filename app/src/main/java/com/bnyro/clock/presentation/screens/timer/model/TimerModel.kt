@@ -20,6 +20,7 @@ class TimerModel : ViewModel() {
 
     var onEnqueue: ((timer: TimerObject) -> Unit)? = null
     var updateTimer: (id: Int, settings: TimerSettings) -> Unit = { _, _ -> }
+    var openRingingTimer: (id: Int) -> Unit = {}
 
     var savedTimers by mutableStateOf(
         TimerSettings.getSavedTimers(),
