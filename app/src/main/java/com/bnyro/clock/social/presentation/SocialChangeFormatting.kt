@@ -94,6 +94,11 @@ fun SocialChange.groupLogTitle(context: Context): String {
     val actor = actorName ?: context.getString(R.string.unknown_group_member)
     val subject = subjectName ?: entityLabel ?: context.getString(R.string.unknown_group_member)
     return when (action) {
+        "rang" -> if (entityLabel.isNullOrBlank()) {
+            context.getString(R.string.group_ring_completed, actor, groupName)
+        } else {
+            context.getString(R.string.group_ring_completed_labeled, actor, groupName, entityLabel)
+        }
         "created" -> context.getString(R.string.group_log_created, actor)
         "joined" -> context.getString(R.string.group_log_joined, subject)
         "left" -> context.getString(R.string.group_log_left, subject)

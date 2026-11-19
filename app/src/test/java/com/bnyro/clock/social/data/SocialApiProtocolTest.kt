@@ -20,6 +20,9 @@ class SocialApiProtocolTest {
         val authorization: String?,
         val identity: String?,
         val installation: String?,
+        val ringOrigin: String?,
+        val ringPushTokenDigest: String?,
+        val ringLabel: String?,
         val accept: String?,
         val operationId: String?,
         val body: String
@@ -34,7 +37,9 @@ class SocialApiProtocolTest {
             requests += Request(
                 path, exchange.requestMethod, exchange.requestHeaders.getFirst("X-Jay-Protocol"),
                 exchange.requestHeaders.getFirst("Authorization"), exchange.requestHeaders.getFirst("X-Jay-Identity-ID"),
-                exchange.requestHeaders.getFirst("X-Jay-Installation"), exchange.requestHeaders.getFirst("Accept"),
+                exchange.requestHeaders.getFirst("X-Jay-Installation"), exchange.requestHeaders.getFirst("X-Jay-Ring-Origin"),
+                exchange.requestHeaders.getFirst("X-Jay-Ring-Push-Token-Digest"),
+                exchange.requestHeaders.getFirst("X-Jay-Ring-Label"), exchange.requestHeaders.getFirst("Accept"),
                 exchange.requestHeaders.getFirst("Idempotency-Key"), exchange.requestBody.bufferedReader().use { it.readText() }
             )
             val body = when (path) {
@@ -69,9 +74,12 @@ class SocialApiProtocolTest {
                 changes += it
                 listening = false
             }
-            api.holdGroupRing("group")
+            val origin = "fcc8c006-4202-49da-b4ab-75c83a705c73"
+            val pushTokenDigest = "a".repeat(64)
+            api.holdGroupRing("group", origin, pushTokenDigest, "Café + 🍳")
+            api.holdGroupRing("group", origin, pushTokenDigest, null)
 
-            assertEquals(6, requests.size)
+            assertEquals(7, requests.size)
             assertTrue(requests.all { it.protocol == "3" })
             val registration = requests.single { it.path == "/v1/identities/register" }
             assertEquals("POST", registration.method)
@@ -87,11 +95,17 @@ class SocialApiProtocolTest {
             assertEquals(operation.operationId, mutation.operationId)
             assertEquals(operation.payload, mutation.body)
             assertEquals("text/event-stream", requests.single { it.path == "/v1/events" }.accept)
-            val ring = requests.single { it.path == "/v1/groups/group/ring" }
-            assertEquals("POST", ring.method)
-            assertEquals("text/event-stream", ring.accept)
-            assertNull(ring.operationId)
-            assertEquals("", ring.body)
+            val rings = requests.filter { it.path == "/v1/groups/group/ring" }
+            assertEquals(listOf("Caf%C3%A9+%2B+%F0%9F%8D%B3", null), rings.map { it.ringLabel })
+            rings.forEach { ring ->
+                assertEquals("POST", ring.method)
+                assertEquals(origin, ring.ringOrigin)
+                assertEquals(pushTokenDigest, ring.ringPushTokenDigest)
+                assertEquals("text/event-stream", ring.accept)
+                assertNull(ring.operationId)
+                assertEquals("", ring.body)
+            }
+            assertTrue((requests - rings.toSet()).all { it.ringOrigin == null && it.ringPushTokenDigest == null && it.ringLabel == null })
             assertEquals(listOf(setOf("group")), changes)
         } finally {
             server.stop(0)

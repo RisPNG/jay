@@ -19,6 +19,7 @@ class SocialPushMessagingService : FirebaseMessagingService() {
             "sync" -> SocialSyncWorker.enqueue(this, expedited = true)
             "ring" -> {
                 if (message.priority != RemoteMessage.PRIORITY_HIGH) return
+                if (message.data["origin"] == SocialRepository.groupRingOrigin) return
                 val server = Preferences.instance.getString(
                     SocialPreferences.serverUrlKey,
                     SocialRepository.DEFAULT_SERVER_URL

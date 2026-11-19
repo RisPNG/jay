@@ -1,0 +1,9 @@
+- Add an optional label to Hold to Ring. Show who rang and their label in the group log and in the latest completed ring notice for each group.
+- Tap a ringing timer in the timer list to open its ringing screen.
+- Show group members in the order they joined, with the earliest first.
+- On Android 8 and later, show heads-up notifications for incoming group rings and for ringing timers when full-screen alerts are off.
+- Make the phone holding the ring button vibrate while other devices ring, including devices on the same profile.
+- Fix an expiry timestamp that could prevent group rings from starting.
+- Fix timer expiry and notification behaviour when pausing or adjusting timers.
+- Update Estonian translations.
+- Keep existing group features working on Jay 1.2.5 to 1.2.7.

@@ -59,11 +59,13 @@ class SocialPushMessagingServiceTest {
             "session_id" to "hold",
             "group_id" to "family",
             "identity_id" to identity.id,
+            "origin" to "fcc8c006-4202-49da-b4ab-75c83a705c73",
             "server_url" to "https://jay.example/",
             "expires_at" to Instant.ofEpochMilli(System.currentTimeMillis() + 5_000L).toString()
         )
         for (data in listOf(
             valid + ("identity_id" to "previous-profile"),
+            valid + ("origin" to SocialRepository.groupRingOrigin),
             valid + ("server_url" to "https://previous.example"),
             valid + ("expires_at" to Instant.ofEpochMilli(System.currentTimeMillis() - 1_000L).toString()),
             valid + ("expires_at" to "invalid"),

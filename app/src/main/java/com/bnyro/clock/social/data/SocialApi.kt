@@ -29,6 +29,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URLEncoder
 import java.time.ZoneId
 import java.io.File
 
@@ -220,12 +221,15 @@ class SocialApi(
         }
     }
 
-    suspend fun holdGroupRing(groupId: String) = coroutineScope {
+    suspend fun holdGroupRing(groupId: String, origin: String, pushTokenDigest: String?, label: String?) = coroutineScope {
         val connection = URI("$baseUrl/v1/groups/$groupId/ring").toURL().openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
         connection.connectTimeout = 15_000
         connection.readTimeout = 7_000
         connection.setRequestProperty("X-Jay-Protocol", "3")
+        connection.setRequestProperty("X-Jay-Ring-Origin", origin)
+        pushTokenDigest?.let { connection.setRequestProperty("X-Jay-Ring-Push-Token-Digest", it) }
+        label?.let { connection.setRequestProperty("X-Jay-Ring-Label", URLEncoder.encode(it, Charsets.UTF_8.name())) }
         connection.setRequestProperty("Accept", "text/event-stream")
         connection.setRequestProperty("Authorization", "Bearer ${identity.token}")
         connection.setRequestProperty("X-Jay-Identity-ID", identity.id)

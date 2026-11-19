@@ -2,6 +2,7 @@ package com.bnyro.clock
 
 import android.Manifest
 import android.app.Application
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Intent
 import android.os.Looper
@@ -11,11 +12,13 @@ import com.bnyro.clock.domain.model.BackupTimer
 import com.bnyro.clock.domain.model.TimerDescriptor
 import com.bnyro.clock.domain.model.TimerSettings
 import com.bnyro.clock.domain.model.WatchState
+import com.bnyro.clock.presentation.screens.timer.TimerAlertActivity
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.RingingCoordinator
 import com.bnyro.clock.util.services.TimerService
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -55,7 +58,8 @@ class TimerForegroundLifecycleTest {
                 )
                 val timer = service.timerObjects.single()
                 val expiresAt = timer.expiresAt
-                ShadowSystemClock.advanceBy(Duration.ofMillis(seconds * 1000L - 1))
+                val remaining = timer.elapsedRealtimeDeadline - SystemClock.elapsedRealtime()
+                ShadowSystemClock.advanceBy(Duration.ofMillis(remaining - 1))
                 updateState.invoke(service)
                 assertEquals(WatchState.RUNNING, timer.state.value)
                 assertNull(RingingCoordinator.selected)
@@ -93,6 +97,61 @@ class TimerForegroundLifecycleTest {
                 shadowOf(Looper.getMainLooper()).idle()
                 assertTrue(service.timerObjects.isEmpty())
             }
+        } finally {
+            service.timerObjects.toList().forEach { timer ->
+                service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_STOP, timer.id))
+            }
+            shadowOf(Looper.getMainLooper()).idle()
+            controller.destroy()
+            Preferences.instance.edit().clear().commit()
+        }
+    }
+
+    @Test
+    fun ringingTimerKeepsItsHeadsUpEligibilityThroughElapsedTimeUpdates() {
+        val application = ApplicationProvider.getApplicationContext<Application>()
+        Preferences.init(application)
+        Preferences.instance.edit().clear()
+            .putBoolean(Preferences.timerFullScreenAlertKey, false).commit()
+        shadowOf(application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        NotificationHelper.createStaticNotificationChannels(application)
+        val controller = Robolectric.buildService(TimerService::class.java).create()
+        val service = controller.get()
+        val updateState = TimerService::class.java.getDeclaredMethod("updateState").apply {
+            isAccessible = true
+        }
+        try {
+            val settings = TimerSettings(seconds = 1, soundEnabled = false, vibrate = false, timeoutMinutes = 1)
+            service.onStartCommand(
+                Intent(application, TimerService::class.java).putExtra(
+                    TimerService.INITIAL_TIMER_EXTRA_KEY, TimerDescriptor(1, settings)
+                ), 0, 1
+            )
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            updateState.invoke(service)
+
+            val notificationId = shadowOf(service).lastForegroundNotificationId
+            val announcement = requireNotNull(shadowOf(service).lastForegroundNotification)
+            assertEquals(NotificationHelper.TIMER_FINISHED_CHANNEL, announcement.channelId)
+            assertEquals(Notification.GROUP_ALERT_ALL, announcement.groupAlertBehavior)
+            assertFalse(announcement.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+            assertNull(announcement.fullScreenIntent)
+
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            updateState.invoke(service)
+
+            val manager = application.getSystemService(NotificationManager::class.java)
+            val elapsedUpdate = manager.activeNotifications.single { it.id == notificationId }.notification
+            assertEquals(Notification.GROUP_ALERT_ALL, elapsedUpdate.groupAlertBehavior)
+            assertTrue(elapsedUpdate.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+            assertNull(elapsedUpdate.fullScreenIntent)
+
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(61))
+
+            val finished = manager.activeNotifications.single { it.id == notificationId }.notification
+            assertNotNull(finished.group)
+            assertEquals(Notification.GROUP_ALERT_SUMMARY, finished.groupAlertBehavior)
+            assertNull(finished.fullScreenIntent)
         } finally {
             service.timerObjects.toList().forEach { timer ->
                 service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_STOP, timer.id))
@@ -155,6 +214,67 @@ class TimerForegroundLifecycleTest {
             assertEquals(2, service.timerObjects.size)
             updateState.invoke(service)
             assertEquals(2, service.timerObjects.size)
+        } finally {
+            service.timerObjects.toList().forEach { timer ->
+                service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_STOP, timer.id))
+            }
+            shadowOf(Looper.getMainLooper()).idle()
+            controller.destroy()
+            Preferences.instance.edit().clear().commit()
+        }
+    }
+
+    @Test
+    fun openingAnAlertTargetsOnlyTheRequestedLiveRing() {
+        val application = ApplicationProvider.getApplicationContext<Application>()
+        Preferences.init(application)
+        Preferences.instance.edit().clear()
+            .putBoolean(Preferences.timerFullScreenAlertKey, false).commit()
+        shadowOf(application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        NotificationHelper.createStaticNotificationChannels(application)
+        val controller = Robolectric.buildService(TimerService::class.java).create()
+        val service = controller.get()
+        val updateState = TimerService::class.java.getDeclaredMethod("updateState").apply {
+            isAccessible = true
+        }
+        try {
+            val firstSettings = TimerSettings(seconds = 1, soundEnabled = false, vibrate = false, timeoutMinutes = 5)
+            val secondSettings = firstSettings.copy(seconds = 2, timeoutMinutes = 1)
+            listOf(TimerDescriptor(1, firstSettings), TimerDescriptor(2, secondSettings)).forEach { descriptor ->
+                service.onStartCommand(
+                    Intent(application, TimerService::class.java).putExtra(
+                        TimerService.INITIAL_TIMER_EXTRA_KEY, descriptor
+                    ), 0, descriptor.id
+                )
+            }
+            val (first, second) = service.timerObjects
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            updateState.invoke(service)
+            val firstRing = RingingCoordinator.selected
+            assertNotNull(firstRing)
+
+            service.openRingingTimer(second.id)
+            assertNull(shadowOf(application).nextStartedActivity)
+
+            ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
+            updateState.invoke(service)
+            assertTrue(first.isRinging.value)
+            assertTrue(second.isRinging.value)
+
+            service.openRingingTimer(second.id)
+
+            val alert = requireNotNull(shadowOf(application).nextStartedActivity)
+            assertEquals(TimerAlertActivity::class.java.name, alert.component?.className)
+            assertEquals(second.id, alert.getIntExtra(TimerService.ID_EXTRA_KEY, 0))
+            assertSame(firstRing, RingingCoordinator.selected)
+
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(61))
+            service.openRingingTimer(second.id)
+
+            assertTrue(second in service.timerObjects)
+            assertFalse(second.isRinging.value)
+            assertNull(shadowOf(application).nextStartedActivity)
+            assertSame(firstRing, RingingCoordinator.selected)
         } finally {
             service.timerObjects.toList().forEach { timer ->
                 service.sendBroadcast(TimerService.updateStateIntent(TimerService.ACTION_STOP, timer.id))

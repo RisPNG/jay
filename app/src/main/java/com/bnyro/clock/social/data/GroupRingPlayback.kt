@@ -17,7 +17,7 @@ import java.time.Instant
 
 class GroupRingPlayback(
     private val context: Context,
-    private val onChanged: (List<JsonObject>) -> Unit = {}
+    private val onChanged: (active: List<JsonObject>, completed: List<JsonObject>) -> Unit = { _, _ -> }
 ) : RingingSession {
     override val soundEnabled = true
     override val vibrate = false
@@ -27,23 +27,10 @@ class GroupRingPlayback(
     private val handler = Handler(Looper.getMainLooper())
     private val leases = linkedMapOf<String, Pair<Long, JsonObject>>()
     private var player: MediaPlayer? = null
-    private val expiry = object : Runnable {
-        override fun run() {
-            val now = SystemClock.elapsedRealtime()
-            leases.entries.removeAll { it.value.first <= now }
-            if (leases.isEmpty()) {
-                RingingCoordinator.stop(this@GroupRingPlayback)
-            } else {
-                handler.postDelayed(this, leases.values.minOf { it.first } - now)
-            }
-            onChanged(leases.values.map { it.second })
-        }
-    }
+    private val expiry = Runnable { updateLeases() }
 
     fun receive(event: JsonObject?) {
-        handler.removeCallbacks(expiry)
-        val elapsed = SystemClock.elapsedRealtime()
-        leases.entries.removeAll { it.value.first <= elapsed }
+        var released: JsonObject? = null
         if (event == null) {
             leases.clear()
         } else {
@@ -56,11 +43,23 @@ class GroupRingPlayback(
                     (Instant.parse(expiresAt).toEpochMilli() - now).coerceAtMost(leaseMillis)
                 } ?: leaseMillis
                 if (remaining > 0) {
-                    leases[session] = (elapsed + remaining) to event
+                    leases[session] = (SystemClock.elapsedRealtime() + remaining) to event
                 }
             } else {
-                leases.remove(session)
+                released = leases.remove(session)?.second
             }
+        }
+        updateLeases(released)
+    }
+
+    private fun updateLeases(released: JsonObject? = null) {
+        handler.removeCallbacks(expiry)
+        val now = SystemClock.elapsedRealtime()
+        val expired = mutableListOf<Pair<Long, JsonObject>>()
+        leases.values.removeAll { lease ->
+            if (lease.first > now) return@removeAll false
+            expired += lease
+            true
         }
         if (leases.isEmpty()) {
             RingingCoordinator.stop(this)
@@ -68,7 +67,7 @@ class GroupRingPlayback(
             RingingCoordinator.start(this)
             handler.postDelayed(expiry, leases.values.minOf { it.first } - SystemClock.elapsedRealtime())
         }
-        onChanged(leases.values.map { it.second })
+        onChanged(leases.values.map { it.second }, expired.sortedBy { it.first }.map { it.second } + listOfNotNull(released))
     }
 
     override fun onSelected() {

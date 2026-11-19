@@ -36,6 +36,8 @@ data class TimerObject(
     var sharedGroupName: String? = null,
     var sharedCanEdit: Boolean = true
 ) {
+    val isRinging = mutableStateOf(false)
+
     val secondsLeft: Int
         get() = ceil(currentPosition.value / 1000.0).toInt()
 

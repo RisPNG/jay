@@ -7,6 +7,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from datetime import datetime, timedelta
+from hashlib import sha256
 from uuid import uuid4
 
 from channels.db import database_sync_to_async
@@ -350,7 +351,8 @@ def maintain_state():
 
 
 def push_recipients(work):
-    if work.payload.get("kind") == "ring":
+    ring = work.payload.get("kind") == "ring"
+    if ring:
         if datetime.fromisoformat(work.payload["expires_at"]) <= timezone.now() or not DeliveryWork.objects.filter(pk=work.pk, lease_owner=work.lease_owner).exists():
             return []
         actor = GroupMembership.objects.select_related("group").filter(
@@ -360,7 +362,7 @@ def push_recipients(work):
         if actor is None or (actor.group.alarm_permission == "leaders" and actor.role != "leader"):
             return []
     subscriptions = PushSubscription.objects.filter(identity__retired_at=None).order_by("token")
-    if work.payload.get("kind") == "ring":
+    if ring:
         subscriptions = subscriptions.filter(group_ring_enabled=True)
     if work.payload.get("identity_id"):
         subscriptions = subscriptions.filter(identity_id=work.payload["identity_id"])
@@ -370,7 +372,16 @@ def push_recipients(work):
             subscriptions = subscriptions.exclude(identity_id=work.payload["excluding"])
     if work.payload.get("after_token"):
         subscriptions = subscriptions.filter(token__gt=work.payload["after_token"])
-    return list(subscriptions.values_list("token", "identity_id")[:101])
+    page_limit = 101
+    recipients = subscriptions.values_list("token", "identity_id")
+    origin_digest = work.payload.get("origin_push_digest") if ring else None
+    if origin_digest is None:
+        return list(recipients[:page_limit])
+    actor_id = work.payload["actor_id"]
+    return [
+        (token, identity_id) for token, identity_id in recipients[:page_limit + 1]
+        if identity_id != actor_id or sha256(token.encode()).hexdigest() != origin_digest
+    ][:page_limit]
 
 
 class Worker:
@@ -490,8 +501,16 @@ class Worker:
                             "kind": "ring", "session_id": work.payload["session_id"], "group_id": work.payload["group_id"],
                             "server_url": settings.PUBLIC_URL, "expires_at": work.payload["expires_at"],
                         } if ring else {"kind": "sync", "scope_id": work.payload["scope_id"]}
+                        actor_id = work.payload.get("actor_id")
+                        origin = {"origin": work.payload["origin"]} if ring and "origin" in work.payload else {}
                         android = messaging.AndroidConfig(priority="high", ttl=0 if ring else None)
-                        messages = [messaging.Message(token=token, data={**data, "identity_id": identity_id} if ring else data, android=android) for token, identity_id in recipients[:100]]
+                        messages = [
+                            messaging.Message(
+                                token=token, android=android,
+                                data={**data, "identity_id": identity_id, **(origin if identity_id == actor_id else {})} if ring else data,
+                            )
+                            for token, identity_id in recipients[:100]
+                        ]
                         response = await asyncio.wait_for(messaging.send_each_async(messages), timeout=min(20, remaining))
                         retry = False
                         for (token, identity_id), result in zip(recipients[:100], response.responses):

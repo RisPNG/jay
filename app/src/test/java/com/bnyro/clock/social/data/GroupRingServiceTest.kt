@@ -42,6 +42,8 @@ class GroupRingServiceTest {
     private lateinit var controller: ServiceController<GroupRingService>
     private lateinit var service: GroupRingService
     private lateinit var notifications: NotificationManager
+    private val familyGroupId = "e8058219-5992-4dae-94ef-1a143a085d90"
+    private val friendsGroupId = "558c04a1-0754-4801-853a-6fb1fb1e6138"
     private var destroyed = false
 
     @Before
@@ -70,7 +72,7 @@ class GroupRingServiceTest {
     @Test
     fun aVisibleRingRetainsTheServiceAndOnlyShowsItsColoredExplanation() {
         service.onBind(Intent(app, GroupRingService::class.java))
-        service.receive(Json.parseToJsonElement("""{"session_id":"visible","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"visible","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
 
         val retained = requireNotNull(shadowOf(app).nextStartedService)
         assertEquals(GroupRingService::class.java.name, retained.component?.className)
@@ -86,10 +88,36 @@ class GroupRingServiceTest {
     }
 
     @Test
+    fun anOutgoingRingIsSilentWhileAnotherInstallationOnTheSameProfileCanRing() {
+        val actor = DeviceIdentityStore.loadOrCreate(app, "http://127.0.0.1:1").id
+        val ownRing = Json.parseToJsonElement("""{"session_id":"own-ring","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_id":"$actor","actor_label":"Alice","group_label":"Family","origin":"${SocialRepository.groupRingOrigin}"}""").jsonObject
+        val incomingRing = Json.parseToJsonElement("""{"session_id":"incoming-ring","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_id":"$actor","actor_label":"Alice","group_label":"Family","origin":"fcc8c006-4202-49da-b4ab-75c83a705c73"}""").jsonObject
+
+        service.receive(ownRing)
+
+        assertNull(RingingCoordinator.selected)
+        assertNull(shadowOf(app).nextStartedService)
+        assertTrue(notifications.activeNotifications.isEmpty())
+
+        service.receive(incomingRing)
+        service.receive(ownRing)
+        service.receive(Json.parseToJsonElement("""{"session_id":"own-ring","group_id":"$familyGroupId","active":false,"lease_seconds":5}""").jsonObject)
+
+        assertNotNull(RingingCoordinator.selected)
+        assertEquals("Alice is ringing Family", notifications.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+
+        service.receive(Json.parseToJsonElement("""{"session_id":"incoming-ring","group_id":"$familyGroupId","active":false,"lease_seconds":5}""").jsonObject)
+
+        assertNull(RingingCoordinator.selected)
+        assertEquals("Alice rang Family", notifications.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+    }
+
+    @Test
     fun aPushWaitsSilentlyThroughStreamResetAndExpiresWithoutAFreshLease() {
         service.onStartCommand(
             Intent(app, GroupRingService::class.java).setAction(GroupRingService.ACTION_WAKE)
                 .putExtra(GroupRingService.EXTRA_SESSION_ID, "pending")
+                .putExtra(GroupRingService.EXTRA_GROUP_ID, familyGroupId)
                 .putExtra(GroupRingService.EXTRA_LEASE_MILLIS, 5_000L), 0, 1
         )
         service.receive(null)
@@ -109,17 +137,18 @@ class GroupRingServiceTest {
 
     @Test
     fun duplicatePushesCannotExtendAnActiveRingOrResurrectAReleasedSession() {
-        service.receive(Json.parseToJsonElement("""{"session_id":"duplicate","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"duplicate","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
         val wake = Intent(app, GroupRingService::class.java).setAction(GroupRingService.ACTION_WAKE)
             .putExtra(GroupRingService.EXTRA_SESSION_ID, "duplicate")
+            .putExtra(GroupRingService.EXTRA_GROUP_ID, familyGroupId)
             .putExtra(GroupRingService.EXTRA_LEASE_MILLIS, 5_000L)
         service.onStartCommand(wake, 0, 1)
         assertEquals("Alice is ringing Family", notifications.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
 
-        service.receive(Json.parseToJsonElement("""{"session_id":"duplicate","active":false,"lease_seconds":5}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"duplicate","group_id":"$familyGroupId","active":false,"lease_seconds":5}""").jsonObject)
         service.onStartCommand(wake, 0, 2)
 
-        assertTrue(notifications.activeNotifications.isEmpty())
+        assertEquals("Alice rang Family", notifications.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
         assertNull(RingingCoordinator.selected)
     }
 
@@ -128,10 +157,11 @@ class GroupRingServiceTest {
         service.onStartCommand(
             Intent(app, GroupRingService::class.java).setAction(GroupRingService.ACTION_WAKE)
                 .putExtra(GroupRingService.EXTRA_SESSION_ID, "released-pending")
+                .putExtra(GroupRingService.EXTRA_GROUP_ID, familyGroupId)
                 .putExtra(GroupRingService.EXTRA_LEASE_MILLIS, 5_000L), 0, 1
         )
 
-        service.receive(Json.parseToJsonElement("""{"session_id":"released-pending","active":false,"lease_seconds":5}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"released-pending","group_id":"$familyGroupId","active":false,"lease_seconds":5}""").jsonObject)
 
         assertTrue(notifications.activeNotifications.isEmpty())
         assertTrue(shadowOf(service).isStoppedBySelf)
@@ -143,43 +173,102 @@ class GroupRingServiceTest {
         service.onStartCommand(
             Intent(app, GroupRingService::class.java).setAction(GroupRingService.ACTION_WAKE)
                 .putExtra(GroupRingService.EXTRA_SESSION_ID, "cold")
+                .putExtra(GroupRingService.EXTRA_GROUP_ID, familyGroupId)
                 .putExtra(GroupRingService.EXTRA_LEASE_MILLIS, 5_000L), 0, 1
         )
         assertNull(RingingCoordinator.selected)
+        val waiting = notifications.activeNotifications.single().notification
+        assertTrue(waiting.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
 
-        service.receive(Json.parseToJsonElement("""{"session_id":"cold","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+        val lease = Json.parseToJsonElement("""{"session_id":"cold","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject
+        service.receive(lease)
         assertNotNull(RingingCoordinator.selected)
-        assertEquals("Alice is ringing Family", notifications.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+        val ringing = notifications.activeNotifications.single().notification
+        assertEquals("Alice is ringing Family", ringing.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+        assertFalse(ringing.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertNull(ringing.fullScreenIntent)
+        assertTrue(ringing.actions.isNullOrEmpty())
 
-        service.receive(Json.parseToJsonElement("""{"session_id":"cold","active":false,"lease_seconds":5}""").jsonObject)
+        service.receive(lease)
+        val renewal = notifications.activeNotifications.single().notification
+        assertTrue(renewal.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
 
-        assertTrue(notifications.activeNotifications.isEmpty())
+        service.receive(Json.parseToJsonElement("""{"session_id":"cold","group_id":"$familyGroupId","active":false,"lease_seconds":5}""").jsonObject)
+
         assertNull(RingingCoordinator.selected)
+        val recap = notifications.activeNotifications.single().notification
+        assertEquals("Alice rang Family", recap.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+        assertFalse(recap.flags and (Notification.FLAG_ONGOING_EVENT or Notification.FLAG_NO_CLEAR) != 0)
+        assertNull(recap.sound)
+        assertNull(recap.fullScreenIntent)
+        assertTrue(recap.actions.isNullOrEmpty())
+
+        controller.destroy()
+        destroyed = true
+
+        assertEquals("Alice rang Family", notifications.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+    }
+
+    @Test
+    fun onlyTheLatestCompletedRingPerGroupRemains() {
+        service.receive(Json.parseToJsonElement("""{"session_id":"first","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+        val firstRelease = Json.parseToJsonElement("""{"session_id":"first","group_id":"$familyGroupId","active":false,"lease_seconds":5}""").jsonObject
+        service.receive(firstRelease)
+        service.receive(Json.parseToJsonElement("""{"session_id":"other-group","group_id":"$friendsGroupId","active":true,"lease_seconds":5,"actor_label":"Casey","group_label":"Family"}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"other-group","group_id":"$friendsGroupId","active":false,"lease_seconds":5}""").jsonObject)
+
+        assertEquals(listOf("Alice rang Family", "Casey rang Family"), notifications.activeNotifications.map {
+            it.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+        }.sorted())
+
+        service.receive(Json.parseToJsonElement("""{"session_id":"latest","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Bob","group_label":"Family","ring_label":"Breakfast"}""").jsonObject)
+        val ongoing = notifications.activeNotifications.single { it.id == GroupRingService.NOTIFICATION_ID }
+        assertEquals("Bob is ringing Family for Breakfast", ongoing.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+        service.receive(Json.parseToJsonElement("""{"session_id":"latest","group_id":"$familyGroupId","active":false,"lease_seconds":5}""").jsonObject)
+        service.receive(firstRelease)
+
+        assertEquals(listOf("Bob rang Family for Breakfast", "Casey rang Family"), notifications.activeNotifications.map {
+            it.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+        }.sorted())
     }
 
     @Test
     fun concurrentCallersKeepTheirExplanationUntilTheLastLeaseExpires() {
-        service.receive(Json.parseToJsonElement("""{"session_id":"alice","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
-        service.receive(Json.parseToJsonElement("""{"session_id":"bob","active":true,"lease_seconds":5,"actor_label":"Bob","group_label":"Friends"}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"alice","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"bob","group_id":"$friendsGroupId","active":true,"lease_seconds":5,"actor_label":"Bob","group_label":"Friends"}""").jsonObject)
         val combined = notifications.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
         assertTrue(combined.contains("Alice is ringing Family"))
         assertTrue(combined.contains("Bob is ringing Friends"))
 
-        service.receive(Json.parseToJsonElement("""{"session_id":"alice","active":false,"lease_seconds":5}""").jsonObject)
-        assertEquals("Bob is ringing Friends", notifications.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+        service.receive(Json.parseToJsonElement("""{"session_id":"alice","group_id":"$familyGroupId","active":false,"lease_seconds":5}""").jsonObject)
+        assertEquals(listOf("Alice rang Family", "Bob is ringing Friends"), notifications.activeNotifications.map {
+            it.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+        }.sorted())
         assertNotNull(RingingCoordinator.selected)
         val wakeLock = GroupRingService::class.java.getDeclaredField("wakeLock").apply { isAccessible = true }.get(service) as PowerManager.WakeLock
 
         shadowOf(Looper.getMainLooper()).idleFor(5, TimeUnit.SECONDS)
 
-        assertTrue(notifications.activeNotifications.isEmpty())
+        assertEquals(listOf("Alice rang Family", "Bob rang Friends"), notifications.activeNotifications.map {
+            it.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+        }.sorted())
         assertNull(RingingCoordinator.selected)
         assertFalse(wakeLock.isHeld)
     }
 
     @Test
+    fun resettingTheStreamClearsAnActiveRingWithoutPostingARecap() {
+        service.receive(Json.parseToJsonElement("""{"session_id":"reset-stream","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+
+        service.receive(null)
+
+        assertTrue(notifications.activeNotifications.isEmpty())
+        assertNull(RingingCoordinator.selected)
+    }
+
+    @Test
     fun destroyingTheServiceReleasesPlaybackNotificationAndWakeLock() {
-        service.receive(Json.parseToJsonElement("""{"session_id":"destroyed","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"destroyed","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
         val wakeLock = GroupRingService::class.java.getDeclaredField("wakeLock").apply { isAccessible = true }.get(service) as PowerManager.WakeLock
         assertTrue(wakeLock.isHeld)
 
@@ -195,7 +284,7 @@ class GroupRingServiceTest {
 
     @Test
     fun changingTheServerEndsItsRingAndNotification() {
-        service.receive(Json.parseToJsonElement("""{"session_id":"old-server","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"old-server","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
 
         Preferences.instance.edit().putString(SocialPreferences.serverUrlKey, "http://127.0.0.1:2").commit()
         shadowOf(Looper.getMainLooper()).idle()
@@ -206,7 +295,7 @@ class GroupRingServiceTest {
 
     @Test
     fun importingAnotherProfileEndsThePreviousProfilesRing() {
-        service.receive(Json.parseToJsonElement("""{"session_id":"old-profile","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"old-profile","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
 
         app.getSharedPreferences("jay_identity", Context.MODE_PRIVATE).edit()
             .putString(SocialPreferences.deviceSecretKey, android.util.Base64.encodeToString(ByteArray(32) { 1 }, android.util.Base64.NO_WRAP or android.util.Base64.URL_SAFE)).commit()
@@ -218,7 +307,7 @@ class GroupRingServiceTest {
 
     @Test
     fun resettingTheProfileEndsItsRingEvenWhenPreferencesReportAClear() {
-        service.receive(Json.parseToJsonElement("""{"session_id":"reset-profile","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+        service.receive(Json.parseToJsonElement("""{"session_id":"reset-profile","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
 
         app.getSharedPreferences("jay_identity", Context.MODE_PRIVATE).edit().clear().commit()
         shadowOf(Looper.getMainLooper()).idle()

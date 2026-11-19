@@ -290,7 +290,8 @@ class SocialRepository(
                     it.groupId,
                     it.deviceId,
                     it.name,
-                    MemberRole.valueOf(it.role.uppercase())
+                    MemberRole.valueOf(it.role.uppercase()),
+                    it.joinedAtMicros
                 )
             })
         }
@@ -582,12 +583,13 @@ class SocialRepository(
         }
     }
 
-    suspend fun holdGroupRing(groupId: String) = withContext(Dispatchers.IO) {
+    suspend fun holdGroupRing(groupId: String, label: String?) = withContext(Dispatchers.IO) {
         val group = groups.first().first { it.id == groupId }
         check(group.canEditAlarms) { "Group edit permission is required to ring this group" }
         val serverUrl = Preferences.instance.getString(SocialPreferences.serverUrlKey, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
         val identity = DeviceIdentityStore.loadOrCreate(context, serverUrl)
-        SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl)).holdGroupRing(groupId)
+        SocialApi(serverUrl, identity, PlayInstallationStore.credential(context, serverUrl))
+            .holdGroupRing(groupId, groupRingOrigin, PushRegistrationWorker.tokenDigest, label)
     }
 
     suspend fun followLiveChanges(onRing: suspend (JsonObject?) -> Unit) = withContext(Dispatchers.IO) {
@@ -1425,6 +1427,7 @@ class SocialRepository(
 
     companion object {
         const val DEFAULT_SERVER_URL = "https://jay.poppybit.com"
+        internal val groupRingOrigin = UUID.randomUUID().toString()
 
         private val RESOLVED_OCCURRENCE_STATUSES = setOf("dismissed", "ignored")
         private const val SHARED_TIMER_LINGER_MILLIS = 15 * 60_000L

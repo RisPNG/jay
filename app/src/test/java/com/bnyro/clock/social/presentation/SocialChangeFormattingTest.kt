@@ -44,6 +44,14 @@ class SocialChangeFormattingTest {
     }
 
     @Test
+    fun groupLogsShowTheRingerAndOptionalLabel() {
+        val ring = change.copy(entityType = "ring", action = "rang", entityLabel = "Breakfast", entityTime = null)
+
+        assertEquals("Alex rang Household for Breakfast", ring.groupLogTitle(context))
+        assertEquals("Alex rang Household", ring.copy(entityLabel = null).groupLogTitle(context))
+    }
+
+    @Test
     fun alarmEditsRetainDetailsWhenEnabledStateAlsoChanges() {
         val entry = change.copy(details = buildJsonObject {
             put("previous_label", "Morning")
