@@ -49,7 +49,7 @@ def ring_wake(group, member):
     return DeliveryWork.objects.create(kind="push", deduplication_key=f"ring:{uuid4()}", payload={
         "kind": "ring", "scope_id": str(group.scope_id), "group_id": str(group.pk),
         "session_id": str(uuid4()), "actor_id": "2" * 64,
-        "expires_at": (timezone.now() + timedelta(seconds=5)).isoformat(),
+        "expires_at": (timezone.now() + timedelta(seconds=5)).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
     })
 
 

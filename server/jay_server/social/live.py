@@ -5,7 +5,7 @@ from uuid import uuid4
 from contextlib import suppress
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import UTC, timedelta
 
 from channels.consumer import AsyncConsumer
 from channels.db import database_sync_to_async
@@ -16,6 +16,7 @@ from django.http.request import split_domain_port, validate_host
 from django.utils import timezone
 from psycopg import AsyncConnection
 from rest_framework.exceptions import APIException
+from rest_framework.fields import DateTimeField
 
 from .authentication import authenticate_identity
 from .access import require_membership
@@ -47,7 +48,7 @@ def authorize_stream(authorization, identity_id):
 
 @transaction.atomic
 def publish_group_ring(authorization, identity_id, group_id, session_id, scope_id=None, wake=False):
-    expires_at = timezone.now() + timedelta(seconds=5)
+    lease_seconds = 5
     if scope_id is None:
         identity = authenticate_identity(authorization, identity_id)
         group = Group.objects.filter(pk=group_id, deleted_at=None).first()
@@ -58,13 +59,14 @@ def publish_group_ring(authorization, identity_id, group_id, session_id, scope_i
         active = True
     else:
         active = False
-    payload = {"scope_id": scope_id, "group_id": str(group_id), "session_id": session_id, "active": active, "lease_seconds": 5}
+    payload = {"scope_id": scope_id, "group_id": str(group_id), "session_id": session_id, "active": active, "lease_seconds": lease_seconds}
     if active:
-        payload.update(actor_id=identity.pk, actor_label=identity.name, group_label=group.name, expires_at=expires_at.isoformat())
+        expires_at = DateTimeField(format="iso-8601", default_timezone=UTC).to_representation(timezone.now() + timedelta(seconds=lease_seconds))
+        payload.update(actor_id=identity.pk, actor_label=identity.name, group_label=group.name, expires_at=expires_at)
         if wake and settings.FIREBASE_CREDENTIALS_JSON:
             DeliveryWork.objects.create(kind="push", deduplication_key=f"ring:{session_id}", payload={
                 "kind": "ring", "scope_id": scope_id, "group_id": str(group_id), "session_id": session_id,
-                "actor_id": identity.pk, "expires_at": expires_at.isoformat(),
+                "actor_id": identity.pk, "expires_at": expires_at,
             })
     else:
         DeliveryWork.objects.filter(deduplication_key=f"ring:{session_id}").delete()

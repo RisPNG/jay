@@ -208,10 +208,12 @@ def test_group_ring_reaches_connected_members_and_stops_on_release(client, group
             assert started["actor_id"] == "2" * 64
             assert started["actor_label"] == "Bob"
             assert started["group_label"] == group.name
+            assert started["expires_at"].endswith("Z")
             assert timezone.now() < datetime.fromisoformat(started["expires_at"])
             assert "event: sync" not in body
             renewed, _ = await receive_ring(stream, True)
             assert renewed["session_id"] == started["session_id"]
+            assert renewed["expires_at"].endswith("Z")
             await hold.send_input({"type": "http.disconnect"})
             await hold.wait(timeout=5)
             stopped, _ = await receive_ring(stream, False)
@@ -239,6 +241,7 @@ def test_group_ring_wake_is_queued_once_and_removed_on_release(client, group, se
         "kind": "ring", "scope_id": str(group.scope_id), "group_id": str(group.pk),
         "session_id": session_id, "actor_id": identity_id, "expires_at": work.payload["expires_at"],
     }
+    assert work.payload["expires_at"].endswith("Z")
     assert 0 < (datetime.fromisoformat(work.payload["expires_at"]) - timezone.now()).total_seconds() <= 5
     publish_group_ring(authorization, identity_id, group.pk, session_id)
     assert list(DeliveryWork.objects.filter(deduplication_key=f"ring:{session_id}").values_list("payload", flat=True)) == [work.payload]
