@@ -850,10 +850,8 @@ class TimerService : Service() {
         val finishedNotificationId = finishedNotificationId(timerObject)
         val ring = ringingTimers[timerObject.id]
         val ringing = ring != null && rangFor == null
-        val alertShowing = alertedTimerId == timerObject.id
-        // the ring announces itself once, and again whenever the screen that was answering for it
-        // goes away; the counting that follows is the same announcement wearing a newer number
-        val announces = ringing && RingingCoordinator.selected === ring && announcing && !alertShowing
+        val alertEligible = ringing && RingingCoordinator.selected === ring && alertedTimerId != timerObject.id
+        val announces = alertEligible && announcing
 
         val stopIntent = updateStateIntent(ACTION_STOP, timerObject.id).apply {
             ring?.let { putExtra(RINGING_SINCE_EXTRA_KEY, it.ringingSince) }
@@ -932,14 +930,16 @@ class TimerService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setDeleteIntent(deletePendingIntent)
             .setOngoing(false)
-            .setSilent(!announces)
+            .setSilent(!alertEligible)
+            .setOnlyAlertOnce(!announces)
             .apply {
                 if (ringing) {
                     setColorized(true)
                     setColor(TextColor.PrimaryDark.getColorValue(this@TimerService))
                 }
-                if (announces && fullScreenAlertEnabled) {
-                    setFullScreenIntent(alertPendingIntent, true)
+                if (announces) {
+                    setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+                    if (fullScreenAlertEnabled) setFullScreenIntent(alertPendingIntent, true)
                 }
             }
             .addAction(stopAction)
