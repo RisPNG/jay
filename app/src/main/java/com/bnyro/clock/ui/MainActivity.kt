@@ -75,6 +75,7 @@ class MainActivity : AppCompatActivity() {
                 timerService.enqueueNew(it)
             }
             timerModel.updateTimer = timerService::updateTimer
+            timerModel.openRingingTimer = timerService::openRingingTimer
 
             timerService.invokeChangeListener()
         }
@@ -83,6 +84,7 @@ class MainActivity : AppCompatActivity() {
             timerService.onChangeTimers = {}
             timerModel.onEnqueue = null
             timerModel.updateTimer = { _, _ -> }
+            timerModel.openRingingTimer = {}
         }
     }
 

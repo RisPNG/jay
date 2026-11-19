@@ -505,6 +505,7 @@ class TimerService : Service() {
             ?.let { it to endRinging(it, keepAlert = true) }
 
         ringingTimerId = timerObject.id
+        timerObject.isRinging.value = true
         ringingSince = System.currentTimeMillis()
         lastRungSeconds = 0
         NotificationManagerCompat.from(this).cancel(timerObject.id)
@@ -535,6 +536,7 @@ class TimerService : Service() {
         ringTimeout?.cancel()
         ringTimeout = null
         ringingTimerId = null
+        timerObject.isRinging.value = false
         if (!keepAlert) closeAlert(timerObject)
         return rangFor
     }
@@ -563,6 +565,12 @@ class TimerService : Service() {
 
     private fun finishedNotificationId(timerObject: TimerObject) =
         (Integer.MAX_VALUE / 3) + timerObject.id * 10
+
+    fun openRingingTimer(id: Int) {
+        if (id != ringingTimerId) return
+        val timerObject = timerObjects.firstOrNull { it.id == id } ?: return
+        startActivity(alertIntent(timerObject))
+    }
 
     /**
      * The screen a finished timer takes over the phone with, named after the timer it belongs to so
@@ -765,6 +773,8 @@ class TimerService : Service() {
     }
 
     override fun onDestroy() {
+        timerObjects.firstOrNull { it.id == ringingTimerId }?.isRinging?.value = false
+        ringingTimerId = null
         releaseWakeLock()
         runCatching {
             unregisterReceiver(receiver)

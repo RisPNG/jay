@@ -65,7 +65,10 @@ fun TimerItem(
         modifier = modifier
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .clip(cardShape)
-            .clickable(onClick = onEdit),
+            .clickable {
+                if (obj.isRinging.value) timerModel.openRingingTimer(obj.id)
+                else onEdit()
+            },
         shape = cardShape,
         colors = CardDefaults.elevatedCardColors()
     ) {

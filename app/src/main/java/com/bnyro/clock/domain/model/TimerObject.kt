@@ -21,6 +21,8 @@ data class TimerObject(
     var vibrationPatternName: String = "Default",
     var incrementSeconds: Int? = null
 ) {
+    val isRinging = mutableStateOf(false)
+
     val secondsLeft: Int
         get() = ceil(currentPosition.value / 1000.0).toInt()
 
