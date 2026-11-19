@@ -20,6 +20,8 @@ class SocialApiProtocolTest {
         val authorization: String?,
         val identity: String?,
         val installation: String?,
+        val ringOrigin: String?,
+        val ringPushTokenDigest: String?,
         val accept: String?,
         val operationId: String?,
         val body: String
@@ -34,7 +36,8 @@ class SocialApiProtocolTest {
             requests += Request(
                 path, exchange.requestMethod, exchange.requestHeaders.getFirst("X-Jay-Protocol"),
                 exchange.requestHeaders.getFirst("Authorization"), exchange.requestHeaders.getFirst("X-Jay-Identity-ID"),
-                exchange.requestHeaders.getFirst("X-Jay-Installation"), exchange.requestHeaders.getFirst("Accept"),
+                exchange.requestHeaders.getFirst("X-Jay-Installation"), exchange.requestHeaders.getFirst("X-Jay-Ring-Origin"),
+                exchange.requestHeaders.getFirst("X-Jay-Ring-Push-Token-Digest"), exchange.requestHeaders.getFirst("Accept"),
                 exchange.requestHeaders.getFirst("Idempotency-Key"), exchange.requestBody.bufferedReader().use { it.readText() }
             )
             val body = when (path) {
@@ -69,7 +72,9 @@ class SocialApiProtocolTest {
                 changes += it
                 listening = false
             }
-            api.holdGroupRing("group")
+            val origin = "fcc8c006-4202-49da-b4ab-75c83a705c73"
+            val pushTokenDigest = "a".repeat(64)
+            api.holdGroupRing("group", origin, pushTokenDigest)
 
             assertEquals(6, requests.size)
             assertTrue(requests.all { it.protocol == "3" })
@@ -89,6 +94,9 @@ class SocialApiProtocolTest {
             assertEquals("text/event-stream", requests.single { it.path == "/v1/events" }.accept)
             val ring = requests.single { it.path == "/v1/groups/group/ring" }
             assertEquals("POST", ring.method)
+            assertEquals(origin, ring.ringOrigin)
+            assertEquals(pushTokenDigest, ring.ringPushTokenDigest)
+            assertTrue(requests.filter { it !== ring }.all { it.ringOrigin == null && it.ringPushTokenDigest == null })
             assertEquals("text/event-stream", ring.accept)
             assertNull(ring.operationId)
             assertEquals("", ring.body)

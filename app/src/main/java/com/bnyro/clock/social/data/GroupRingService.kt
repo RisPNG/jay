@@ -91,6 +91,7 @@ class GroupRingService : Service() {
     }
 
     fun receive(event: JsonObject?) {
+        if (event?.get("origin")?.jsonPrimitive?.contentOrNull == SocialRepository.groupRingOrigin) return
         event?.let {
             val session = requireNotNull(it["session_id"]).jsonPrimitive.content
             pending.remove(session)

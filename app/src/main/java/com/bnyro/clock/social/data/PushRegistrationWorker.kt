@@ -9,6 +9,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.bnyro.clock.App
+import java.security.MessageDigest
 
 class PushRegistrationWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
@@ -23,7 +24,12 @@ class PushRegistrationWorker(context: Context, parameters: WorkerParameters) :
     companion object {
         private const val PUSH_TOKEN = "push_token"
 
+        @Volatile
+        internal var tokenDigest: String? = null
+            private set
+
         fun enqueue(context: Context, token: String) {
+            tokenDigest = MessageDigest.getInstance("SHA-256").digest(token.toByteArray()).joinToString("") { "%02x".format(it) }
             WorkManager.getInstance(context).enqueue(
                 OneTimeWorkRequestBuilder<PushRegistrationWorker>()
                     .setConstraints(

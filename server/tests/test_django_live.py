@@ -72,6 +72,31 @@ def test_malformed_ring_routes_retain_http_limits(settings, path, limit, status)
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize("header", [
+    (b"x-jay-ring-origin", b"not-a-uuid"),
+    (b"x-jay-ring-push-token-digest", b"A" * 64),
+    (b"x-jay-ring-push-token-digest", b"a" * 63),
+])
+def test_group_ring_rejects_an_invalid_origin_header(header):
+    async def scenario():
+        application = Application()
+        hold = ApplicationCommunicator(application, {
+            "type": "http", "method": "POST", "path": f"/v1/groups/{uuid4()}/ring",
+            "headers": [(b"host", b"testserver"), header],
+        })
+        try:
+            await hold.send_input({"type": "http.request", "body": b""})
+            assert (await hold.receive_output(timeout=5))["status"] == 400
+            await hold.receive_output(timeout=5)
+            await hold.wait(timeout=5)
+            assert not application.broker.ringers
+        finally:
+            hold.stop()
+            await application.broker.stop()
+
+    asyncio.run(scenario())
+
+
 def test_group_ring_uses_live_connection_capacity(client, group, settings):
     settings.MAX_EVENT_CONNECTIONS = 1
 
@@ -177,21 +202,36 @@ async def receive_ring(stream, active):
                     return event, body
 
 
-@pytest.mark.parametrize("protocol", [None, "2", "3"])
-def test_group_ring_reaches_connected_members_and_stops_on_release(client, group, member, protocol):
+@pytest.mark.parametrize(("protocol", "tagged", "same_profile"), [
+    (None, False, False), ("2", False, False), ("3", False, False),
+    ("3", True, False), ("3", True, True),
+])
+def test_group_ring_reaches_connected_members_and_stops_on_release(client, group, member, settings, protocol, tagged, same_profile):
+    origin = str(uuid4()) if tagged else None
+    push_token_digest = "a" * 64
+    if tagged:
+        settings.FIREBASE_CREDENTIALS_JSON = "configured"
+    holder_token = ("Bearer " + "another-secret" * 5).encode()
+    holder_id = b"2" * 64
+    listener_token = holder_token if same_profile else ("Bearer " + "secret" * 10).encode()
+    listener_id = holder_id if same_profile else b"1" * 64
+
     async def scenario():
         sender_application = Application()
         receiver_broker, sender_broker = LiveBroker(), sender_application.broker
         await receiver_broker.start()
         await sender_broker.start()
         protocol_headers = [(b"x-jay-protocol", protocol.encode())] if protocol is not None else []
+        origin_headers = [
+            (b"x-jay-ring-origin", origin.encode()), (b"x-jay-ring-push-token-digest", push_token_digest.encode()),
+        ] if origin is not None else []
         stream = ApplicationCommunicator(EventConsumer.as_asgi(), {
             "type": "http", "method": "GET", "path": "/v1/events", "jay.broker": receiver_broker,
-            "headers": [(b"host", b"testserver"), (b"authorization", ("Bearer " + "secret" * 10).encode()), (b"x-jay-identity-id", b"1" * 64), *protocol_headers],
+            "headers": [(b"host", b"testserver"), (b"authorization", listener_token), (b"x-jay-identity-id", listener_id), *protocol_headers],
         })
         hold = ApplicationCommunicator(sender_application, {
             "type": "http", "method": "POST", "path": f"/v1/groups/{group.pk}/ring",
-            "headers": [(b"host", b"testserver"), (b"authorization", ("Bearer " + "another-secret" * 5).encode()), (b"x-jay-identity-id", b"2" * 64), *protocol_headers],
+            "headers": [(b"host", b"testserver"), (b"authorization", holder_token), (b"x-jay-identity-id", holder_id), *protocol_headers, *origin_headers],
         })
         try:
             await asyncio.wait_for(receiver_broker.ready.wait(), timeout=5)
@@ -214,10 +254,20 @@ def test_group_ring_reaches_connected_members_and_stops_on_release(client, group
             renewed, _ = await receive_ring(stream, True)
             assert renewed["session_id"] == started["session_id"]
             assert renewed["expires_at"].endswith("Z")
+            assert "origin_push_digest" not in started and "origin_push_digest" not in renewed
+            if tagged:
+                work = await DeliveryWork.objects.aget(deduplication_key=f"ring:{started['session_id']}")
+                assert work.payload["origin_push_digest"] == push_token_digest
+            if origin is None or not same_profile:
+                assert "origin" not in started and "origin" not in renewed
+            else:
+                assert started["origin"] == renewed["origin"] == origin
             await hold.send_input({"type": "http.disconnect"})
             await hold.wait(timeout=5)
             stopped, _ = await receive_ring(stream, False)
             assert stopped["session_id"] == started["session_id"]
+            assert "origin" not in stopped
+            assert "origin_push_digest" not in stopped
             assert not sender_broker.ringers
             await stream.send_input({"type": "http.disconnect"})
             await stream.wait(timeout=5)
@@ -230,20 +280,23 @@ def test_group_ring_reaches_connected_members_and_stops_on_release(client, group
     asyncio.run(scenario())
 
 
-def test_group_ring_wake_is_queued_once_and_removed_on_release(client, group, settings):
+@pytest.mark.parametrize("tagged", [False, True])
+def test_group_ring_wake_is_queued_once_and_removed_on_release(client, group, settings, tagged):
     settings.FIREBASE_CREDENTIALS_JSON = "configured"
     session_id = str(uuid4())
+    origin = str(uuid4()) if tagged else None
     authorization, identity_id = "Bearer " + "secret" * 10, "1" * 64
-    scope_id = publish_group_ring(authorization, identity_id, group.pk, session_id, wake=True)
+    scope_id = publish_group_ring(authorization, identity_id, group.pk, session_id, wake=True, origin=origin)
     work = DeliveryWork.objects.get(deduplication_key=f"ring:{session_id}")
     assert work.kind == "push"
     assert work.payload == {
         "kind": "ring", "scope_id": str(group.scope_id), "group_id": str(group.pk),
         "session_id": session_id, "actor_id": identity_id, "expires_at": work.payload["expires_at"],
+        **({"origin": origin} if tagged else {}),
     }
     assert work.payload["expires_at"].endswith("Z")
     assert 0 < (datetime.fromisoformat(work.payload["expires_at"]) - timezone.now()).total_seconds() <= 5
-    publish_group_ring(authorization, identity_id, group.pk, session_id)
+    publish_group_ring(authorization, identity_id, group.pk, session_id, origin=origin)
     assert list(DeliveryWork.objects.filter(deduplication_key=f"ring:{session_id}").values_list("payload", flat=True)) == [work.payload]
     publish_group_ring(authorization, identity_id, group.pk, session_id, scope_id)
     assert not DeliveryWork.objects.filter(pk=work.pk).exists()

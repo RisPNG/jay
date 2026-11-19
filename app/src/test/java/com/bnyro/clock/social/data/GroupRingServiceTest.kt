@@ -86,6 +86,31 @@ class GroupRingServiceTest {
     }
 
     @Test
+    fun anOutgoingRingIsSilentWhileAnotherInstallationOnTheSameProfileCanRing() {
+        val actor = DeviceIdentityStore.loadOrCreate(app, "http://127.0.0.1:1").id
+        val ownRing = Json.parseToJsonElement("""{"session_id":"own-ring","active":true,"lease_seconds":5,"actor_id":"$actor","actor_label":"Alice","group_label":"Family","origin":"${SocialRepository.groupRingOrigin}"}""").jsonObject
+        val incomingRing = Json.parseToJsonElement("""{"session_id":"incoming-ring","active":true,"lease_seconds":5,"actor_id":"$actor","actor_label":"Alice","group_label":"Family","origin":"fcc8c006-4202-49da-b4ab-75c83a705c73"}""").jsonObject
+
+        service.receive(ownRing)
+
+        assertNull(RingingCoordinator.selected)
+        assertNull(shadowOf(app).nextStartedService)
+        assertTrue(notifications.activeNotifications.isEmpty())
+
+        service.receive(incomingRing)
+        service.receive(ownRing)
+        service.receive(Json.parseToJsonElement("""{"session_id":"own-ring","active":false,"lease_seconds":5}""").jsonObject)
+
+        assertNotNull(RingingCoordinator.selected)
+        assertEquals("Alice is ringing Family", notifications.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+
+        service.receive(Json.parseToJsonElement("""{"session_id":"incoming-ring","active":false,"lease_seconds":5}""").jsonObject)
+
+        assertNull(RingingCoordinator.selected)
+        assertTrue(notifications.activeNotifications.isEmpty())
+    }
+
+    @Test
     fun aPushWaitsSilentlyThroughStreamResetAndExpiresWithoutAFreshLease() {
         service.onStartCommand(
             Intent(app, GroupRingService::class.java).setAction(GroupRingService.ACTION_WAKE)

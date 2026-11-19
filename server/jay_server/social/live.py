@@ -1,11 +1,12 @@
 import asyncio
 import json
 import logging
-from uuid import uuid4
+import re
 from contextlib import suppress
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import UTC, timedelta
+from uuid import UUID, uuid4
 
 from channels.consumer import AsyncConsumer
 from channels.db import database_sync_to_async
@@ -47,7 +48,7 @@ def authorize_stream(authorization, identity_id):
 
 
 @transaction.atomic
-def publish_group_ring(authorization, identity_id, group_id, session_id, scope_id=None, wake=False):
+def publish_group_ring(authorization, identity_id, group_id, session_id, scope_id=None, wake=False, *, origin=None, push_token_digest=None):
     lease_seconds = 5
     if scope_id is None:
         identity = authenticate_identity(authorization, identity_id)
@@ -59,17 +60,21 @@ def publish_group_ring(authorization, identity_id, group_id, session_id, scope_i
         active = True
     else:
         active = False
-    payload = {"scope_id": scope_id, "group_id": str(group_id), "session_id": session_id, "active": active, "lease_seconds": lease_seconds}
+    payload = {"scope_id": scope_id, "group_id": str(group_id), "session_id": session_id}
     if active:
         expires_at = DateTimeField(format="iso-8601", default_timezone=UTC).to_representation(timezone.now() + timedelta(seconds=lease_seconds))
-        payload.update(actor_id=identity.pk, actor_label=identity.name, group_label=group.name, expires_at=expires_at)
+        payload.update(actor_id=identity.pk, expires_at=expires_at)
+        if origin is not None:
+            payload["origin"] = origin
         if wake and settings.FIREBASE_CREDENTIALS_JSON:
-            DeliveryWork.objects.create(kind="push", deduplication_key=f"ring:{session_id}", payload={
-                "kind": "ring", "scope_id": scope_id, "group_id": str(group_id), "session_id": session_id,
-                "actor_id": identity.pk, "expires_at": expires_at,
-            })
+            wake_payload = {"kind": "ring", **payload}
+            if push_token_digest is not None:
+                wake_payload["origin_push_digest"] = push_token_digest
+            DeliveryWork.objects.create(kind="push", deduplication_key=f"ring:{session_id}", payload=wake_payload)
+        payload.update(actor_label=identity.name, group_label=group.name)
     else:
         DeliveryWork.objects.filter(deduplication_key=f"ring:{session_id}").delete()
+    payload.update(active=active, lease_seconds=lease_seconds)
     with connection.cursor() as cursor:
         cursor.execute("SELECT pg_notify('jay_rings', %s)", [json.dumps(payload, separators=(",", ":"))])
     return scope_id
@@ -216,7 +221,10 @@ class EventConsumer(AsyncConsumer):
                     body += 'event: ring_reset\ndata: {}\n\n'
                 for ring in rings:
                     if ring["scope_id"] in self.subscription.scopes:
-                        body += "event: ring\ndata: " + json.dumps({key: value for key, value in ring.items() if key != "scope_id"}, separators=(",", ":")) + "\n\n"
+                        frame = {key: value for key, value in ring.items() if key != "scope_id"}
+                        if ring.get("actor_id") != self.subscription.identity_id:
+                            frame.pop("origin", None)
+                        body += "event: ring\ndata: " + json.dumps(frame, separators=(",", ":")) + "\n\n"
                 if body:
                     await asyncio.wait_for(self.send({"type": "http.response.body", "body": body.encode(), "more_body": True}), timeout=5)
         except (APIException, DatabaseError, OSError, TimeoutError):
@@ -245,7 +253,17 @@ class GroupRingConsumer(AsyncConsumer):
             return
         headers = {key.lower(): value.decode("latin1") for key, value in self.scope["headers"]}
         domain, _ = split_domain_port(headers.get(b"host", ""))
-        if self.scope["method"] != "POST" or event.get("body") or event.get("more_body") or not validate_host(domain, settings.ALLOWED_HOSTS):
+        origin_header = headers.get(b"x-jay-ring-origin")
+        push_token_digest = headers.get(b"x-jay-ring-push-token-digest")
+        self.origin = None
+        if origin_header is not None:
+            with suppress(ValueError):
+                self.origin = str(UUID(origin_header))
+        if (
+            self.scope["method"] != "POST" or event.get("body") or event.get("more_body")
+            or not validate_host(domain, settings.ALLOWED_HOSTS) or (origin_header is not None and self.origin is None)
+            or (push_token_digest is not None and not re.fullmatch(r"[0-9a-f]{64}", push_token_digest))
+        ):
             await self.send({"type": "http.response.start", "status": 400, "headers": []})
             await self.send({"type": "http.response.body", "body": b"Invalid ring request"})
             raise StopConsumer()
@@ -261,7 +279,10 @@ class GroupRingConsumer(AsyncConsumer):
         self.broker.ringers[self.session_id] = None
         try:
             self.broker.authenticating += 1
-            self.scope_id = await database_sync_to_async(publish_group_ring, thread_sensitive=False, executor=self.broker.executor)(self.authorization, self.identity_id, self.group_id, self.session_id, wake=True)
+            self.scope_id = await database_sync_to_async(publish_group_ring, thread_sensitive=False, executor=self.broker.executor)(
+                self.authorization, self.identity_id, self.group_id, self.session_id,
+                wake=True, origin=self.origin, push_token_digest=push_token_digest,
+            )
         except (APIException, DatabaseError) as error:
             self.broker.ringers.pop(self.session_id, None)
             status = error.status_code if isinstance(error, APIException) else 503
@@ -280,7 +301,7 @@ class GroupRingConsumer(AsyncConsumer):
             while True:
                 await asyncio.wait_for(self.send({"type": "http.response.body", "body": b": ringing\n\n", "more_body": True}), timeout=3)
                 await asyncio.sleep(2)
-                await database_sync_to_async(publish_group_ring, thread_sensitive=False, executor=self.broker.executor)(self.authorization, self.identity_id, self.group_id, self.session_id)
+                await database_sync_to_async(publish_group_ring, thread_sensitive=False, executor=self.broker.executor)(self.authorization, self.identity_id, self.group_id, self.session_id, origin=self.origin)
         except (APIException, DatabaseError, OSError, TimeoutError):
             with suppress(OSError, TimeoutError):
                 await asyncio.wait_for(self.send({"type": "http.response.body", "body": b"", "more_body": False}), timeout=1)

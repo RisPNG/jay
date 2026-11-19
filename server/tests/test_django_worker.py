@@ -1,6 +1,7 @@
 import asyncio
 import threading
 from datetime import timedelta
+from hashlib import sha256
 from io import StringIO
 from types import SimpleNamespace
 from uuid import uuid4
@@ -133,19 +134,46 @@ def test_mixed_app_versions_on_one_profile_only_receive_supported_pushes(ring_wa
     assert push_recipients(ring_wake) == [("current", "1" * 64), ("legacy", "1" * 64)]
 
 
-@pytest.mark.parametrize("ring", [False, True])
-def test_push_provider_delivers_scoped_ring_wakes_and_existing_syncs(ring_wake, settings, monkeypatch, ring):
+@pytest.mark.parametrize("token_owner", ["1" * 64, "2" * 64])
+def test_ring_wake_skips_only_the_senders_matching_token_and_keeps_page_continuation(ring_wake, token_owner):
+    matching_token = "token-010"
+    subscriptions = [
+        PushSubscription(token=f"token-{index:03}", identity_id="2" * 64, group_ring_enabled=True)
+        for index in range(102)
+    ]
+    subscriptions[10].identity_id = token_owner
+    PushSubscription.objects.bulk_create(subscriptions)
+    ring_wake.payload["origin_push_digest"] = sha256(matching_token.encode()).hexdigest()
+    expected = [
+        (subscription.token, subscription.identity_id) for subscription in subscriptions
+        if subscription.token != matching_token or token_owner != "2" * 64
+    ]
+
+    page = push_recipients(ring_wake)
+    assert page == expected[:101]
+    ring_wake.payload["after_token"] = page[99][0]
+    assert push_recipients(ring_wake) == expected[100:]
+
+
+@pytest.mark.parametrize(("ring", "tagged"), [(False, False), (True, False), (True, True)])
+def test_push_provider_delivers_scoped_ring_wakes_and_existing_syncs(ring_wake, settings, monkeypatch, ring, tagged):
     import firebase_admin
     from firebase_admin import messaging
 
     settings.FIREBASE_CREDENTIALS_JSON = "configured"
     settings.PUBLIC_URL = "https://jay.example"
     DeliveryWork.objects.exclude(pk=ring_wake.pk).delete()
+    origin = str(uuid4()) if tagged else None
     if not ring:
         ring_wake.payload = {"scope_id": ring_wake.payload["scope_id"], "group_id": ring_wake.payload["group_id"], "revision": 1}
         ring_wake.save(update_fields=["payload"])
+    elif origin is not None:
+        ring_wake.payload["origin"] = origin
+        ring_wake.payload["origin_push_digest"] = sha256(b"bob").hexdigest()
+        ring_wake.save(update_fields=["payload"])
     PushSubscription.objects.create(token="alice", identity_id="1" * 64, group_ring_enabled=ring)
     PushSubscription.objects.create(token="bob", identity_id="2" * 64, group_ring_enabled=ring)
+    PushSubscription.objects.create(token="bob-other-device", identity_id="2" * 64, group_ring_enabled=ring)
     delivered = []
     monkeypatch.setattr(firebase_admin, "get_app", lambda: object())
 
@@ -167,14 +195,16 @@ def test_push_provider_delivers_scoped_ring_wakes_and_existing_syncs(ring_wake, 
 
     asyncio.run(scenario())
     assert not DeliveryWork.objects.filter(pk=ring_wake.pk).exists()
-    assert [message.token for message in delivered] == ["alice", "bob"]
-    for message, identity_id in zip(delivered, ["1" * 64, "2" * 64]):
+    assert [message.token for message in delivered] == (["alice", "bob-other-device"] if tagged else ["alice", "bob", "bob-other-device"])
+    for message in delivered:
+        identity_id = "1" * 64 if message.token == "alice" else "2" * 64
         assert message.android.priority == "high"
         if ring:
             assert message.android.ttl == 0
             assert message.data == {
                 "kind": "ring", "session_id": ring_wake.payload["session_id"], "group_id": ring_wake.payload["group_id"],
                 "identity_id": identity_id, "server_url": settings.PUBLIC_URL, "expires_at": ring_wake.payload["expires_at"],
+                **({"origin": origin} if tagged and identity_id == "2" * 64 else {}),
             }
         else:
             assert message.android.ttl is None

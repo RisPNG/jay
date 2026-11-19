@@ -220,12 +220,14 @@ class SocialApi(
         }
     }
 
-    suspend fun holdGroupRing(groupId: String) = coroutineScope {
+    suspend fun holdGroupRing(groupId: String, origin: String, pushTokenDigest: String?) = coroutineScope {
         val connection = URI("$baseUrl/v1/groups/$groupId/ring").toURL().openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
         connection.connectTimeout = 15_000
         connection.readTimeout = 7_000
         connection.setRequestProperty("X-Jay-Protocol", "3")
+        connection.setRequestProperty("X-Jay-Ring-Origin", origin)
+        pushTokenDigest?.let { connection.setRequestProperty("X-Jay-Ring-Push-Token-Digest", it) }
         connection.setRequestProperty("Accept", "text/event-stream")
         connection.setRequestProperty("Authorization", "Bearer ${identity.token}")
         connection.setRequestProperty("X-Jay-Identity-ID", identity.id)
