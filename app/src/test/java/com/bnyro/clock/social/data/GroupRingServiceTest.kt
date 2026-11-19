@@ -177,10 +177,21 @@ class GroupRingServiceTest {
                 .putExtra(GroupRingService.EXTRA_LEASE_MILLIS, 5_000L), 0, 1
         )
         assertNull(RingingCoordinator.selected)
+        val waiting = notifications.activeNotifications.single().notification
+        assertTrue(waiting.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
 
-        service.receive(Json.parseToJsonElement("""{"session_id":"cold","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject)
+        val lease = Json.parseToJsonElement("""{"session_id":"cold","group_id":"$familyGroupId","active":true,"lease_seconds":5,"actor_label":"Alice","group_label":"Family"}""").jsonObject
+        service.receive(lease)
         assertNotNull(RingingCoordinator.selected)
-        assertEquals("Alice is ringing Family", notifications.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+        val ringing = notifications.activeNotifications.single().notification
+        assertEquals("Alice is ringing Family", ringing.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+        assertFalse(ringing.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertNull(ringing.fullScreenIntent)
+        assertTrue(ringing.actions.isNullOrEmpty())
+
+        service.receive(lease)
+        val renewal = notifications.activeNotifications.single().notification
+        assertTrue(renewal.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
 
         service.receive(Json.parseToJsonElement("""{"session_id":"cold","group_id":"$familyGroupId","active":false,"lease_seconds":5}""").jsonObject)
 

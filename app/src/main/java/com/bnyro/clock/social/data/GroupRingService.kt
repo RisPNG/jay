@@ -64,9 +64,10 @@ class GroupRingService : Service() {
                 setReferenceCounted(false)
             }
         playback = GroupRingPlayback(this) { active, completed ->
+            val announces = active.any { ring -> rings.none { it["session_id"] == ring["session_id"] } }
             rings = active
             if (!destroying) {
-                updateRingingState()
+                updateRingingState(announces)
                 showCompletedRings(completed)
             }
         }
@@ -123,7 +124,7 @@ class GroupRingService : Service() {
         }
     }
 
-    private fun updateRingingState() {
+    private fun updateRingingState(announces: Boolean = false) {
         handler.removeCallbacks(pendingExpiry)
         val now = SystemClock.elapsedRealtime()
         pending.entries.removeAll { it.value <= now }
@@ -140,11 +141,11 @@ class GroupRingService : Service() {
             startService(Intent(this, GroupRingService::class.java))
         }
         wakeLock.acquire(10_000L)
-        showRingingNotification()
+        showRingingNotification(announces)
         pending.values.minOrNull()?.let { handler.postDelayed(pendingExpiry, it - now) }
     }
 
-    private fun showRingingNotification() {
+    private fun showRingingNotification(announces: Boolean = false) {
         val text = rings.mapNotNull {
             val actor = it["actor_label"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             val group = it["group_label"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
@@ -165,8 +166,8 @@ class GroupRingService : Service() {
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-                .setOnlyAlertOnce(true)
-                .setSilent(true)
+                .setOnlyAlertOnce(!announces)
+                .setSilent(rings.isEmpty())
                 .setOngoing(true)
                 .build()
         )
