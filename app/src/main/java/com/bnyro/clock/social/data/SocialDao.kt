@@ -121,7 +121,7 @@ interface SocialDao {
     @Query("SELECT * FROM social_groups ORDER BY name")
     fun getGroupsStream(): Flow<List<SocialGroup>>
 
-    @Query("SELECT * FROM social_members ORDER BY groupId, role DESC, name")
+    @Query("SELECT * FROM social_members ORDER BY groupId, joinedAtMicros IS NULL, joinedAtMicros, role DESC, name, deviceId")
     fun getMembersStream(): Flow<List<SocialMember>>
 
     @Query(

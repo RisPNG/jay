@@ -7,6 +7,7 @@ import com.bnyro.clock.ui.theme.DefaultLabelColor
 import kotlinx.serialization.Serializable
 import com.bnyro.clock.domain.model.TimerSettings
 import kotlinx.serialization.json.JsonObject
+import java.time.OffsetDateTime
 
 enum class AlarmPermission {
     EVERYONE,
@@ -75,7 +76,8 @@ data class SocialMember(
     val groupId: String,
     val deviceId: String,
     val name: String,
-    val role: MemberRole
+    val role: MemberRole,
+    val joinedAtMicros: Long? = null
 )
 
 @Entity(
@@ -320,8 +322,13 @@ data class SocialMemberDto(
     @SerialName("group_id") val groupId: String,
     @SerialName("identity_id") val deviceId: String,
     val name: String,
-    val role: String
-)
+    val role: String,
+    @SerialName("joined_at") val joinedAt: String? = null
+) {
+    val joinedAtMicros: Long?
+        get() = joinedAt?.let { runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+            ?.let { it.epochSecond * 1_000_000 + it.nano / 1_000 }
+}
 
 @Serializable
 data class SharedAlarmDto(

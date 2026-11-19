@@ -10,6 +10,7 @@ import com.bnyro.clock.social.domain.DismissedSharedTimer
 import com.bnyro.clock.social.domain.SharedAlarmLink
 import com.bnyro.clock.social.domain.SocialGroup
 import com.bnyro.clock.social.domain.SocialMember
+import com.bnyro.clock.social.domain.SocialMemberDto
 import com.bnyro.clock.social.domain.PendingOperation
 import com.bnyro.clock.social.domain.PendingSocialActivity
 import com.bnyro.clock.social.domain.StagedResource
@@ -36,7 +37,7 @@ import java.time.OffsetDateTime
         SyncedResource::class,
         SyncScopeState::class
     ],
-    version = 2
+    version = 3
 )
 abstract class SocialDatabase : RoomDatabase() {
     abstract fun socialDao(): SocialDao
@@ -83,12 +84,29 @@ abstract class SocialDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE social_members ADD COLUMN joinedAtMicros INTEGER")
+                val json = Json { ignoreUnknownKeys = true }
+                database.query("SELECT representation FROM sync_resources WHERE kind = 'member'").use { rows ->
+                    while (rows.moveToNext()) {
+                        val member = runCatching { json.decodeFromString<SocialMemberDto>(rows.getString(0)) }.getOrNull() ?: continue
+                        val joinedAt = member.joinedAtMicros ?: continue
+                        database.execSQL(
+                            "UPDATE social_members SET joinedAtMicros = ? WHERE groupId = ? AND deviceId = ?",
+                            arrayOf<Any>(joinedAt, member.groupId, member.deviceId)
+                        )
+                    }
+                }
+            }
+        }
+
         @Volatile
         private var instance: SocialDatabase? = null
 
         fun getDatabase(context: Context): SocialDatabase = instance ?: synchronized(this) {
             Room.databaseBuilder(context, SocialDatabase::class.java, "jay_social")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
                 .also { instance = it }
         }

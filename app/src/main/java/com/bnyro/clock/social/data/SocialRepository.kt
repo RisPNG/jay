@@ -290,7 +290,8 @@ class SocialRepository(
                     it.groupId,
                     it.deviceId,
                     it.name,
-                    MemberRole.valueOf(it.role.uppercase())
+                    MemberRole.valueOf(it.role.uppercase()),
+                    it.joinedAtMicros
                 )
             })
         }

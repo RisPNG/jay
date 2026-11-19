@@ -116,17 +116,18 @@ class SharedTimerMigrationTest {
                 sqlite.execSQL("DROP TABLE dismissed_shared_timers")
                 sqlite.execSQL("CREATE TABLE dismissed_shared_timers (timerId TEXT NOT NULL PRIMARY KEY, expiresAt INTEGER NOT NULL, timerExpiresAt INTEGER NOT NULL DEFAULT 0)")
                 sqlite.execSQL("INSERT INTO dismissed_shared_timers VALUES (?, ?, ?)", arrayOf<Any>(timerId, retentionExpiry, if (case.expiryKnown) timerExpiry else 0L))
+                sqlite.execSQL("ALTER TABLE social_members DROP COLUMN joinedAtMicros")
                 sqlite.version = 1
                 original.close()
                 upgraded = Room.databaseBuilder(context, SocialDatabase::class.java, name)
-                    .addMigrations(SocialDatabase.MIGRATION_1_2).build()
+                    .addMigrations(SocialDatabase.MIGRATION_1_2, SocialDatabase.MIGRATION_2_3).build()
                 val expected = if (case.preserved) listOf(DismissedSharedTimer(
                     timerId, memberId, case.runId ?: timerId, case.repeatIndex, retentionExpiry
                 )) else emptyList()
                 assertEquals(case.name, expected, upgraded.socialDao().getDismissedTimers())
                 assertEquals(case.name, resources.toSet(), upgraded.socialDao().getResources().toSet())
                 if (operation != null) assertEquals(case.name, operation, upgraded.socialDao().getOperation(operation.operationId))
-                assertEquals(case.name, 2, upgraded.openHelper.writableDatabase.version)
+                assertEquals(case.name, 3, upgraded.openHelper.writableDatabase.version)
                 upgraded.close()
                 upgraded = Room.databaseBuilder(context, SocialDatabase::class.java, name).build()
                 assertEquals(case.name, expected, upgraded.socialDao().getDismissedTimers())
