@@ -553,6 +553,7 @@ class TimerService : Service() {
         if (timerObject.id in ringingTimers) return
         val ring = TimerRing(timerObject)
         ringingTimers[timerObject.id] = ring
+        timerObject.isRinging.value = true
         NotificationManagerCompat.from(this).cancel(timerObject.id)
         handler.postDelayed(
             ring.timeout,
@@ -567,6 +568,7 @@ class TimerService : Service() {
 
     private fun endRinging(timerObject: TimerObject): Long {
         val ring = ringingTimers.remove(timerObject.id) ?: return 0L
+        ring.timerObject.isRinging.value = false
         handler.removeCallbacks(ring.timeout)
         RingingCoordinator.stop(ring)
         closeAlert(ring)
@@ -611,6 +613,11 @@ class TimerService : Service() {
 
     private fun finishedNotificationId(timerObject: TimerObject) =
         (Integer.MAX_VALUE / 3) + timerObject.id * 10
+
+    fun openRingingTimer(id: Int) {
+        val ring = ringingTimers[id] ?: return
+        startActivity(alertIntent(ring))
+    }
 
     /**
      * The screen a finished timer takes over the phone with, named after the timer it belongs to so
@@ -674,10 +681,8 @@ class TimerService : Service() {
         val finishedNotificationId = finishedNotificationId(timerObject)
         val ring = ringingTimers[timerObject.id]
         val ringing = ring != null && rangFor == null
-        val alertShowing = alertedTimerId == timerObject.id
-        // the ring announces itself once, and again whenever the screen that was answering for it
-        // goes away; the counting that follows is the same announcement wearing a newer number
-        val announces = ringing && RingingCoordinator.selected === ring && announcing && !alertShowing
+        val alertEligible = ringing && RingingCoordinator.selected === ring && alertedTimerId != timerObject.id
+        val announces = alertEligible && announcing
 
         val stopIntent = updateStateIntent(ACTION_STOP, timerObject.id).apply {
             ring?.let { putExtra(RINGING_SINCE_EXTRA_KEY, it.ringingSince) }
@@ -756,14 +761,16 @@ class TimerService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setDeleteIntent(deletePendingIntent)
             .setOngoing(false)
-            .setSilent(!announces)
+            .setSilent(!alertEligible)
+            .setOnlyAlertOnce(!announces)
             .apply {
                 if (ringing) {
                     setColorized(true)
                     setColor(TextColor.PrimaryDark.getColorValue(this@TimerService))
                 }
-                if (announces && fullScreenAlertEnabled) {
-                    setFullScreenIntent(alertPendingIntent, true)
+                if (announces) {
+                    setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+                    if (fullScreenAlertEnabled) setFullScreenIntent(alertPendingIntent, true)
                 }
             }
             .addAction(stopAction)
@@ -849,6 +856,7 @@ class TimerService : Service() {
         ringingTimers.clear()
         RingingCoordinator.stop(*rings.toTypedArray())
         rings.forEach {
+            it.timerObject.isRinging.value = false
             handler.removeCallbacks(it.timeout)
             closeAlert(it)
         }
