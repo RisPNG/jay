@@ -1,5 +1,6 @@
 package com.bnyro.clock.social.data
 
+import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -11,9 +12,11 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.bnyro.clock.App
 import com.bnyro.clock.R
+import com.bnyro.clock.domain.model.Permission
 import com.bnyro.clock.util.NotificationHelper
 import com.bnyro.clock.util.Preferences
 import com.bnyro.clock.util.widgets.TextColor
@@ -60,9 +63,12 @@ class GroupRingService : Service() {
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GroupRingService::Lock").apply {
                 setReferenceCounted(false)
             }
-        playback = GroupRingPlayback(this) {
-            rings = it
-            if (!destroying) updateRingingState()
+        playback = GroupRingPlayback(this) { active, completed ->
+            rings = active
+            if (!destroying) {
+                updateRingingState()
+                showCompletedRings(completed)
+            }
         }
         identityPreferences = getSharedPreferences("jay_identity", Context.MODE_PRIVATE)
         identityPreferences.registerOnSharedPreferenceChangeListener(profileListener)
@@ -165,6 +171,30 @@ class GroupRingService : Service() {
         foreground = true
     }
 
+    @SuppressLint("MissingPermission")
+    private fun showCompletedRings(completed: List<JsonObject>) {
+        if (completed.isEmpty() || !Permission.NotificationPermission.hasPermission(this)) return
+        val manager = NotificationManagerCompat.from(this)
+        for (ring in completed) {
+            val groupId = ring["group_id"]?.jsonPrimitive?.contentOrNull ?: continue
+            val actor = ring["actor_label"]?.jsonPrimitive?.contentOrNull ?: continue
+            val group = ring["group_label"]?.jsonPrimitive?.contentOrNull ?: continue
+            val text = getString(R.string.group_ring_completed, actor, group)
+            manager.notify(
+                "group-ring:$groupId",
+                COMPLETED_NOTIFICATION_ID,
+                NotificationCompat.Builder(this, NotificationHelper.ALARM_CHANNEL)
+                    .setSmallIcon(R.drawable.ic_notification)
+                    .setContentTitle(getString(R.string.group_ring_notification_title))
+                    .setContentText(text)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                    .setShowWhen(true)
+                    .setSilent(true)
+                    .build()
+            )
+        }
+    }
+
     override fun onDestroy() {
         destroying = true
         identityPreferences.unregisterOnSharedPreferenceChangeListener(profileListener)
@@ -185,6 +215,7 @@ class GroupRingService : Service() {
         const val EXTRA_EXPIRES_AT = "expires_at"
         const val EXTRA_LEASE_MILLIS = "lease_millis"
         const val NOTIFICATION_ID = 600_000_000
+        private const val COMPLETED_NOTIFICATION_ID = 600_000_001
         private val endedSessions = mutableMapOf<String, Long>()
     }
 }

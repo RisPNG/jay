@@ -1,3 +1,4 @@
+- Show who rang each group after the ring ends, keeping only the latest notice per group.
 - Make the phone holding the ring button vibrate while other devices ring, including devices on the same profile.
 - Fix an expiry timestamp that could prevent group rings from starting.
 - Fix timer expiry and notification behaviour when pausing or adjusting timers.

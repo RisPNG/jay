@@ -135,17 +135,20 @@ class GroupRingPlaybackTest {
     }
 
     @Test
-    fun leaseChangesReportTheRemainingCallersUntilTheirLastExpiry() {
-        val updates = mutableListOf<List<String>>()
-        playback = GroupRingPlayback(ApplicationProvider.getApplicationContext<Application>()) { events ->
-            updates.add(events.map { requireNotNull(it["session_id"]).jsonPrimitive.content })
+    fun leaseChangesReportActiveAndCompletedCallersUntilTheLastExpiry() {
+        val activeCallers = mutableListOf<List<String>>()
+        val completedCallers = mutableListOf<String>()
+        playback = GroupRingPlayback(ApplicationProvider.getApplicationContext<Application>()) { active, completed ->
+            activeCallers.add(active.map { requireNotNull(it["session_id"]).jsonPrimitive.content })
+            completed.mapTo(completedCallers) { requireNotNull(it["session_id"]).jsonPrimitive.content }
         }
         playback.receive(Json.parseToJsonElement("""{"session_id":"first","active":true,"lease_seconds":5}""").jsonObject)
         playback.receive(Json.parseToJsonElement("""{"session_id":"second","active":true,"lease_seconds":5}""").jsonObject)
         playback.receive(Json.parseToJsonElement("""{"session_id":"first","active":false,"lease_seconds":5}""").jsonObject)
         shadowOf(Looper.getMainLooper()).idleFor(5, TimeUnit.SECONDS)
 
-        assertEquals(listOf(listOf("first"), listOf("first", "second"), listOf("second"), emptyList()), updates)
+        assertEquals(listOf(listOf("first"), listOf("first", "second"), listOf("second"), emptyList()), activeCallers)
+        assertEquals(listOf("first", "second"), completedCallers)
     }
 
     @Test
