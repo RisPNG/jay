@@ -1,0 +1,5 @@
+- Make the phone holding the ring button vibrate while other devices ring, including devices on the same profile.
+- Fix an expiry timestamp that could prevent group rings from starting.
+- Fix timer expiry and notification behaviour when pausing or adjusting timers.
+- Update Estonian translations.
+- Keep existing group features working on Jay 1.2.5 to 1.2.7.
