@@ -26,7 +26,6 @@ import androidx.compose.material.icons.rounded.EventRepeat
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -140,14 +139,14 @@ fun RecurrencePicker(
     val startLocalDate = LocalDate.ofEpochDay(startDate)
 
     if (!advanced) {
-        SwitchItem(
-            title = stringResource(R.string.repeat),
-            isChecked = endOccurrences != 1,
-            onClick = { repeats -> onEndChange(null, 1.takeUnless { repeats }) },
-            enabled = enabled,
-            icon = Icons.Rounded.EventRepeat
-        )
-        AnimatedVisibility(visible = endOccurrences != 1) {
+        Column {
+            SwitchItem(
+                title = stringResource(R.string.repeat),
+                isChecked = endOccurrences != 1,
+                onClick = { repeats -> onEndChange(null, 1.takeUnless { repeats }) },
+                enabled = enabled,
+                icon = Icons.Rounded.EventRepeat
+            )
             WeekdaySelector(chosenDays, enabled)
         }
         return
