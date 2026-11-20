@@ -1,5 +1,4 @@
 package com.bnyro.clock.presentation.screens.alarmpicker.components
-
 import com.bnyro.clock.ui.theme.resolveLabelColor
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -265,11 +264,11 @@ fun AlarmPicker(
                     }
                 )
                 val vibrationPatternNameDisplay =
-    if (vibrationPatternName == "Default") {
-        stringResource(R.string.default_vibration_pattern)
-    } else {
-        vibrationPatternName
-    }
+                    if (vibrationPatternName == "Default") {
+                        stringResource(R.string.default_vibration_pattern)
+                    } else {
+                        vibrationPatternName
+                    }
 
                 SwitchWithDivider(
                     title = stringResource(R.string.vibrate),
@@ -341,6 +340,8 @@ fun AlarmPicker(
             }
             Spacer(modifier = Modifier.width(16.dp))
             Button(onClick = {
+                val isOneTimeScheduled = !advanced && chosenDays.isNotEmpty() && repeatInterval == 0
+
                 val alarm =
                     currentAlarm.copy(
                         time = (hours * 60 + minutes) * 60 * 1000L,
@@ -361,11 +362,11 @@ fun AlarmPicker(
                         startDate = startDate,
                         repeatDuration = repeatDuration,
                         repeatDurationUnit = repeatDurationUnit,
-                        repeatInterval = repeatInterval,
+                        repeatInterval = if (isOneTimeScheduled) 0 else repeatInterval,
                         repeatUnit = repeatUnit,
                         repeatAnchor = repeatAnchor,
-                        endDate = endDate,
-                        endOccurrences = endOccurrences,
+                        endDate = if (isOneTimeScheduled) null else endDate,
+                        endOccurrences = if (isOneTimeScheduled) 1 else endOccurrences,
                         advanced = advanced
                     )
                 onSave(alarm)
