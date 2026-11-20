@@ -282,8 +282,8 @@ fun AlarmScreen(
                     }
                 }
             }
-        }) { pv ->
-
+        }
+    ) { pv ->
         Row(Modifier.fillMaxSize().padding(pv)) {
             if (isLandscape) {
                 Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
