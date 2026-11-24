@@ -55,6 +55,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.material.icons.rounded.HourglassBottom
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModelProvider
 import com.bnyro.clock.BuildConfig
@@ -104,6 +105,8 @@ fun SettingsScreen(
     var showTimerVolumeRampDialog by remember { mutableStateOf(false) }
     var showDefaultRingtoneDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showDefaultAlarmRingtoneDialog by remember { mutableStateOf(false) }
+    var showDefaultTimerRingtoneDialog by remember { mutableStateOf(false) }
 
     val currentLanguageTag = Preferences.instance.getString(Preferences.languageKey, "") ?: ""
 
@@ -475,6 +478,14 @@ fun SettingsScreen(
                 }
             }
 
+            IconPreference(
+                title = stringResource(R.string.sound),
+                summary = settingsModel.defaultTimerSoundName ?: stringResource(R.string.default_sound),
+                imageVector = Icons.Rounded.HourglassBottom
+            ) {
+                showDefaultTimerRingtoneDialog = true
+            }
+
             ButtonGroupPref(
                 title = stringResource(R.string.timer_picker_behaviour),
                 options = TimerPickerBehaviour.entries.map {
@@ -713,6 +724,32 @@ fun SettingsScreen(
                 showTimerVolumeRampDialog = false
             }
         )
+    }
+
+    if (showDefaultAlarmRingtoneDialog) {
+        RingtonePickerDialog(
+            onDismissRequest = { showDefaultAlarmRingtoneDialog = false }
+        ) { title, uri ->
+            settingsModel.defaultAlarmSoundUri = uri?.toString()
+            settingsModel.defaultAlarmSoundName = title
+            Preferences.edit {
+                putString(Preferences.defaultAlarmSoundUriKey, uri?.toString())
+                putString(Preferences.defaultAlarmSoundNameKey, title)
+            }
+        }
+    }
+
+    if (showDefaultTimerRingtoneDialog) {
+        RingtonePickerDialog(
+            onDismissRequest = { showDefaultTimerRingtoneDialog = false }
+        ) { title, uri ->
+            settingsModel.defaultTimerSoundUri = uri?.toString()
+            settingsModel.defaultTimerSoundName = title
+            Preferences.edit {
+                putString(Preferences.defaultTimerSoundUriKey, uri?.toString())
+                putString(Preferences.defaultTimerSoundNameKey, title)
+            }
+        }
     }
 }
 

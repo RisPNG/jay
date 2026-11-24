@@ -267,9 +267,16 @@ class TimerService : Service() {
     private fun play(settings: TimerSettings) {
         stopAudio()
         if (settings.soundEnabled) {
-            val alert: Uri = settings.soundUri?.toUri() ?: RingtoneManager.getDefaultUri(
-                RingtoneManager.TYPE_ALARM
-            )
+            val defaultTimerSoundUri = Preferences.instance
+                .getString(Preferences.defaultTimerSoundUriKey, null)
+                ?.takeIf { it.isNotBlank() }
+                ?.toUri()
+
+            val alert: Uri = settings.soundUri
+                ?.takeIf { it.isNotBlank() }
+                ?.toUri()
+                ?: defaultTimerSoundUri
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
 
             mediaPlayer = MediaPlayer()
 
