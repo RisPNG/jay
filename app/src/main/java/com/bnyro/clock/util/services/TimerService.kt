@@ -266,7 +266,9 @@ class TimerService : Service() {
         stopAudio()
         if (settings.soundEnabled) {
             ringingAudio.start(
-                settings.soundUri,
+                settings.soundUri?.takeIf { it.isNotBlank() }
+                    ?: Preferences.instance.getString(Preferences.defaultTimerSoundUriKey, null)
+                        ?.takeIf { it.isNotBlank() },
                 Preferences.instance.getInt(Preferences.timerVolumeRampSecondsKey, 0),
                 deadline
             )
