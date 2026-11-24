@@ -116,7 +116,6 @@ fun SettingsScreen(
     var showTimerVolumeRampDialog by remember { mutableStateOf(false) }
     var showDefaultRingtoneDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
-    var showDefaultAlarmRingtoneDialog by remember { mutableStateOf(false) }
     var showDefaultTimerRingtoneDialog by remember { mutableStateOf(false) }
 
     val displayLocale = LocalConfiguration.current.locales[0]
@@ -776,19 +775,6 @@ fun SettingsScreen(
                 showTimerVolumeRampDialog = false
             }
         )
-    }
-
-    if (showDefaultAlarmRingtoneDialog) {
-        RingtonePickerDialog(
-            onDismissRequest = { showDefaultAlarmRingtoneDialog = false }
-        ) { title, uri ->
-            settingsModel.defaultAlarmSoundUri = uri?.toString()
-            settingsModel.defaultAlarmSoundName = title
-            Preferences.edit {
-                putString(Preferences.defaultAlarmSoundUriKey, uri?.toString())
-                putString(Preferences.defaultAlarmSoundNameKey, title)
-            }
-        }
     }
 
     if (showDefaultTimerRingtoneDialog) {
